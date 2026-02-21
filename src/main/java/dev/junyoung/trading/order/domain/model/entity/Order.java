@@ -1,5 +1,10 @@
-package dev.junyoung.trading.order.domain.model;
+package dev.junyoung.trading.order.domain.model.entity;
 
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 import lombok.Getter;
 
 import java.time.Instant;

@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.domain.model;
+package dev.junyoung.trading.order.domain.model.value;
 
 import java.util.Objects;
 import java.util.UUID;

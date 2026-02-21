@@ -9,11 +9,11 @@ import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.TreeMap;
 
-import dev.junyoung.trading.order.domain.model.Order;
-import dev.junyoung.trading.order.domain.model.OrderId;
-import dev.junyoung.trading.order.domain.model.OrderStatus;
-import dev.junyoung.trading.order.domain.model.Price;
-import dev.junyoung.trading.order.domain.model.Side;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 
 /**
  * 단일 종목 호가창. bids(매수 내림차순) / asks(매도 오름차순), 동일 가격 FIFO.

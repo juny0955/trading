@@ -6,6 +6,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.*;
 
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+
 @DisplayName("Order")
 class OrderTest {
 

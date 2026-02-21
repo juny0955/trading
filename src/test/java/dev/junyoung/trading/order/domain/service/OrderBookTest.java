@@ -1,10 +1,10 @@
 package dev.junyoung.trading.order.domain.service;
 
-import dev.junyoung.trading.order.domain.model.Order;
-import dev.junyoung.trading.order.domain.model.OrderId;
-import dev.junyoung.trading.order.domain.model.Price;
-import dev.junyoung.trading.order.domain.model.Quantity;
-import dev.junyoung.trading.order.domain.model.Side;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

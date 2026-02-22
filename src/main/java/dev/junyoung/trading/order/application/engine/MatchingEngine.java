@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import lombok.RequiredArgsConstructor;
 
@@ -66,13 +67,12 @@ public class MatchingEngine {
 	 *   <li>{@link Order#cancel()}을 호출해 상태를 {@link OrderStatus#CANCELLED}로 전환한다.</li>
 	 * </ol>
 	 *
-	 * @param order 취소할 주문
+	 * @param orderId 취소할 주문 ID
 	 * @throws IllegalStateException 주문이 활성 상태({@link OrderStatus#NEW} /
 	 *                               {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
 	 */
-	public void cancelOrder(Order order) {
-		orderBook.remove(order.getOrderId());
-		order.cancel();
+	public void cancelOrder(OrderId orderId) {
+		orderBook.remove(orderId).ifPresent(Order::cancel);
 	}
 
 	/**

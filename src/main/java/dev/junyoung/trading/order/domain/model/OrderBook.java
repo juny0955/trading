@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.domain.service;
+package dev.junyoung.trading.order.domain.model;
 
 import java.util.ArrayDeque;
 import java.util.Comparator;

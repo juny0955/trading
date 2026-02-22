@@ -349,6 +349,19 @@ class OrderBookTest {
 		}
 
 		@Test
+		@DisplayName("동일 가격 레벨 첫 번째 주문 제거 후 두 번째 주문이 peek된다")
+		void removeFirstOrderOfLevelLeavesSecondOrderPeekable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(second);
+		}
+
+		@Test
 		@DisplayName("동일 가격 레벨 두 번째 주문 제거 후 첫 번째 주문이 poll된다")
 		void removeSecondOrderOfLevelLeavesFirstOrderPollable() {
 			Order first  = newBuyOrder(10_000, 3);
@@ -359,6 +372,19 @@ class OrderBookTest {
 			orderBook.remove(second.getOrderId());
 
 			assertThat(orderBook.poll(Side.BUY)).contains(first);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨 두 번째 주문 제거 후 첫 번째 주문이 peek된다")
+		void removeSecondOrderOfLevelLeavesFirstOrderPeekable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(second.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(first);
 		}
 
 		@Test
@@ -434,6 +460,19 @@ class OrderBookTest {
 			assertThat(orderBook.poll(Side.BUY)).contains(second);
 			assertThat(orderBook.poll(Side.BUY)).isEmpty();
 		}
+
+		@Test
+		@DisplayName("remove() 후 해당 주문은 peek()에서 나오지 않는다")
+		void peekAfterRemoveDoesNotReturnRemovedOrder() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(second);
+		}
 	}
 
 	// ── 가격 우선순위 ──────────────────────────────────────────────────────
@@ -497,7 +536,7 @@ class OrderBookTest {
 
 		@Test
 		@DisplayName("동일 BUY 가격: 먼저 추가된 주문이 먼저 poll된다")
-		void sameBuyPriceRespectsFifo() {
+		void sameBuyPriceRespectsFifo_poll() {
 			Order first  = newBuyOrder(10_000, 1);
 			Order second = newBuyOrder(10_000, 2);
 			Order third  = newBuyOrder(10_000, 3);
@@ -511,8 +550,21 @@ class OrderBookTest {
 		}
 
 		@Test
+		@DisplayName("동일 BUY 가격: 먼저 추가된 주문이 먼저 peek된다")
+		void sameBuyPriceRespectsFifo_peek() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			Order third  = newBuyOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.peek(Side.BUY)).contains(first);
+		}
+
+		@Test
 		@DisplayName("동일 SELL 가격: 먼저 추가된 주문이 먼저 poll된다")
-		void sameSellPriceRespectsFifo() {
+		void sameSellPriceRespectsFifo_poll() {
 			Order first  = newSellOrder(10_000, 1);
 			Order second = newSellOrder(10_000, 2);
 			Order third  = newSellOrder(10_000, 3);
@@ -523,6 +575,19 @@ class OrderBookTest {
 			assertThat(orderBook.poll(Side.SELL)).contains(first);
 			assertThat(orderBook.poll(Side.SELL)).contains(second);
 			assertThat(orderBook.poll(Side.SELL)).contains(third);
+		}
+
+		@Test
+		@DisplayName("동일 SELL 가격: 먼저 추가된 주문이 먼저 peek된다")
+		void sameSellPriceRespectsFifo_peek() {
+			Order first  = newSellOrder(10_000, 1);
+			Order second = newSellOrder(10_000, 2);
+			Order third  = newSellOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.peek(Side.SELL)).contains(first);
 		}
 	}
 }

@@ -63,6 +63,19 @@ public class OrderBook {
 	}
 
 	/**
+	 * 최우선 호가 주문을 확인한다
+	 *
+	 * @param side {@link Side#BUY} -> 최고 매수가, {@link Side#SELL} -> 최저 매도가
+	 * @return 최우선 주문. 호가 없으면 {@link Optional#empty()}
+	 */
+	public Optional<Order> peek(Side side) {
+		Map.Entry<Price, Deque<Order>> bestLevel = bestLevelOf(side);
+		if (bestLevel == null) return Optional.empty();
+
+		return Optional.ofNullable(bestLevel.getValue().peekFirst());
+	}
+
+	/**
 	 * @return 최우선 매수 호가(Best Bid). 없으면 {@link Optional#empty()}
 	 */
 	public Optional<Price> bestBid() {

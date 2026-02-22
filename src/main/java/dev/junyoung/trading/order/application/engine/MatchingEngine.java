@@ -60,6 +60,22 @@ public class MatchingEngine {
 	}
 
 	/**
+	 * 주문을 취소한다.
+	 * <ol>
+	 *   <li>호가창에서 해당 주문을 제거한다. 이미 체결되어 없는 경우 무시한다.</li>
+	 *   <li>{@link Order#cancel()}을 호출해 상태를 {@link OrderStatus#CANCELLED}로 전환한다.</li>
+	 * </ol>
+	 *
+	 * @param order 취소할 주문
+	 * @throws IllegalStateException 주문이 활성 상태({@link OrderStatus#NEW} /
+	 *                               {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+	 */
+	public void cancelOrder(Order order) {
+		orderBook.remove(order.getOrderId());
+		order.cancel();
+	}
+
+	/**
 	 * taker와 maker 간 가격 매칭 여부를 판단한다.
 	 * <ul>
 	 *   <li>BUY taker : maker 가격 ≤ taker 가격 (bestAsk ≤ buy price)</li>

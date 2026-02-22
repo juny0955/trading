@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.stereotype.Component;
+
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
  * 단일 종목 지정가(LIMIT) 주문 매칭 엔진. 가격-시간 우선(Price-Time Priority)으로 체결을 수행한다.
  * <p>{@link OrderBook} 상태 변경은 이 클래스 내부에서만 이루어지며, 체결 결과는 {@link Trade} 목록으로 반환한다.</p>
  */
+@Component
 @RequiredArgsConstructor
 public class MatchingEngine {
 
@@ -72,7 +75,10 @@ public class MatchingEngine {
 	 *                               {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
 	 */
 	public void cancelOrder(OrderId orderId) {
-		orderBook.remove(orderId).ifPresent(Order::cancel);
+		Order order = orderBook.remove(orderId)
+			.orElseThrow(() -> new IllegalStateException("Already Processed or Cancelled Order"));
+
+		order.cancel();
 	}
 
 	/**

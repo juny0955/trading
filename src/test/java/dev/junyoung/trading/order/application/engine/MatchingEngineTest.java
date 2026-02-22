@@ -417,26 +417,26 @@ class MatchingEngineTest {
 		}
 
 		@Test
-		@DisplayName("FILLED 주문이면 예외 없이 무시된다")
-		void filledOrder_silentlyIgnored() {
+		@DisplayName("FILLED 주문 취소 시 IllegalStateException이 발생한다")
+		void filledOrder_throwsIllegalStateException() {
 			orderBook.add(activatedSellOrder(10_000, 5));
 			Order order = buyOrder(10_000, 5);
 			engine.placeLimitOrder(order);
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
 
-			assertDoesNotThrow(() -> engine.cancelOrder(order.getOrderId()));
+			assertThrows(IllegalStateException.class, () -> engine.cancelOrder(order.getOrderId()));
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
-		@DisplayName("이미 CANCELLED된 주문이면 예외 없이 무시된다")
-		void alreadyCancelledOrder_silentlyIgnored() {
+		@DisplayName("이미 CANCELLED된 주문 취소 시 IllegalStateException이 발생한다")
+		void alreadyCancelledOrder_throwsIllegalStateException() {
 			Order order = buyOrder(10_000, 5);
 			engine.placeLimitOrder(order);
 			engine.cancelOrder(order.getOrderId());
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 
-			assertDoesNotThrow(() -> engine.cancelOrder(order.getOrderId()));
+			assertThrows(IllegalStateException.class, () -> engine.cancelOrder(order.getOrderId()));
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 	}

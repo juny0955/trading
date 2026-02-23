@@ -105,9 +105,9 @@ public class EngineLoop implements Runnable {
 				// stop()에서 interrupt()를 호출했을 때 발생 → 루프 정상 종료
 				Thread.currentThread().interrupt();
 				break;
-			} catch (Throwable t) {
+			} catch (Exception e) {
 				// 특정 커맨드 처리 실패가 전체 엔진을 멈추지 않도록 예외를 격리
-				log.error("Engine Command Failed", t);
+				log.error("Engine Command Failed", e);
 			}
 		}
 	}

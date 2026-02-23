@@ -42,6 +42,9 @@ public class EngineHandler {
 				}
 			}
 			case EngineCommand.CancelOrder c -> engine.cancelOrder(c.orderId());
+			case EngineCommand.Shutdown _ ->
+				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
+				log.warn("Shutdown command reached EngineHandler; this should not happen.");
 		}
 	}
 }

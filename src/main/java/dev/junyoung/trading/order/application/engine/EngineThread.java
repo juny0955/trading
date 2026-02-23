@@ -56,12 +56,12 @@ public class EngineThread {
 	}
 
 	/**
-	 * ExecutorService를 종료한다. 2초 내 종료되지 않으면 강제 중단한다.
+	 * ExecutorService를 종료한다. 5초 내 종료되지 않으면 강제 중단한다.
 	 */
 	public void shutDown() {
 		executorService.shutdown();
 		try {
-			if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
+			if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
 				executorService.shutdownNow();
 			}
 		} catch (InterruptedException e) {

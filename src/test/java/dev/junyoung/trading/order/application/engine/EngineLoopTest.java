@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.ArrayBlockingQueue;
@@ -52,6 +54,7 @@ class EngineLoopTest {
 
 	@AfterEach
 	void tearDown() {
+		queue.clear();
 		loop.stop();
 	}
 
@@ -172,6 +175,91 @@ class EngineLoopTest {
 
 			assertThat(started.await(2, TimeUnit.SECONDS)).isTrue();
 			assertDoesNotThrow(() -> loop.stop());
+		}
+
+		@Test
+		@DisplayName("stop() 전 제출된 커맨드가 모두 처리된 후 종료된다")
+		void stop_drainsQueueBeforeTerminating() {
+			int commandCount = 2; // QUEUE_CAPACITY(3) - Shutdown(1)
+			CountDownLatch allProcessed = new CountDownLatch(commandCount);
+			doAnswer(_ -> { allProcessed.countDown(); return null; }).when(handler).handle(any());
+
+			// 루프 시작 전에 큐에 커맨드를 쌓아둔다
+			for (int i = 0; i < commandCount; i++) {
+				loop.submit(placeOrderCommand());
+			}
+
+			loop.start();
+			loop.stop(); // Poison Pill 삽입 → 큐 소진 후 종료 대기
+
+			// stop()이 반환되면 모든 커맨드가 처리되어 있어야 한다
+			assertThat(allProcessed.getCount()).isZero();
+		}
+
+		@Test
+		@DisplayName("stop() 후 submit() 호출 시 예외가 발생한다")
+		void submit_afterStop_throwsIllegalStateException() {
+			loop.stop();
+
+			assertThrows(IllegalStateException.class, () -> loop.submit(placeOrderCommand()));
+		}
+
+		@Test
+		@DisplayName("Shutdown 커맨드는 EngineHandler.handle()로 전달되지 않는다")
+		void stop_shutdownCommandIsNotPassedToHandler() {
+			loop.submit(placeOrderCommand());
+			loop.start();
+			loop.stop(); // shutDown()이 스레드 종료를 보장
+
+			// PlaceOrder 1번만 처리됨; Shutdown은 handle()에 전달되지 않음
+			verify(handler, times(1)).handle(any());
+			verify(handler, never()).handle(any(EngineCommand.Shutdown.class));
+		}
+
+		@Test
+		@DisplayName("큐가 꽉 찼을 때 stop()은 엔진이 드레이닝할 때까지 대기한 후 종료된다")
+		void stop_whenQueueFull_blocksUntilDrained() throws InterruptedException {
+			CountDownLatch firstHandled = new CountDownLatch(1);
+			CountDownLatch releaseHandler = new CountDownLatch(1);
+
+			// 첫 번째 커맨드 처리 중 블로킹 → 큐가 꽉 찬 상태 유지 가능
+			doAnswer(_ -> {
+				firstHandled.countDown();
+				try { releaseHandler.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+				return null;
+			}).doAnswer(_ -> null).when(handler).handle(any());
+
+			loop.start();
+			loop.submit(placeOrderCommand()); // 엔진이 처리 시작 → 핸들러 블로킹
+			assertThat(firstHandled.await(2, TimeUnit.SECONDS)).isTrue();
+
+			// 핸들러가 블로킹된 동안 큐를 가득 채움 (QUEUE_CAPACITY = 3)
+			loop.submit(placeOrderCommand());
+			loop.submit(placeOrderCommand());
+			loop.submit(placeOrderCommand());
+
+			// stop()을 별도 스레드에서 호출: 큐가 꽉 찼으므로 put()이 블로킹됨
+			Thread stopThread = new Thread(() -> loop.stop(), "test-stop-thread");
+			stopThread.start();
+			Thread.sleep(100); // stop()이 put() 블로킹 상태에 진입할 시간
+
+			// 핸들러 해제 → 엔진이 드레이닝 → put() 성공 → stop() 완료
+			releaseHandler.countDown();
+
+			stopThread.join(5_000);
+			assertThat(stopThread.isAlive()).isFalse();
+		}
+
+		@Test
+		@DisplayName("stop()을 여러 번 호출해도 예외가 발생하지 않는다")
+		void stop_calledMultipleTimes_doesNotThrow() {
+			loop.start();
+
+			assertDoesNotThrow(() -> {
+				loop.stop();
+				loop.stop();
+				loop.stop();
+			});
 		}
 	}
 }

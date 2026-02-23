@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.springframework.stereotype.Component;
 
@@ -30,8 +31,17 @@ public class EngineLoop implements Runnable {
 	private final EngineHandler engineHandler;
 	private final EngineThread engineThread;
 
-	/** 루프 종료 플래그. {@code volatile}로 선언해 engine-thread가 즉시 변경을 감지한다. */
-	private volatile boolean running = true;
+	/**
+	 * 루프 종료 플래그.
+	 * {@link #submitLock}을 보유한 상태에서만 읽고 쓰므로 {@code volatile} 불필요.
+	 */
+	private boolean running = true;
+
+	/**
+	 * {@link #submit}의 check-then-act(running 확인 → 큐 삽입)와
+	 * {@link #stop}의 running 변경을 원자적으로 묶어 TOCTOU를 방지한다.
+	 */
+	private final ReentrantLock submitLock = new ReentrantLock();
 
 	/** Spring 빈 초기화 후 engine-thread를 시작한다. */
 	@PostConstruct
@@ -42,19 +52,38 @@ public class EngineLoop implements Runnable {
 	/** Spring 컨텍스트 종료 시 루프를 중단하고 스레드를 정리한다. */
 	@PreDestroy
 	public void stop() {
-		running = false;
-		engineThread.interrupt(); // BlockingQueue.take() 블로킹 해제
+		submitLock.lock();
+		try {
+			running = false;
+			// 락 보유 중 삽입하므로 Shutdown이 항상 마지막 커맨드임을 보장한다.
+			// 큐가 가득 찼으면 engine-thread가 드레이닝할 때까지 대기(put)한다.
+			engineQueue.put(new EngineCommand.Shutdown());
+		} catch (InterruptedException e) {
+			// shutdown 스레드 자체가 인터럽트된 경우 → interrupt()로 take() 블로킹 해제
+			Thread.currentThread().interrupt();
+			engineThread.interrupt();
+		} finally {
+			submitLock.unlock();
+		}
+
 		engineThread.shutDown();  // ExecutorService 종료 대기
 	}
 
 	/**
 	 * 커맨드를 큐에 제출한다. engine-thread가 비동기로 처리한다.
 	 *
-	 * @throws IllegalStateException 큐가 가득 찬 경우 (용량: {@code ArrayBlockingQueue(10_000)})
+	 * <p>{@code running} 확인과 큐 삽입을 {@link #submitLock}으로 묶어
+	 * Shutdown 이후 커맨드가 큐에 유입되는 TOCTOU를 방지한다.</p>
+	 *
+	 * @throws IllegalStateException 엔진이 종료 중이거나 큐가 가득 찬 경우 (용량: {@code ArrayBlockingQueue(10_000)})
 	 */
 	public void submit(EngineCommand command) {
-		if (!engineQueue.offer(command)) {
-			throw new IllegalStateException("Engine Queue is full");
+		submitLock.lock();
+		try {
+			if (!running) throw new IllegalStateException("Engine is shutting down");
+			if (!engineQueue.offer(command)) throw new IllegalStateException("Engine Queue is full");
+		} finally {
+			submitLock.unlock();
 		}
 	}
 
@@ -65,14 +94,17 @@ public class EngineLoop implements Runnable {
 	 */
 	@Override
 	public void run() {
-		while (running && !Thread.currentThread().isInterrupted()) {
+		while (!Thread.currentThread().isInterrupted()) {
 			try {
 				EngineCommand command = engineQueue.take(); // 커맨드가 올 때까지 블로킹
+				if (command instanceof EngineCommand.Shutdown) {
+					break;
+				}
 				engineHandler.handle(command);
 			} catch (InterruptedException e) {
 				// stop()에서 interrupt()를 호출했을 때 발생 → 루프 정상 종료
 				Thread.currentThread().interrupt();
-				running = false;
+				break;
 			} catch (Throwable t) {
 				// 특정 커맨드 처리 실패가 전체 엔진을 멈추지 않도록 예외를 격리
 				log.error("Engine Command Failed", t);

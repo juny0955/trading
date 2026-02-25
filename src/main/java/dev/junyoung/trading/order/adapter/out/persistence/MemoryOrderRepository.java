@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.adapter.out.persistance;
+package dev.junyoung.trading.order.adapter.out.persistence;
 
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;

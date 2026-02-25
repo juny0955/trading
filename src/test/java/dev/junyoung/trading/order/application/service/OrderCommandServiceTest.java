@@ -1,0 +1,136 @@
+package dev.junyoung.trading.order.application.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.Mockito.verify;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import dev.junyoung.trading.order.application.engine.EngineCommand;
+import dev.junyoung.trading.order.application.engine.EngineLoop;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("OrderCommandService")
+class OrderCommandServiceTest {
+
+    @Mock
+    private EngineLoop engineLoop;
+
+    @InjectMocks
+    private OrderCommandService sut;
+
+    // ── placeOrder ────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("placeOrder()")
+    class PlaceOrder {
+
+        @Test
+        @DisplayName("orderId를 UUID 문자열로 반환한다")
+        void placeOrder_returnsUuidString() {
+            String result = sut.placeOrder("BUY", 10_000, 5);
+
+            assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+        }
+
+        @Test
+        @DisplayName("PlaceOrder 커맨드를 EngineLoop에 제출한다")
+        void placeOrder_submitsPlaceOrderCommand() {
+            sut.placeOrder("BUY", 10_000, 5);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineLoop).submit(captor.capture());
+            assertThat(captor.getValue()).isInstanceOf(EngineCommand.PlaceOrder.class);
+        }
+
+        @Test
+        @DisplayName("커맨드에 담긴 Order의 side/price/quantity가 입력값과 일치한다")
+        void placeOrder_commandContainsCorrectOrderFields() {
+            sut.placeOrder("SELL", 20_000, 3);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineLoop).submit(captor.capture());
+
+            EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
+            assertThat(cmd.order().getSide().name()).isEqualTo("SELL");
+            assertThat(cmd.order().getPrice().value()).isEqualTo(20_000L);
+            assertThat(cmd.order().getQuantity().value()).isEqualTo(3L);
+        }
+
+        @Test
+        @DisplayName("반환된 orderId가 커맨드의 Order orderId와 동일하다")
+        void placeOrder_returnedOrderIdMatchesCommandOrderId() {
+            String returnedId = sut.placeOrder("BUY", 10_000, 5);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineLoop).submit(captor.capture());
+
+            EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
+            assertThat(returnedId).isEqualTo(cmd.order().getOrderId().toString());
+        }
+
+        @Test
+        @DisplayName("잘못된 side 값이 전달되면 IllegalArgumentException이 발생한다")
+        void placeOrder_invalidSide_throwsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.placeOrder("INVALID", 10_000, 5));
+        }
+    }
+
+    // ── cancelOrder ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("cancelOrder()")
+    class CancelOrder {
+
+        @Test
+        @DisplayName("CancelOrder 커맨드를 EngineLoop에 제출한다")
+        void cancelOrder_submitsCancelOrderCommand() {
+            String orderId = UUID.randomUUID().toString();
+
+            sut.cancelOrder(orderId);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineLoop).submit(captor.capture());
+            assertThat(captor.getValue()).isInstanceOf(EngineCommand.CancelOrder.class);
+        }
+
+        @Test
+        @DisplayName("커맨드에 담긴 OrderId가 입력값과 일치한다")
+        void cancelOrder_commandContainsCorrectOrderId() {
+            String orderId = UUID.randomUUID().toString();
+
+            sut.cancelOrder(orderId);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineLoop).submit(captor.capture());
+
+            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
+            assertThat(cmd.orderId().toString()).isEqualTo(orderId);
+        }
+
+        @Test
+        @DisplayName("잘못된 UUID 형식의 orderId가 전달되면 IllegalArgumentException이 발생한다")
+        void cancelOrder_invalidOrderIdFormat_throwsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.cancelOrder("not-a-valid-uuid"));
+        }
+
+        @Test
+        @DisplayName("null orderId가 전달되면 IllegalArgumentException이 발생한다")
+        void cancelOrder_nullOrderId_throwsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> sut.cancelOrder(null));
+        }
+    }
+}

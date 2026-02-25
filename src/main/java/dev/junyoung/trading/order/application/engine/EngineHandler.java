@@ -1,12 +1,12 @@
 package dev.junyoung.trading.order.application.engine;
 
-import java.util.List;
-
-import org.springframework.stereotype.Component;
-
+import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -23,6 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 public class EngineHandler {
 
 	private final MatchingEngine engine;
+	private final OrderBook orderBook;
+	private final OrderBookCache orderBookCache;
 
 	/**
 	 * 커맨드 타입에 따라 엔진 동작을 실행한다.
@@ -37,11 +39,13 @@ public class EngineHandler {
 			case EngineCommand.PlaceOrder c -> {
 				List<Trade> trades = engine.placeLimitOrder(c.order());
 				// MVP: 체결 결과를 로그로 기록. 추후 TradeRepository 저장 또는 이벤트 발행으로 대체.
-				if (!trades.isEmpty()) {
-					log.info("Trades executed: {}", trades);
-				}
+				if (!trades.isEmpty()) log.info("Trades executed: {}", trades);
+				orderBookCache.update(orderBook);
 			}
-			case EngineCommand.CancelOrder c -> engine.cancelOrder(c.orderId());
+			case EngineCommand.CancelOrder c -> {
+				engine.cancelOrder(c.orderId());
+				orderBookCache.update(orderBook);
+			}
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");

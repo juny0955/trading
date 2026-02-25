@@ -42,8 +42,8 @@ public class OrderBookCache {
      * NPE 없이 빈 bids/asks를 반환한다.
      */
     private static final Snapshot EMPTY = new Snapshot(
-            Collections.unmodifiableNavigableMap(new TreeMap<>(Comparator.reverseOrder())),
-            Collections.unmodifiableNavigableMap(new TreeMap<>())
+            Collections.unmodifiableNavigableMap(new TreeMap<Long, Long>(Comparator.reverseOrder())),
+            Collections.unmodifiableNavigableMap(new TreeMap<Long, Long>())
     );
 
     /** 항상 최신 스냅샷을 가리킨다. EMPTY로 초기화되어 null이 반환되지 않음이 보장된다. */

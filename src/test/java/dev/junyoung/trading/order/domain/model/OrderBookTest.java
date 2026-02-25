@@ -5,6 +5,8 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+
+import java.util.NavigableMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -472,6 +474,156 @@ class OrderBookTest {
 			orderBook.remove(first.getOrderId());
 
 			assertThat(orderBook.peek(Side.BUY)).contains(second);
+		}
+	}
+
+	// ── bidsSnapshot() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("bidsSnapshot()")
+	class BidsSnapshot {
+
+		@Test
+		@DisplayName("BUY 주문이 없으면 빈 맵을 반환한다")
+		void bidsSnapshot_empty_returnsEmptyMap() {
+			assertThat(orderBook.bidsSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("단일 BUY 주문의 잔량이 반영된다")
+		void bidsSnapshot_singleOrder_reflectsQuantity() {
+			orderBook.add(newBuyOrder(10_000, 5));
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), 5L);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨의 여러 BUY 주문 잔량이 합산된다")
+		void bidsSnapshot_samePriceMultipleOrders_sumsQuantity() {
+			orderBook.add(newBuyOrder(10_000, 3));
+			orderBook.add(newBuyOrder(10_000, 7));
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), 10L);
+		}
+
+		@Test
+		@DisplayName("여러 가격 레벨은 내림차순(높은 가격 먼저)으로 반환된다")
+		void bidsSnapshot_multiplePriceLevels_descendingOrder() {
+			orderBook.add(newBuyOrder(9_000, 1));
+			orderBook.add(newBuyOrder(11_000, 1));
+			orderBook.add(newBuyOrder(10_000, 1));
+
+			NavigableMap<Price, Long> snapshot = orderBook.bidsSnapshot();
+
+			assertThat(snapshot.firstKey()).isEqualTo(new Price(11_000));
+			assertThat(snapshot.lastKey()).isEqualTo(new Price(9_000));
+		}
+
+		@Test
+		@DisplayName("SELL 주문은 bidsSnapshot에 포함되지 않는다")
+		void bidsSnapshot_doesNotIncludeSellOrders() {
+			orderBook.add(newSellOrder(10_000, 5));
+
+			assertThat(orderBook.bidsSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("부분 체결된 BUY 주문의 remaining 잔량이 반영된다")
+		void bidsSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
+			Order order = newBuyOrder(10_000, 10);
+			order.fill(new Quantity(3)); // remaining = 7
+			orderBook.add(order);
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), 7L);
+		}
+
+		@Test
+		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
+		void bidsSnapshot_isIndependentCopy() {
+			orderBook.add(newBuyOrder(10_000, 5));
+			NavigableMap<Price, Long> snapshot = orderBook.bidsSnapshot();
+
+			orderBook.add(newBuyOrder(9_000, 3));
+
+			assertThat(snapshot).doesNotContainKey(new Price(9_000));
+		}
+	}
+
+	// ── asksSnapshot() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("asksSnapshot()")
+	class AsksSnapshot {
+
+		@Test
+		@DisplayName("SELL 주문이 없으면 빈 맵을 반환한다")
+		void asksSnapshot_empty_returnsEmptyMap() {
+			assertThat(orderBook.asksSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("단일 SELL 주문의 잔량이 반영된다")
+		void asksSnapshot_singleOrder_reflectsQuantity() {
+			orderBook.add(newSellOrder(10_000, 5));
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), 5L);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨의 여러 SELL 주문 잔량이 합산된다")
+		void asksSnapshot_samePriceMultipleOrders_sumsQuantity() {
+			orderBook.add(newSellOrder(10_000, 4));
+			orderBook.add(newSellOrder(10_000, 6));
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), 10L);
+		}
+
+		@Test
+		@DisplayName("여러 가격 레벨은 오름차순(낮은 가격 먼저)으로 반환된다")
+		void asksSnapshot_multiplePriceLevels_ascendingOrder() {
+			orderBook.add(newSellOrder(11_000, 1));
+			orderBook.add(newSellOrder(9_000, 1));
+			orderBook.add(newSellOrder(10_000, 1));
+
+			NavigableMap<Price, Long> snapshot = orderBook.asksSnapshot();
+
+			assertThat(snapshot.firstKey()).isEqualTo(new Price(9_000));
+			assertThat(snapshot.lastKey()).isEqualTo(new Price(11_000));
+		}
+
+		@Test
+		@DisplayName("BUY 주문은 asksSnapshot에 포함되지 않는다")
+		void asksSnapshot_doesNotIncludeBuyOrders() {
+			orderBook.add(newBuyOrder(10_000, 5));
+
+			assertThat(orderBook.asksSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("부분 체결된 SELL 주문의 remaining 잔량이 반영된다")
+		void asksSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
+			Order order = newSellOrder(10_000, 10);
+			order.fill(new Quantity(4)); // remaining = 6
+			orderBook.add(order);
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), 6L);
+		}
+
+		@Test
+		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
+		void asksSnapshot_isIndependentCopy() {
+			orderBook.add(newSellOrder(10_000, 5));
+			NavigableMap<Price, Long> snapshot = orderBook.asksSnapshot();
+
+			orderBook.add(newSellOrder(11_000, 3));
+
+			assertThat(snapshot).doesNotContainKey(new Price(11_000));
 		}
 	}
 

@@ -44,7 +44,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderId를 UUID 문자열로 반환한다")
         void placeOrder_returnsUuidString() {
-            String result = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            String result = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
         }
@@ -52,7 +52,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("PlaceOrder 커맨드를 EngineLoop에 제출한다")
         void placeOrder_submitsPlaceOrderCommand() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineLoop).submit(captor.capture());
@@ -62,7 +62,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("커맨드에 담긴 Order의 side/price/quantity가 입력값과 일치한다")
         void placeOrder_commandContainsCorrectOrderFields() {
-            sut.placeOrder("BTC", "SELL", "LIMIT", 20_000, 3);
+            sut.placeOrder("BTC", "SELL", "LIMIT", 20_000L, 3);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineLoop).submit(captor.capture());
@@ -76,7 +76,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("반환된 orderId가 커맨드의 Order orderId와 동일하다")
         void placeOrder_returnedOrderIdMatchesCommandOrderId() {
-            String returnedId = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            String returnedId = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineLoop).submit(captor.capture());
@@ -89,13 +89,13 @@ class OrderCommandServiceTest {
         @DisplayName("잘못된 side 값이 전달되면 IllegalArgumentException이 발생한다")
         void placeOrder_invalidSide_throwsIllegalArgumentException() {
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.placeOrder("BTC", "INVALID", "LIMIT", 10_000, 5));
+                    () -> sut.placeOrder("BTC", "INVALID", "LIMIT", 10_000L, 5));
         }
 
         @Test
         @DisplayName("생성된 Order를 ACCEPTED 상태로 orderRepository에 저장한다")
         void placeOrder_savesOrderToRepository() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
             verify(orderRepository).save(captor.capture());
@@ -105,7 +105,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderRepository에 저장되는 Order와 EngineLoop에 제출되는 Order가 동일 객체다")
         void placeOrder_savedOrderIsSameAsSubmittedOrder() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
             ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
@@ -120,7 +120,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderRepository.save는 engineLoop.submit 이전에 호출된다")
         void placeOrder_savesOrderBeforeSubmittingCommand() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             InOrder inOrder = inOrder(orderRepository, engineLoop);
             inOrder.verify(orderRepository).save(any());

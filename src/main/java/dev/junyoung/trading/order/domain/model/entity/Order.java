@@ -43,7 +43,7 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
-    public static Order create(String symbol, String side, String orderType, long price, long quantity) {
+    public static Order create(String symbol, String side, String orderType, Long price, long quantity) {
         Quantity q = new Quantity(quantity);
         Symbol sym = new Symbol(symbol);
         Side s = Side.valueOf(side);

@@ -4,7 +4,7 @@ public record PlaceOrderRequest(
     String symbol,
     String side,
     String orderType,
-    long price,
+    Long price,
     long quantity
 ) {
 }

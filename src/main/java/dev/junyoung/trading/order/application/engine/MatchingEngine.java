@@ -90,8 +90,8 @@ public class MatchingEngine {
 	 * </ul>
 	 */
 	private boolean isPriceMatch(Order taker, Order maker) {
-		long tp = taker.getPrice().value();
-		long mp = maker.getPrice().value();
+		long tp = taker.getLimitPriceOrThrow().value();
+		long mp = maker.getLimitPriceOrThrow().value();
 		return taker.getSide() == Side.BUY ? mp <= tp : mp >= tp;
 	}
 }

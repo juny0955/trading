@@ -43,6 +43,17 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
+    public static Order create(String symbol, String side, String orderType, long price, long quantity) {
+        Quantity q = new Quantity(quantity);
+        Symbol sym = new Symbol(symbol);
+        Side s = Side.valueOf(side);
+
+        return switch (OrderType.valueOf(orderType)) {
+            case MARKET -> Order.createMarket(s, sym, q);
+            case LIMIT  -> Order.createLimit(s, sym, new Price(price), q);
+        };
+    }
+
     /**
      * LIMIT 주문을 생성한다.
      *

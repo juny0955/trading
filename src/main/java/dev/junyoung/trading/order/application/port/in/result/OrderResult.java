@@ -5,7 +5,7 @@ import java.time.Instant;
 public record OrderResult(
     String orderId,
     String side,
-    long price,
+    Long price,
     long quantity,
     long remaining,
     String status,

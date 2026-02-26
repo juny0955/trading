@@ -22,7 +22,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody PlaceOrderRequest request) {
-        String orderId = placeOrderUseCase.placeOrder(request.side(), request.price(), request.quantity());
+        String orderId = placeOrderUseCase.placeOrder(request.symbol(), request.side(), request.orderType(), request.price(), request.quantity());
 
         return ResponseEntity
                 .accepted()

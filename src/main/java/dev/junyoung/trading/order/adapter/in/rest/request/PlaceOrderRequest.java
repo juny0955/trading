@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.adapter.in.rest.reqeust;
+package dev.junyoung.trading.order.adapter.in.rest.request;
 
 public record PlaceOrderRequest(
     String side,

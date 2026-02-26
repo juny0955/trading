@@ -1,6 +1,6 @@
 package dev.junyoung.trading.order.adapter.in.rest;
 
-import dev.junyoung.trading.order.adapter.in.rest.reqeust.PlaceOrderRequest;
+import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.response.OrderResponse;
 import dev.junyoung.trading.order.adapter.in.rest.response.PlaceOrderResponse;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;

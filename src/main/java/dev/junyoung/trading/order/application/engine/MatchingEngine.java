@@ -74,11 +74,12 @@ public class MatchingEngine {
 	 * @throws IllegalStateException 주문이 활성 상태({@link OrderStatus#NEW} /
 	 *                               {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
 	 */
-	public void cancelOrder(OrderId orderId) {
+	public Order cancelOrder(OrderId orderId) {
 		Order order = orderBook.remove(orderId)
 			.orElseThrow(() -> new IllegalStateException("Already Processed or Cancelled Order"));
 
 		order.cancel();
+		return order;
 	}
 
 	/**

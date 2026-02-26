@@ -110,6 +110,16 @@ public class OrderBook {
 		return Optional.of(order);
 	}
 
+	/** 매수 호가창 스냅샷. 가격 → 잔량 합계 (내림차순) */
+	public NavigableMap<Price, Long> bidsSnapshot() {
+		return aggregateDepth(bids);
+	}
+
+	/** 매도 호가창 스냅샷. 가격 → 잔량 합계 (오름차순) */
+	public NavigableMap<Price, Long> asksSnapshot() {
+		return aggregateDepth(asks);
+	}
+
 	private NavigableMap<Price, Deque<Order>> bookOf(Side side) {
 		return side == Side.BUY ? bids : asks;
 	}
@@ -127,5 +137,14 @@ public class OrderBook {
 
 	private Optional<Price> firstKeyOf(NavigableMap<Price, Deque<Order>> book) {
 		return book.isEmpty() ? Optional.empty() : Optional.of(book.firstKey());
+	}
+
+	private NavigableMap<Price, Long> aggregateDepth(NavigableMap<Price, Deque<Order>> book) {
+		NavigableMap<Price, Long> snapshot = new TreeMap<>(book.comparator());
+		book.forEach((price, queue) -> {
+			long qty = queue.stream().mapToLong(o -> o.getRemaining().value()).sum();
+			snapshot.put(price, qty);
+		});
+		return snapshot;
 	}
 }

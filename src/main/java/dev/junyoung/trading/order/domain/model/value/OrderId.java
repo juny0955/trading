@@ -22,4 +22,9 @@ public record OrderId(
 
         return new OrderId(UUID.fromString(raw));
     }
+
+    @Override
+    public String toString() {
+        return value.toString();
+    }
 }

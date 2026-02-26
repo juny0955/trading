@@ -1,12 +1,14 @@
 package dev.junyoung.trading.order.application.engine;
 
-import java.util.List;
-
-import org.springframework.stereotype.Component;
-
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -23,25 +25,31 @@ import lombok.extern.slf4j.Slf4j;
 public class EngineHandler {
 
 	private final MatchingEngine engine;
+	private final OrderBook orderBook;
+	private final OrderBookCache orderBookCache;
+	private final OrderRepository orderRepository;
 
 	/**
 	 * 커맨드 타입에 따라 엔진 동작을 실행한다.
 	 *
 	 * <ul>
-	 *   <li>{@link EngineCommand.PlaceOrder}: 주문을 매칭 엔진에 전달하고 체결 결과를 로깅한다.</li>
-	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이한다.</li>
+	 *   <li>{@link EngineCommand.PlaceOrder}: 주문을 매칭 엔진에 전달하고 체결 결과를 저장한다.
+	 *       taker/maker 상태 변경은 참조 공유로 OrderRepository에 자동 반영된다 (in-memory MVP).</li>
+	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이 후 명시적 save.</li>
 	 * </ul>
 	 */
 	public void handle(EngineCommand command) {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
 				List<Trade> trades = engine.placeLimitOrder(c.order());
-				// MVP: 체결 결과를 로그로 기록. 추후 TradeRepository 저장 또는 이벤트 발행으로 대체.
-				if (!trades.isEmpty()) {
-					log.info("Trades executed: {}", trades);
-				}
+				if (!trades.isEmpty()) log.info("Trades executed: {}", trades);
+				orderBookCache.update(orderBook);
 			}
-			case EngineCommand.CancelOrder c -> engine.cancelOrder(c.orderId());
+			case EngineCommand.CancelOrder c -> {
+				Order cancelled = engine.cancelOrder(c.orderId());
+				orderRepository.save(cancelled);
+				orderBookCache.update(orderBook);
+			}
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");

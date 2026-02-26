@@ -1,10 +1,10 @@
 package dev.junyoung.trading.order.domain.model.entity;
 
-import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.enums.Side;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -16,8 +16,8 @@ public class Order {
     private final Side side;
     private final Price price;
     private final Quantity quantity;
-    private Quantity remaining;
-    private OrderStatus status;
+    private volatile Quantity remaining;
+    private volatile OrderStatus status;
     private final Instant orderedAt;
 
     /**

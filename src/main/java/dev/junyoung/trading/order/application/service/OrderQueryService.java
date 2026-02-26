@@ -21,7 +21,7 @@ public class OrderQueryService implements GetOrderUseCase {
         return new OrderResult(
             order.getOrderId().toString(),
             order.getSide().name(),
-            order.getPrice().value(),
+            order.isMarket() ? null : order.getLimitPriceOrThrow().value(),
             order.getQuantity().value(),
             order.getRemaining().value(),
             order.getStatus().name(),

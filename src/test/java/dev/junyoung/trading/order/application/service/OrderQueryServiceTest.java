@@ -21,6 +21,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderQueryService")
@@ -36,10 +37,12 @@ class OrderQueryServiceTest {
     @DisplayName("getOrder()")
     class GetOrder {
 
+        private static final Symbol SYMBOL = new Symbol("BTC");
+
         @Test
         @DisplayName("주문이 존재하면 OrderResult를 반환한다")
         void getOrder_found_returnsOrderResult() {
-            Order order = new Order(Side.BUY, new Price(10_000), new Quantity(5));
+            Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 
@@ -52,7 +55,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("OrderResult의 side/price/quantity/remaining/status/orderedAt이 Order와 일치한다")
         void getOrder_found_resultFieldsMatchOrder() {
-            Order order = new Order(Side.SELL, new Price(50_000), new Quantity(10));
+            Order order = Order.createLimit(Side.SELL, SYMBOL, new Price(50_000), new Quantity(10));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 

@@ -25,7 +25,7 @@ public record Trade(
 		return new Trade(
 			isBuy ? taker.getOrderId() : maker.getOrderId(),
 			isBuy ? maker.getOrderId() : taker.getOrderId(),
-			maker.getPrice(),
+			maker.getLimitPriceOrThrow(),
 			qty
 		);
 	}

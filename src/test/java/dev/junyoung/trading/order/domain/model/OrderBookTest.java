@@ -4,6 +4,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 
 import java.util.NavigableMap;
@@ -26,16 +27,18 @@ class OrderBookTest {
 
 	// ── 헬퍼 ──────────────────────────────────────────────────────────────
 
+	private static final Symbol SYMBOL = new Symbol("BTC");
+
 	/** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
 	private Order newBuyOrder(long price, long qty) {
-		Order order = new Order(Side.BUY, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	/** ACCEPTED → activate() → NEW 상태인 SELL 주문 */
 	private Order newSellOrder(long price, long qty) {
-		Order order = new Order(Side.SELL, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.SELL, SYMBOL, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
@@ -640,9 +643,9 @@ class OrderBookTest {
 			orderBook.add(newBuyOrder(11_000, 1));
 			orderBook.add(newBuyOrder(10_000, 1));
 
-			assertThat(orderBook.poll(Side.BUY).map(Order::getPrice)).contains(new Price(11_000));
-			assertThat(orderBook.poll(Side.BUY).map(Order::getPrice)).contains(new Price(10_000));
-			assertThat(orderBook.poll(Side.BUY).map(Order::getPrice)).contains(new Price(9_000));
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(11_000));
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(10_000));
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(9_000));
 		}
 
 		@Test
@@ -652,9 +655,9 @@ class OrderBookTest {
 			orderBook.add(newSellOrder(9_000, 1));
 			orderBook.add(newSellOrder(10_000, 1));
 
-			assertThat(orderBook.poll(Side.SELL).map(Order::getPrice)).contains(new Price(9_000));
-			assertThat(orderBook.poll(Side.SELL).map(Order::getPrice)).contains(new Price(10_000));
-			assertThat(orderBook.poll(Side.SELL).map(Order::getPrice)).contains(new Price(11_000));
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(9_000));
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(10_000));
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(11_000));
 		}
 
 		@Test

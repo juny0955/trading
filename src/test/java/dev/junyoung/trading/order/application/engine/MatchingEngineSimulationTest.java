@@ -19,16 +19,18 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @DisplayName("MatchingEngine 시뮬레이션 — 랜덤 10만 건 불변식 검증")
 class MatchingEngineSimulationTest {
 
-    private static final long SEED        = 42L;
-    private static final int  ORDER_COUNT = 100_000;
-    private static final long PRICE_MIN   = 95L;
-    private static final long PRICE_MAX   = 105L;
-    private static final long QTY_MIN     = 1L;
-    private static final long QTY_MAX     = 50L;
+    private static final long   SEED        = 42L;
+    private static final int    ORDER_COUNT = 100_000;
+    private static final long   PRICE_MIN   = 95L;
+    private static final long   PRICE_MAX   = 105L;
+    private static final long   QTY_MIN     = 1L;
+    private static final long   QTY_MAX     = 50L;
+    private static final Symbol SYMBOL      = new Symbol("BTC");
 
     private OrderBook      orderBook;
     private MatchingEngine engine;
@@ -62,7 +64,7 @@ class MatchingEngineSimulationTest {
             Side  side  = (random.nextInt(2) == 0) ? Side.BUY : Side.SELL;
             long  price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
             long  qty   = QTY_MIN   + random.nextLong(QTY_MAX   - QTY_MIN   + 1);
-            Order order = new Order(side, new Price(price), new Quantity(qty));
+            Order order = Order.createLimit(side, SYMBOL, new Price(price), new Quantity(qty));
 
             submissionSeq.put(order.getOrderId(), i);
             allOrders.add(order);

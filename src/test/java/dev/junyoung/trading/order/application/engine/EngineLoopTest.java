@@ -25,6 +25,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 /**
  * {@link EngineLoop} 단위 테스트.
@@ -58,8 +59,10 @@ class EngineLoopTest {
 		loop.stop();
 	}
 
+	private static final Symbol SYMBOL = new Symbol("BTC");
+
 	private EngineCommand.PlaceOrder placeOrderCommand() {
-		Order order = new Order(Side.BUY, new Price(10_000), new Quantity(5));
+		Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
 		return new EngineCommand.PlaceOrder(order);
 	}
 

@@ -8,6 +8,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,8 +51,10 @@ class EngineHandlerTest {
 	@InjectMocks
 	private EngineHandler handler;
 
+	private static final Symbol SYMBOL = new Symbol("BTC");
+
 	private Order buyOrder(long price, long qty) {
-		return new Order(Side.BUY, new Price(price), new Quantity(qty));
+		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
 	}
 
 	// ── PlaceOrder ──────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ class EngineHandlerTest {
 		@DisplayName("Trade가 발생해도 예외 없이 정상 종료한다")
 		void handle_placeOrder_withTrades_doesNotThrow() {
 			Order taker = buyOrder(10_000, 5);
-			Order maker = new Order(Side.SELL, new Price(10_000), new Quantity(5));
+			Order maker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
 			maker.activate();
 			Trade trade = Trade.of(taker, maker, new Quantity(5));
 			when(engine.placeLimitOrder(taker)).thenReturn(List.of(trade));

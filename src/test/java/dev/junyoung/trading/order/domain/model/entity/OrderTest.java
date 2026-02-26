@@ -7,21 +7,25 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @DisplayName("Order")
 class OrderTest {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
+    private static final Symbol SYMBOL = new Symbol("BTC");
+
     private Order buyOrder(long price, long qty) {
-        return new Order(Side.BUY, new Price(price), new Quantity(qty));
+        return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
     }
 
     private Order sellOrder(long price, long qty) {
-        return new Order(Side.SELL, new Price(price), new Quantity(qty));
+        return Order.createLimit(Side.SELL, SYMBOL, new Price(price), new Quantity(qty));
     }
 
     /** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
@@ -37,89 +41,159 @@ class OrderTest {
     @DisplayName("생성")
     class Creation {
 
-        @Test
-        @DisplayName("BUY 주문을 정상 생성한다")
-        void createBuyOrder() {
-            Order order = new Order(Side.BUY, new Price(10_000), new Quantity(5));
+        @Nested
+        @DisplayName("LIMIT 주문")
+        class LimitCreation {
 
-            assertThat(order.getOrderId()).isNotNull();
-            assertThat(order.getSide()).isEqualTo(Side.BUY);
-            assertThat(order.getPrice()).isEqualTo(new Price(10_000));
-            assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
-            assertThat(order.getRemaining()).isEqualTo(new Quantity(5));
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
-            assertThat(order.getOrderedAt()).isNotNull();
+            @Test
+            @DisplayName("BUY LIMIT 주문을 정상 생성한다")
+            void createBuyLimitOrder() {
+                Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
+
+                assertThat(order.getOrderId()).isNotNull();
+                assertThat(order.getSide()).isEqualTo(Side.BUY);
+                assertThat(order.getSymbol()).isEqualTo(SYMBOL);
+                assertThat(order.getOrderType()).isEqualTo(OrderType.LIMIT);
+                assertThat(order.getLimitPriceOrThrow()).isEqualTo(new Price(10_000));
+                assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
+                assertThat(order.getRemaining()).isEqualTo(new Quantity(5));
+                assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+                assertThat(order.getOrderedAt()).isNotNull();
+            }
+
+            @Test
+            @DisplayName("SELL LIMIT 주문을 정상 생성한다")
+            void createSellLimitOrder() {
+                Order order = sellOrder(9_500, 3);
+
+                assertThat(order.getSide()).isEqualTo(Side.SELL);
+                assertThat(order.getOrderType()).isEqualTo(OrderType.LIMIT);
+                assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+            }
+
+            @Test
+            @DisplayName("초기 상태는 ACCEPTED이다")
+            void initialStatusIsAccepted() {
+                assertThat(buyOrder(10_000, 5).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+            }
+
+            @Test
+            @DisplayName("초기 remaining은 quantity와 같다")
+            void initialRemainingEqualsQuantity() {
+                Order order = buyOrder(10_000, 7);
+                assertThat(order.getRemaining()).isEqualTo(order.getQuantity());
+            }
+
+            @Test
+            @DisplayName("quantity = 1(최솟값) 주문을 생성할 수 있다")
+            void createOrderWithMinQuantity() {
+                assertThatCode(() -> buyOrder(1, 1)).doesNotThrowAnyException();
+            }
+
+            @Test
+            @DisplayName("quantity = 0이면 IllegalArgumentException이 발생한다")
+            void rejectZeroQuantity() {
+                assertThatIllegalArgumentException()
+                        .isThrownBy(() -> buyOrder(10_000, 0));
+            }
+
+            @Test
+            @DisplayName("quantity < 0이면 IllegalArgumentException이 발생한다")
+            void rejectNegativeQuantity() {
+                assertThatIllegalArgumentException()
+                        .isThrownBy(() -> buyOrder(10_000, -1));
+            }
+
+            @Test
+            @DisplayName("side = null이면 NullPointerException이 발생한다")
+            void rejectNullSide() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createLimit(null, SYMBOL, new Price(10_000), new Quantity(5)));
+            }
+
+            @Test
+            @DisplayName("symbol = null이면 NullPointerException이 발생한다")
+            void rejectNullSymbol() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, null, new Price(10_000), new Quantity(5)));
+            }
+
+            @Test
+            @DisplayName("price = null이면 NullPointerException이 발생한다")
+            void rejectNullPrice() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, null, new Quantity(5)));
+            }
+
+            @Test
+            @DisplayName("quantity = null이면 NullPointerException이 발생한다")
+            void rejectNullQuantity() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), null));
+            }
+
+            @Test
+            @DisplayName("각 주문은 고유한 orderId를 갖는다")
+            void eachOrderHasUniqueId() {
+                Order o1 = buyOrder(10_000, 5);
+                Order o2 = buyOrder(10_000, 5);
+                assertThat(o1.getOrderId()).isNotEqualTo(o2.getOrderId());
+            }
         }
 
-        @Test
-        @DisplayName("SELL 주문을 정상 생성한다")
-        void createSellOrder() {
-            Order order = new Order(Side.SELL, new Price(9_500), new Quantity(3));
+        @Nested
+        @DisplayName("MARKET 주문")
+        class MarketCreation {
 
-            assertThat(order.getSide()).isEqualTo(Side.SELL);
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
-        }
+            @Test
+            @DisplayName("BUY MARKET 주문을 정상 생성한다")
+            void createBuyMarketOrder() {
+                Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
 
-        @Test
-        @DisplayName("초기 상태는 ACCEPTED이다")
-        void initialStatusIsAccepted() {
-            assertThat(buyOrder(10_000, 5).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
-        }
+                assertThat(order.getOrderId()).isNotNull();
+                assertThat(order.getSide()).isEqualTo(Side.BUY);
+                assertThat(order.getSymbol()).isEqualTo(SYMBOL);
+                assertThat(order.getOrderType()).isEqualTo(OrderType.MARKET);
+                assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
+                assertThat(order.getRemaining()).isEqualTo(new Quantity(5));
+                assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+            }
 
-        @Test
-        @DisplayName("초기 remaining은 quantity와 같다")
-        void initialRemainingEqualsQuantity() {
-            Order order = buyOrder(10_000, 7);
-            assertThat(order.getRemaining()).isEqualTo(order.getQuantity());
-        }
+            @Test
+            @DisplayName("MARKET 주문에서 getLimitPriceOrThrow()를 호출하면 IllegalStateException이 발생한다")
+            void marketOrderThrowsOnGetPrice() {
+                Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                assertThatIllegalStateException()
+                        .isThrownBy(order::getLimitPriceOrThrow);
+            }
 
-        @Test
-        @DisplayName("quantity = 1(최솟값) 주문을 생성할 수 있다")
-        void createOrderWithMinQuantity() {
-            assertThatCode(() -> buyOrder(1, 1)).doesNotThrowAnyException();
-        }
+            @Test
+            @DisplayName("isMarket()은 MARKET 주문에서 true를 반환한다")
+            void isMarketReturnsTrueForMarketOrder() {
+                Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                assertThat(order.isMarket()).isTrue();
+            }
 
-        @Test
-        @DisplayName("quantity = 0이면 IllegalArgumentException이 발생한다")
-        void rejectZeroQuantity() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> buyOrder(10_000, 0));
-        }
+            @Test
+            @DisplayName("isMarket()은 LIMIT 주문에서 false를 반환한다")
+            void isMarketReturnsFalseForLimitOrder() {
+                Order order = buyOrder(10_000, 5);
+                assertThat(order.isMarket()).isFalse();
+            }
 
-        @Test
-        @DisplayName("quantity < 0이면 IllegalArgumentException이 발생한다")
-        void rejectNegativeQuantity() {
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> buyOrder(10_000, -1));
-        }
+            @Test
+            @DisplayName("MARKET 주문 side = null이면 NullPointerException이 발생한다")
+            void rejectNullSide() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createMarket(null, SYMBOL, new Quantity(5)));
+            }
 
-        @Test
-        @DisplayName("side = null이면 NullPointerException이 발생한다")
-        void rejectNullSide() {
-            assertThatNullPointerException()
-                    .isThrownBy(() -> new Order(null, new Price(10_000), new Quantity(5)));
-        }
-
-        @Test
-        @DisplayName("price = null이면 NullPointerException이 발생한다")
-        void rejectNullPrice() {
-            assertThatNullPointerException()
-                    .isThrownBy(() -> new Order(Side.BUY, null, new Quantity(5)));
-        }
-
-        @Test
-        @DisplayName("quantity = null이면 NullPointerException이 발생한다")
-        void rejectNullQuantity() {
-            assertThatNullPointerException()
-                    .isThrownBy(() -> new Order(Side.BUY, new Price(10_000), null));
-        }
-
-        @Test
-        @DisplayName("각 주문은 고유한 orderId를 갖는다")
-        void eachOrderHasUniqueId() {
-            Order o1 = buyOrder(10_000, 5);
-            Order o2 = buyOrder(10_000, 5);
-            assertThat(o1.getOrderId()).isNotEqualTo(o2.getOrderId());
+            @Test
+            @DisplayName("MARKET 주문 symbol = null이면 NullPointerException이 발생한다")
+            void rejectNullSymbol() {
+                assertThatNullPointerException()
+                        .isThrownBy(() -> Order.createMarket(Side.BUY, null, new Quantity(5)));
+            }
         }
     }
 
@@ -413,6 +487,34 @@ class OrderTest {
             order.fill(new Quantity(3));
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
+        }
+
+        @Test
+        @DisplayName("MARKET 주문 ACCEPTED → NEW → FILLED 전체 흐름")
+        void marketOrder_fullLifecycle_Filled() {
+            Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+
+            order.activate();
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
+
+            order.fill(new Quantity(5));
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
+        }
+
+        @Test
+        @DisplayName("MARKET 주문 유동성 부족 → PARTIALLY_FILLED → CANCELLED 전체 흐름")
+        void marketOrder_fullLifecycle_PartialThenCancelled() {
+            Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+
+            order.activate();
+            order.fill(new Quantity(3));
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+
+            order.cancel();
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(order.getRemaining()).isEqualTo(new Quantity(2));
         }
     }
 

@@ -1,6 +1,8 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,25 +27,27 @@ public class EngineHandler {
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
+	private final OrderRepository orderRepository;
 
 	/**
 	 * 커맨드 타입에 따라 엔진 동작을 실행한다.
 	 *
 	 * <ul>
-	 *   <li>{@link EngineCommand.PlaceOrder}: 주문을 매칭 엔진에 전달하고 체결 결과를 로깅한다.</li>
-	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이한다.</li>
+	 *   <li>{@link EngineCommand.PlaceOrder}: 주문을 매칭 엔진에 전달하고 체결 결과를 저장한다.
+	 *       taker/maker 상태 변경은 참조 공유로 OrderRepository에 자동 반영된다 (in-memory MVP).</li>
+	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이 후 명시적 save.</li>
 	 * </ul>
 	 */
 	public void handle(EngineCommand command) {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
 				List<Trade> trades = engine.placeLimitOrder(c.order());
-				// MVP: 체결 결과를 로그로 기록. 추후 TradeRepository 저장 또는 이벤트 발행으로 대체.
 				if (!trades.isEmpty()) log.info("Trades executed: {}", trades);
 				orderBookCache.update(orderBook);
 			}
 			case EngineCommand.CancelOrder c -> {
-				engine.cancelOrder(c.orderId());
+				Order cancelled = engine.cancelOrder(c.orderId());
+				orderRepository.save(cancelled);
 				orderBookCache.update(orderBook);
 			}
 			case EngineCommand.Shutdown _ ->

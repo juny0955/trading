@@ -1,23 +1,26 @@
 package dev.junyoung.trading.order.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.Mockito.verify;
-
-import java.util.UUID;
-
+import dev.junyoung.trading.order.application.engine.EngineCommand;
+import dev.junyoung.trading.order.application.engine.EngineLoop;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineLoop;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderCommandService")
@@ -25,6 +28,9 @@ class OrderCommandServiceTest {
 
     @Mock
     private EngineLoop engineLoop;
+
+    @Mock
+    private OrderRepository orderRepository;
 
     @InjectMocks
     private OrderCommandService sut;
@@ -85,6 +91,41 @@ class OrderCommandServiceTest {
             assertThrows(IllegalArgumentException.class,
                     () -> sut.placeOrder("INVALID", 10_000, 5));
         }
+
+        @Test
+        @DisplayName("생성된 Order를 ACCEPTED 상태로 orderRepository에 저장한다")
+        void placeOrder_savesOrderToRepository() {
+            sut.placeOrder("BUY", 10_000, 5);
+
+            ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+            verify(orderRepository).save(captor.capture());
+            assertThat(captor.getValue().getStatus().name()).isEqualTo("ACCEPTED");
+        }
+
+        @Test
+        @DisplayName("orderRepository에 저장되는 Order와 EngineLoop에 제출되는 Order가 동일 객체다")
+        void placeOrder_savedOrderIsSameAsSubmittedOrder() {
+            sut.placeOrder("BUY", 10_000, 5);
+
+            ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
+            ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
+            verify(orderRepository).save(repositoryCaptor.capture());
+            verify(engineLoop).submit(engineCaptor.capture());
+
+            Order savedOrder = repositoryCaptor.getValue();
+            Order submittedOrder = ((EngineCommand.PlaceOrder) engineCaptor.getValue()).order();
+            assertThat(savedOrder).isSameAs(submittedOrder);
+        }
+
+        @Test
+        @DisplayName("orderRepository.save는 engineLoop.submit 이전에 호출된다")
+        void placeOrder_savesOrderBeforeSubmittingCommand() {
+            sut.placeOrder("BUY", 10_000, 5);
+
+            InOrder inOrder = inOrder(orderRepository, engineLoop);
+            inOrder.verify(orderRepository).save(any());
+            inOrder.verify(engineLoop).submit(any());
+        }
     }
 
     // ── cancelOrder ───────────────────────────────────────────────────────────
@@ -131,6 +172,14 @@ class OrderCommandServiceTest {
         void cancelOrder_nullOrderId_throwsIllegalArgumentException() {
             assertThrows(IllegalArgumentException.class,
                     () -> sut.cancelOrder(null));
+        }
+
+        @Test
+        @DisplayName("orderRepository를 호출하지 않는다 (취소 저장은 EngineHandler 담당)")
+        void cancelOrder_doesNotCallOrderRepository() {
+            sut.cancelOrder(UUID.randomUUID().toString());
+
+            verify(orderRepository, never()).save(any());
         }
     }
 }

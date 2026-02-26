@@ -1,16 +1,13 @@
 package dev.junyoung.trading.order.application.engine;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.util.List;
-
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.entity.Trade;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -20,13 +17,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import dev.junyoung.trading.order.domain.model.OrderBook;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
  * {@link EngineHandler} 단위 테스트.
@@ -46,6 +43,9 @@ class EngineHandlerTest {
 
 	@Mock
 	private OrderBookCache orderBookCache;
+
+	@Mock
+	private OrderRepository orderRepository;
 
 	@InjectMocks
 	private EngineHandler handler;
@@ -186,6 +186,44 @@ class EngineHandlerTest {
 			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderBookCache, never()).update(any());
+		}
+
+		@Test
+		@DisplayName("engine.cancelOrder()가 반환한 Order를 orderRepository.save()에 전달한다")
+		void handle_cancelOrder_savesReturnedOrderToRepository() {
+			OrderId orderId = OrderId.newId();
+			Order cancelled = buyOrder(10_000, 5);
+			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
+
+			handler.handle(new EngineCommand.CancelOrder(orderId));
+
+			verify(orderRepository).save(cancelled);
+		}
+
+		@Test
+		@DisplayName("호출 순서: engine.cancelOrder → orderRepository.save → orderBookCache.update")
+		void handle_cancelOrder_callOrderIsEngineRepositoryCache() {
+			OrderId orderId = OrderId.newId();
+			Order cancelled = buyOrder(10_000, 5);
+			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
+
+			handler.handle(new EngineCommand.CancelOrder(orderId));
+
+			InOrder inOrder = inOrder(engine, orderRepository, orderBookCache);
+			inOrder.verify(engine).cancelOrder(orderId);
+			inOrder.verify(orderRepository).save(cancelled);
+			inOrder.verify(orderBookCache).update(orderBook);
+		}
+
+		@Test
+		@DisplayName("엔진이 예외를 던지면 orderRepository.save는 호출되지 않는다")
+		void handle_cancelOrder_engineThrows_doesNotSaveToRepository() {
+			OrderId orderId = OrderId.newId();
+			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+
+			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+
+			verify(orderRepository, never()).save(any());
 		}
 	}
 }

@@ -1,10 +1,13 @@
 package dev.junyoung.trading.order.domain.model.entity;
 
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
+import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -14,24 +17,23 @@ import java.util.Objects;
 public class Order {
     private final OrderId orderId;
     private final Side side;
-    private final Price price;
+    private final Symbol symbol;
+    private final OrderType orderType;
+
+    @Getter(AccessLevel.NONE)
+    private final Price price; // MARKET 주문은 null
+
     private final Quantity quantity;
     private volatile Quantity remaining;
     private volatile OrderStatus status;
     private final Instant orderedAt;
 
-    /**
-     * 주문을 생성한다. 초기 상태는 {@link OrderStatus#ACCEPTED}이다.
-     *
-     * @param side     매수/매도
-     * @param price    지정가 (≥ 1)
-     * @param quantity 주문 수량 (≥ 1)
-     * @throws IllegalArgumentException quantity &lt; 1인 경우
-     */
-    public Order(Side side, Price price, Quantity quantity) {
+    private Order(Side side, Symbol symbol, OrderType orderType, Price price, Quantity quantity) {
         this.orderId = OrderId.newId();
         this.side = Objects.requireNonNull(side);
-        this.price = Objects.requireNonNull(price);
+        this.symbol = Objects.requireNonNull(symbol);
+        this.orderType = Objects.requireNonNull(orderType);
+        this.price = price;
         this.quantity = Objects.requireNonNull(quantity);
 
         if (quantity.value() < 1) throw new IllegalArgumentException("quantity must be positive");
@@ -39,6 +41,39 @@ public class Order {
         this.remaining = quantity;
         this.status = OrderStatus.ACCEPTED;
         this.orderedAt = Instant.now();
+    }
+
+    /**
+     * LIMIT 주문을 생성한다.
+     *
+     * @throws NullPointerException     price가 null인 경우
+     */
+    public static Order createLimit(Side side, Symbol symbol, Price price, Quantity quantity) {
+        Objects.requireNonNull(price, "price must not be null for LIMIT order");
+        return new Order(side, symbol, OrderType.LIMIT, price, quantity);
+    }
+
+    /**
+     * MARKET 주문을 생성한다. price는 항상 null이다.
+     */
+    public static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
+        return new Order(side, symbol, OrderType.MARKET, null, quantity);
+    }
+
+    /**
+     * LIMIT 주문의 가격을 반환한다.
+     *
+     * @throws IllegalStateException MARKET 주문에서 호출 시
+     */
+    public Price getLimitPriceOrThrow() {
+        if (orderType.isMarket()) {
+            throw new IllegalStateException("MARKET order has no price");
+        }
+        return price;
+    }
+
+    public boolean isMarket() {
+        return orderType.isMarket();
     }
 
     /**

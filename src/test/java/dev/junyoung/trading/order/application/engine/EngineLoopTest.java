@@ -49,7 +49,7 @@ class EngineLoopTest {
 	void setUp() {
 		queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
 		handler = mock(EngineHandler.class);
-		engineThread = new EngineThread();
+		engineThread = new EngineThread("BTC");
 		loop = new EngineLoop(queue, handler, engineThread);
 	}
 

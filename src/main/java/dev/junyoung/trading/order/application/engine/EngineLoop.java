@@ -1,14 +1,10 @@
 package dev.junyoung.trading.order.application.engine;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 매칭 엔진의 단일 스레드 이벤트 루프.
@@ -22,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
  * engine-thread: BlockingQueue.take() → EngineHandler.handle()
  * </pre>
  */
-@Component
 @RequiredArgsConstructor
 @Slf4j
 public class EngineLoop implements Runnable {
@@ -43,14 +38,12 @@ public class EngineLoop implements Runnable {
 	 */
 	private final ReentrantLock submitLock = new ReentrantLock();
 
-	/** Spring 빈 초기화 후 engine-thread를 시작한다. */
-	@PostConstruct
+	/** engine-thread를 시작한다. {@link EngineContext}의 생성자에서 호출된다. */
 	public void start() {
 		engineThread.start(this);
 	}
 
-	/** Spring 컨텍스트 종료 시 루프를 중단하고 스레드를 정리한다. */
-	@PreDestroy
+	/** 루프를 중단하고 스레드를 정리한다. {@link EngineManager}의 {@code @PreDestroy}에서 호출된다. */
 	public void stop() {
 		submitLock.lock();
 		try {

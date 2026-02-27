@@ -4,9 +4,9 @@ import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -20,10 +20,11 @@ import java.util.List;
  * 컴파일 타임에 완전성을 검사한다. 새 커맨드 타입 추가 시 여기에도 case를 추가해야 한다.</p>
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class EngineHandler {
 
+	/** 이 핸들러가 처리하는 심볼. {@link OrderBookCache} 업데이트 시 키로 사용된다. */
+	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
@@ -43,12 +44,12 @@ public class EngineHandler {
 			case EngineCommand.PlaceOrder c -> {
 				List<Trade> trades = engine.placeLimitOrder(c.order());
 				if (!trades.isEmpty()) log.info("Trades executed: {}", trades);
-				orderBookCache.update(orderBook);
+				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.CancelOrder c -> {
 				Order cancelled = engine.cancelOrder(c.orderId());
 				orderRepository.save(cancelled);
-				orderBookCache.update(orderBook);
+				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류

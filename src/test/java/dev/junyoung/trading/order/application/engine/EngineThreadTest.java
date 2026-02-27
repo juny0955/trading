@@ -25,7 +25,7 @@ class EngineThreadTest {
 
 	@BeforeEach
 	void setUp() {
-		engineThread = new EngineThread();
+		engineThread = new EngineThread("BTC");
 	}
 
 	@AfterEach
@@ -51,7 +51,7 @@ class EngineThreadTest {
 			});
 
 			assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-			assertThat(threadName.get()).isEqualTo("engine-thread");
+			assertThat(threadName.get()).isEqualTo("engine-thread-BTC");
 		}
 
 		@Test

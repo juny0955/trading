@@ -13,8 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -48,10 +48,14 @@ class EngineHandlerTest {
 	@Mock
 	private OrderRepository orderRepository;
 
-	@InjectMocks
 	private EngineHandler handler;
 
 	private static final Symbol SYMBOL = new Symbol("BTC");
+
+	@BeforeEach
+	void setUp() {
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, orderRepository);
+	}
 
 	private Order buyOrder(long price, long qty) {
 		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
@@ -116,7 +120,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(orderBookCache).update(orderBook);
+			verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -129,7 +133,7 @@ class EngineHandlerTest {
 
 			InOrder inOrder = inOrder(engine, orderBookCache);
 			inOrder.verify(engine).placeLimitOrder(order);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 	}
 
@@ -165,7 +169,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			verify(orderBookCache).update(orderBook);
+			verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -177,7 +181,7 @@ class EngineHandlerTest {
 
 			InOrder inOrder = inOrder(engine, orderBookCache);
 			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -188,7 +192,7 @@ class EngineHandlerTest {
 
 			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(orderBookCache, never()).update(any());
+			verify(orderBookCache, never()).update(any(), any());
 		}
 
 		@Test
@@ -215,7 +219,7 @@ class EngineHandlerTest {
 			InOrder inOrder = inOrder(engine, orderRepository, orderBookCache);
 			inOrder.verify(engine).cancelOrder(orderId);
 			inOrder.verify(orderRepository).save(cancelled);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -227,6 +231,27 @@ class EngineHandlerTest {
 			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderRepository, never()).save(any());
+		}
+	}
+
+	// ── Shutdown ─────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("Shutdown 커맨드")
+	class ShutdownCommand {
+
+		@Test
+		@DisplayName("Shutdown 커맨드를 수신해도 예외가 발생하지 않는다")
+		void handle_shutdown_doesNotThrow() {
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.Shutdown()));
+		}
+
+		@Test
+		@DisplayName("Shutdown 커맨드를 수신하면 engine, repository, cache를 호출하지 않는다")
+		void handle_shutdown_noInteractions() {
+			handler.handle(new EngineCommand.Shutdown());
+
+			verifyNoInteractions(engine, orderRepository, orderBookCache);
 		}
 	}
 }

@@ -1,12 +1,14 @@
 package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -16,15 +18,17 @@ import java.util.concurrent.atomic.AtomicReference;
  * <pre>
  *   engine-thread                       HTTP thread
  *        |                                   |
- *   update(orderBook)                        |
- *   └─ ref.set(new Snapshot(...))  ──────>  ref.get()
- *      (단일 volatile write)            (단일 volatile read)
+ *   update(symbol, orderBook)                |
+ *   └─ cache.computeIfAbsent(symbol)         |
+ *      └─ ref.set(new Snapshot(...)) ──> cache.get(symbol)
+ *         (단일 volatile write)               └─ ref.get()
+ *                                         (단일 volatile read)
  * </pre>
  *
  * <ul>
  *   <li>{@link #update}는 engine-thread 전용. 락 없이 새 스냅샷을 원자적으로 교체한다.</li>
  *   <li>{@link #latestBids}, {@link #latestAsks}는 임의 스레드에서 호출 가능.
- *       단일 {@code ref.get()} 으로 동일 스냅샷에서 두 맵을 꺼내므로 bids/asks 일관성이 보장된다.</li>
+ *       심볼 키로 조회한 {@code ref.get()}으로 동일 스냅샷에서 두 맵을 꺼내므로 bids/asks 일관성이 보장된다.</li>
  * </ul>
  */
 @Component
@@ -46,8 +50,8 @@ public class OrderBookCache {
             Collections.unmodifiableNavigableMap(new TreeMap<Long, Long>())
     );
 
-    /** 항상 최신 스냅샷을 가리킨다. EMPTY로 초기화되어 null이 반환되지 않음이 보장된다. */
-    private final AtomicReference<Snapshot> ref = new AtomicReference<>(EMPTY);
+    /** 심볼 문자열을 키로, 해당 심볼의 최신 스냅샷 참조를 값으로 갖는 캐시. */
+    private final ConcurrentHashMap<String, AtomicReference<Snapshot>> cache = new ConcurrentHashMap<>();
 
     /**
      * engine-thread에서만 호출. {@link OrderBook}의 현재 상태를 스냅샷으로 빌드해 원자적으로 교체한다.
@@ -58,7 +62,8 @@ public class OrderBookCache {
      * <p>반환된 맵은 {@link Collections#unmodifiableNavigableMap}으로 감싸져 있어
      * 외부에서 수정할 수 없다.</p>
      */
-    public void update(OrderBook orderBook) {
+    public void update(Symbol symbol, OrderBook orderBook) {
+        AtomicReference<Snapshot> ref = cache.computeIfAbsent(symbol.value(), _ -> new AtomicReference<>(EMPTY));
         NavigableMap<Long, Long> bids = new TreeMap<>(Comparator.reverseOrder());
         orderBook.bidsSnapshot().forEach((p, q) -> bids.put(p.value(), q));
 
@@ -72,8 +77,12 @@ public class OrderBookCache {
     }
 
     /** 임의 스레드에서 호출 가능. 최신 스냅샷의 매수 호가 맵을 반환한다. 블로킹 없음. null 반환 없음. */
-    public NavigableMap<Long, Long> latestBids() { return ref.get().bids(); }
+    public NavigableMap<Long, Long> latestBids(Symbol symbol) { return getSnapshot(symbol).get().bids(); }
 
     /** 임의 스레드에서 호출 가능. 최신 스냅샷의 매도 호가 맵을 반환한다. 블로킹 없음. null 반환 없음. */
-    public NavigableMap<Long, Long> latestAsks() { return ref.get().asks(); }
+    public NavigableMap<Long, Long> latestAsks(Symbol symbol) { return getSnapshot(symbol).get().asks(); }
+
+    private AtomicReference<Snapshot> getSnapshot(Symbol symbol) {
+        return cache.getOrDefault(symbol.value(), new AtomicReference<>(EMPTY));
+    }
 }

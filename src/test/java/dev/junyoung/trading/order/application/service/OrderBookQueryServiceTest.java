@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.util.Comparator;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.order.application.engine.OrderBookCache;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderBookQueryService")
@@ -41,10 +43,10 @@ class OrderBookQueryServiceTest {
             NavigableMap<Long, Long> asks = new TreeMap<>();
             asks.put(11_000L, 2L);
 
-            when(orderBookCache.latestBids()).thenReturn(bids);
-            when(orderBookCache.latestAsks()).thenReturn(asks);
+            when(orderBookCache.latestBids(any(Symbol.class))).thenReturn(bids);
+            when(orderBookCache.latestAsks(any(Symbol.class))).thenReturn(asks);
 
-            OrderBookResult result = sut.getOrderBookCache();
+            OrderBookResult result = sut.getOrderBookCache("BTC");
 
             assertThat(result.bids()).isEqualTo(bids);
             assertThat(result.asks()).isEqualTo(asks);
@@ -56,10 +58,10 @@ class OrderBookQueryServiceTest {
             NavigableMap<Long, Long> emptyBids = new TreeMap<>(Comparator.reverseOrder());
             NavigableMap<Long, Long> emptyAsks = new TreeMap<>();
 
-            when(orderBookCache.latestBids()).thenReturn(emptyBids);
-            when(orderBookCache.latestAsks()).thenReturn(emptyAsks);
+            when(orderBookCache.latestBids(any(Symbol.class))).thenReturn(emptyBids);
+            when(orderBookCache.latestAsks(any(Symbol.class))).thenReturn(emptyAsks);
 
-            OrderBookResult result = sut.getOrderBookCache();
+            OrderBookResult result = sut.getOrderBookCache("BTC");
 
             assertThat(result.bids()).isEmpty();
             assertThat(result.asks()).isEmpty();
@@ -76,10 +78,10 @@ class OrderBookQueryServiceTest {
             asks.put(12_000L, 1L);
             asks.put(11_000L, 2L);
 
-            when(orderBookCache.latestBids()).thenReturn(bids);
-            when(orderBookCache.latestAsks()).thenReturn(asks);
+            when(orderBookCache.latestBids(any(Symbol.class))).thenReturn(bids);
+            when(orderBookCache.latestAsks(any(Symbol.class))).thenReturn(asks);
 
-            OrderBookResult result = sut.getOrderBookCache();
+            OrderBookResult result = sut.getOrderBookCache("BTC");
 
             assertThat(result.bids().firstKey()).isEqualTo(10_000L);
             assertThat(result.asks().firstKey()).isEqualTo(11_000L);

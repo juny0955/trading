@@ -473,9 +473,9 @@ class MatchingEngineTest {
 	/**
 	 * 부분 체결된 maker가 updatedOrders에서 누락되는 버그를 검증한다.
 	 *
-	 * <p>현재 구현은 완전 체결(FILLED)된 maker만 updatedOrders에 포함시킨다.
-	 * 부분 체결(PARTIALLY_FILLED)된 maker는 메모리 상태가 변경됐음에도 누락되어
-	 * 영속 DB 전환 시 이중 체결(double execution)을 유발할 수 있다.</p>
+ * <p>이전 구현에서는 완전 체결(FILLED)된 maker만 updatedOrders에 포함시키는 버그가 있었습니다.
+ * 부분 체결(PARTIALLY_FILLED)된 maker는 메모리 상태가 변경됐음에도 누락되어
+ * 영속 DB 전환 시 이중 체결(double execution)을 유발할 수 있다.</p>
 	 */
 	@Nested
 	@DisplayName("PlaceResult.updatedOrders 영속화 계약")

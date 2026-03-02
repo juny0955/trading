@@ -5,7 +5,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
 
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -91,17 +94,15 @@ class OrderTest {
             }
 
             @Test
-            @DisplayName("quantity = 0이면 IllegalArgumentException이 발생한다")
+            @DisplayName("quantity = 0이면 BusinessRuleException이 발생한다")
             void rejectZeroQuantity() {
-                assertThatIllegalArgumentException()
-                        .isThrownBy(() -> buyOrder(10_000, 0));
+                assertThrows(BusinessRuleException.class, () -> buyOrder(10_000, 0));
             }
 
             @Test
-            @DisplayName("quantity < 0이면 IllegalArgumentException이 발생한다")
+            @DisplayName("quantity < 0이면 BusinessRuleException이 발생한다 (Quantity VO 검증)")
             void rejectNegativeQuantity() {
-                assertThatIllegalArgumentException()
-                        .isThrownBy(() -> buyOrder(10_000, -1));
+                assertThrows(BusinessRuleException.class, () -> buyOrder(10_000, -1));
             }
 
             @Test
@@ -160,11 +161,10 @@ class OrderTest {
             }
 
             @Test
-            @DisplayName("MARKET 주문에서 getLimitPriceOrThrow()를 호출하면 IllegalStateException이 발생한다")
+            @DisplayName("MARKET 주문에서 getLimitPriceOrThrow()를 호출하면 BusinessRuleException이 발생한다")
             void marketOrderThrowsOnGetPrice() {
                 Order order = Order.createMarket(Side.BUY, SYMBOL, new Quantity(5));
-                assertThatIllegalStateException()
-                        .isThrownBy(order::getLimitPriceOrThrow);
+                assertThrows(BusinessRuleException.class, order::getLimitPriceOrThrow);
             }
 
             @Test
@@ -212,34 +212,34 @@ class OrderTest {
         }
 
         @Test
-        @DisplayName("NEW 상태에서 activate() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("NEW 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromNew() {
             Order order = newBuyOrder(10_000, 5);
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
-        @DisplayName("PARTIALLY_FILLED 상태에서 activate() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("PARTIALLY_FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(2));
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
-        @DisplayName("FILLED 상태에서 activate() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
-        @DisplayName("CANCELLED 상태에서 activate() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("CANCELLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromCancelled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
     }
 
@@ -323,46 +323,41 @@ class OrderTest {
         }
 
         @Test
-        @DisplayName("체결 수량이 잔량보다 크면 IllegalArgumentException이 발생한다 (remaining 음수 방지)")
+        @DisplayName("체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다 (remaining 음수 방지)")
         void fillExceedingRemainingThrows() {
             Order order = newBuyOrder(10_000, 3);
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> order.fill(new Quantity(4)));
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(4)));
         }
 
         @Test
-        @DisplayName("부분 체결 후 체결 수량이 잔량보다 크면 IllegalArgumentException이 발생한다")
+        @DisplayName("부분 체결 후 체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다")
         void fillExceedingRemainingAfterPartialFillThrows() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(3));  // remaining = 2
-            assertThatIllegalArgumentException()
-                    .isThrownBy(() -> order.fill(new Quantity(3)));
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(3)));
         }
 
         @Test
-        @DisplayName("ACCEPTED 상태에서 fill() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("ACCEPTED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromAccepted() {
             Order order = buyOrder(10_000, 5);
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
         }
 
         @Test
-        @DisplayName("FILLED 상태에서 fill() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("FILLED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
         }
 
         @Test
-        @DisplayName("CANCELLED 상태에서 fill() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("CANCELLED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromCancelled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
         }
     }
 
@@ -399,26 +394,26 @@ class OrderTest {
         }
 
         @Test
-        @DisplayName("ACCEPTED 상태에서 cancel() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("ACCEPTED 상태에서 cancel() 호출하면 ConflictException이 발생한다")
         void cannotCancelFromAccepted() {
             Order order = buyOrder(10_000, 5);
-            assertThatIllegalStateException().isThrownBy(order::cancel);
+            assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
-        @DisplayName("FILLED 상태에서 cancel() 호출하면 IllegalStateException이 발생한다")
+        @DisplayName("FILLED 상태에서 cancel() 호출하면 ConflictException이 발생한다")
         void cannotCancelFromFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException().isThrownBy(order::cancel);
+            assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
-        @DisplayName("CANCELLED 상태에서 cancel() 호출하면 IllegalStateException이 발생한다 (중복 취소 방지)")
+        @DisplayName("CANCELLED 상태에서 cancel() 호출하면 ConflictException이 발생한다 (중복 취소 방지)")
         void cannotCancelFromCancelled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException().isThrownBy(order::cancel);
+            assertThrows(ConflictException.class, order::cancel);
         }
     }
 
@@ -529,8 +524,7 @@ class OrderTest {
         void filledOrder_cannotBeFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
         }
 
         @Test
@@ -538,7 +532,7 @@ class OrderTest {
         void filledOrder_cannotBeCancelled() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException().isThrownBy(order::cancel);
+            assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
@@ -546,7 +540,7 @@ class OrderTest {
         void filledOrder_cannotBeActivated() {
             Order order = newBuyOrder(10_000, 5);
             order.fill(new Quantity(5));
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
@@ -554,8 +548,7 @@ class OrderTest {
         void cancelledOrder_cannotBeFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
         }
 
         @Test
@@ -563,7 +556,7 @@ class OrderTest {
         void cancelledOrder_cannotBeCancelledAgain() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException().isThrownBy(order::cancel);
+            assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
@@ -571,7 +564,7 @@ class OrderTest {
         void cancelledOrder_cannotBeActivated() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThatIllegalStateException().isThrownBy(order::activate);
+            assertThrows(ConflictException.class, order::activate);
         }
     }
 }

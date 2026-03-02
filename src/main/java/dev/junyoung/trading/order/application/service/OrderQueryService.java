@@ -4,6 +4,7 @@ import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +17,7 @@ public class OrderQueryService implements GetOrderUseCase {
     @Override
     public OrderResult getOrder(String orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order Not Found"));
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         return new OrderResult(
             order.getOrderId().toString(),

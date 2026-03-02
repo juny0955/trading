@@ -7,6 +7,8 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+import dev.junyoung.trading.common.exception.ConflictException;
 import lombok.AccessLevel;
 import lombok.Getter;
 
@@ -36,7 +38,9 @@ public class Order {
         this.price = price;
         this.quantity = Objects.requireNonNull(quantity);
 
-        if (quantity.value() < 1) throw new IllegalArgumentException("quantity must be positive");
+        if (quantity.value() < 1) {
+            throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "quantity must be positive");
+        }
 
         this.remaining = quantity;
         this.status = OrderStatus.ACCEPTED;
@@ -78,7 +82,7 @@ public class Order {
      */
     public Price getLimitPriceOrThrow() {
         if (orderType.isMarket()) {
-            throw new IllegalStateException("MARKET order has no price");
+            throw new BusinessRuleException("ORDER_NO_PRICE", "MARKET order has no price");
         }
         return price;
     }
@@ -94,7 +98,7 @@ public class Order {
      */
     public void activate() {
         if (status != OrderStatus.ACCEPTED) {
-            throw new IllegalStateException("Order is not in accepted state: " + status);
+            throw new ConflictException("ORDER_INVALID_STATE", "Order is not in accepted state: " + status);
         }
         this.status = OrderStatus.NEW;
     }
@@ -127,7 +131,7 @@ public class Order {
 
     private void requireActive() {
         if (status != OrderStatus.NEW && status != OrderStatus.PARTIALLY_FILLED) {
-            throw new IllegalStateException("Order is not in an active state: " + status);
+            throw new ConflictException("ORDER_INVALID_STATE", "Order is not in an active state: " + status);
         }
     }
 }

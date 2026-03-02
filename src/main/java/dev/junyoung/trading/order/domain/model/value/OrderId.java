@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.domain.model.value;
 
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+
 import java.util.Objects;
 import java.util.UUID;
 
@@ -17,7 +19,7 @@ public record OrderId(
 
     public static OrderId from(String raw) {
         if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("OrderId cannot be null or blank");
+            throw new BusinessRuleException("ORDER_ID_INVALID", "OrderId cannot be null or blank");
         }
 
         return new OrderId(UUID.fromString(raw));

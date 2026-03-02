@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -70,24 +71,12 @@ class OrderQueryServiceTest {
         }
 
         @Test
-        @DisplayName("주문이 존재하지 않으면 IllegalArgumentException이 발생한다")
-        void getOrder_notFound_throwsIllegalArgumentException() {
+        @DisplayName("주문이 존재하지 않으면 OrderNotFoundException이 발생한다")
+        void getOrder_notFound_throwsOrderNotFoundException() {
             String orderId = UUID.randomUUID().toString();
             when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class, () -> sut.getOrder(orderId));
-        }
-
-        @Test
-        @DisplayName("주문이 존재하지 않을 때 예외 메시지가 'Order Not Found'이다")
-        void getOrder_notFound_exceptionMessageIsOrderNotFound() {
-            String orderId = UUID.randomUUID().toString();
-            when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> sut.getOrder(orderId));
-
-            assertThat(ex.getMessage()).isEqualTo("Order Not Found");
+            assertThrows(OrderNotFoundException.class, () -> sut.getOrder(orderId));
         }
     }
 }

@@ -9,6 +9,10 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
+import dev.junyoung.trading.order.domain.service.PlaceResult;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

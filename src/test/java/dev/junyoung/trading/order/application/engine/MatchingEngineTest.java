@@ -468,6 +468,71 @@ class MatchingEngineTest {
 		}
 	}
 
+	// ── PlaceResult.updatedOrders 영속화 계약 ──────────────────────────────
+
+	/**
+	 * 부분 체결된 maker가 updatedOrders에서 누락되는 버그를 검증한다.
+	 *
+	 * <p>현재 구현은 완전 체결(FILLED)된 maker만 updatedOrders에 포함시킨다.
+	 * 부분 체결(PARTIALLY_FILLED)된 maker는 메모리 상태가 변경됐음에도 누락되어
+	 * 영속 DB 전환 시 이중 체결(double execution)을 유발할 수 있다.</p>
+	 */
+	@Nested
+	@DisplayName("PlaceResult.updatedOrders 영속화 계약")
+	class UpdatedOrdersPersistenceContract {
+
+		@Test
+		@DisplayName("LIMIT taker가 maker를 부분 체결하면 부분 체결된 maker가 updatedOrders에 포함되어야 한다")
+		void limitOrder_partiallyFilledMaker_mustBeInUpdatedOrders() {
+			Order maker = activatedSellOrder(10_000, 10);
+			orderBook.add(maker);
+
+			Order taker = buyOrder(10_000, 3); // taker qty(3) < maker qty(10) → maker PARTIALLY_FILLED
+			PlaceResult result = engine.placeLimitOrder(taker);
+
+			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(result.updatedOrders()).contains(maker);
+		}
+
+		@Test
+		@DisplayName("MARKET taker가 maker를 부분 체결하면 부분 체결된 maker가 updatedOrders에 포함되어야 한다")
+		void marketOrder_partiallyFilledMaker_mustBeInUpdatedOrders() {
+			Order maker = activatedSellOrder(10_000, 10);
+			orderBook.add(maker);
+
+			Order taker = marketBuyOrder(3); // taker qty(3) < maker qty(10) → maker PARTIALLY_FILLED
+			PlaceResult result = engine.placeMarketOrder(taker);
+
+			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(result.updatedOrders()).contains(maker);
+		}
+
+		@Test
+		@DisplayName("완전 체결된 maker는 updatedOrders에 포함된다 (기존 동작 보호)")
+		void limitOrder_fullyFilledMaker_isInUpdatedOrders() {
+			Order maker = activatedSellOrder(10_000, 5);
+			orderBook.add(maker);
+
+			Order taker = buyOrder(10_000, 5);
+			PlaceResult result = engine.placeLimitOrder(taker);
+
+			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(result.updatedOrders()).contains(maker);
+		}
+
+		@Test
+		@DisplayName("체결에 참여한 taker와 부분 체결된 maker 모두 updatedOrders에 포함되어야 한다")
+		void limitOrder_allAffectedOrders_includedInUpdatedOrders() {
+			Order maker = activatedSellOrder(10_000, 10);
+			orderBook.add(maker);
+
+			Order taker = buyOrder(10_000, 3);
+			PlaceResult result = engine.placeLimitOrder(taker);
+
+			assertThat(result.updatedOrders()).containsExactlyInAnyOrder(taker, maker);
+		}
+	}
+
 	// ── cancelOrder() ──────────────────────────────────────────────────────
 
 	@Nested

@@ -73,7 +73,7 @@ public class MatchingEngine {
 		return order;
 	}
 
-	private record MatchLoopResult(List<Trade> trades, List<Order> filledMakers) {}
+	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers) {}
 
 	private PlaceResult placeOrder(Order taker, Consumer<Order> onRemaining) {
 		taker.activate();
@@ -81,7 +81,7 @@ public class MatchingEngine {
 		if (taker.getRemaining().value() > 0) {
 			onRemaining.accept(taker);
 		}
-		var updatedOrders = Stream.concat(loop.filledMakers().stream(), Stream.of(taker)).toList();
+		var updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
 		return new PlaceResult(updatedOrders, loop.trades());
 	}
 
@@ -91,7 +91,7 @@ public class MatchingEngine {
 	 */
 	private MatchLoopResult runMatchingLoop(Order taker) {
 		List<Trade> trades = new ArrayList<>();
-		List<Order> filledMakers = new ArrayList<>();
+		List<Order> updatedMakers = new ArrayList<>();
 		var side = taker.getSide().opposite();
 
 		while (taker.getRemaining().value() > 0) {
@@ -108,10 +108,10 @@ public class MatchingEngine {
 			taker.fill(qty);
 			if (maker.getRemaining().value() == 0) {
 				orderBook.poll(side);
-				filledMakers.add(maker);
 			}
+			updatedMakers.add(maker);
 		}
-		return new MatchLoopResult(trades, filledMakers);
+		return new MatchLoopResult(trades, updatedMakers);
 	}
 
 	/**

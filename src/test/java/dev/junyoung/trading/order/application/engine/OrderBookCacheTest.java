@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@link OrderBookCache} 단위 테스트.
  *
  * <p>engine-thread가 {@link OrderBookCache#update}로 스냅샷을 교체하고, HTTP 스레드가
- * {@link OrderBookCache#latestBids}/{@link OrderBookCache#latestAsks}로 읽는 시나리오를 단일 스레드에서 검증한다.
+ * {@link OrderBookCache#getSnapshot}으로 읽는 시나리오를 단일 스레드에서 검증한다.
  * 동시성 정확성은 통합/스트레스 테스트에서 별도 검증한다.</p>
  */
 @DisplayName("OrderBookCache")
@@ -57,42 +57,42 @@ class OrderBookCacheTest {
 	class BeforeUpdate {
 
 		@Test
-		@DisplayName("등록되지 않은 심볼의 latestBids()는 빈 맵을 반환한다 (NPE 없음)")
-		void latestBids_unknownSymbol_returnsEmptyMap() {
-			NavigableMap<Long, Long> bids = cache.latestBids(new Symbol("UNKNOWN"));
+		@DisplayName("등록되지 않은 심볼의 bids()는 빈 맵을 반환한다 (NPE 없음)")
+		void getSnapshot_unknownSymbol_bidsIsEmpty() {
+			NavigableMap<Long, Long> bids = cache.getSnapshot(new Symbol("UNKNOWN")).bids();
 
 			assertThat(bids).isNotNull().isEmpty();
 		}
 
 		@Test
-		@DisplayName("등록되지 않은 심볼의 latestAsks()는 빈 맵을 반환한다 (NPE 없음)")
-		void latestAsks_unknownSymbol_returnsEmptyMap() {
-			NavigableMap<Long, Long> asks = cache.latestAsks(new Symbol("UNKNOWN"));
+		@DisplayName("등록되지 않은 심볼의 asks()는 빈 맵을 반환한다 (NPE 없음)")
+		void getSnapshot_unknownSymbol_asksIsEmpty() {
+			NavigableMap<Long, Long> asks = cache.getSnapshot(new Symbol("UNKNOWN")).asks();
 
 			assertThat(asks).isNotNull().isEmpty();
 		}
 	}
 
-	// ── latestBids() ──────────────────────────────────────────────────────
+	// ── bids() ──────────────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("latestBids()")
-	class LatestBids {
+	@DisplayName("bids()")
+	class Bids {
 
 		@Test
 		@DisplayName("update 후 BUY 주문 가격이 bids에 포함된다")
-		void latestBids_afterUpdate_containsBidPrice() {
+		void bids_afterUpdate_containsBidPrice() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestBids(BTC)).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(10_000L);
 		}
 
 		@Test
 		@DisplayName("bids는 가격 내림차순으로 정렬된다 (최고가 firstKey)")
-		void latestBids_descendingOrder() {
+		void bids_descendingOrder() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 9_000, 1));
 			book.add(activatedBuy(BTC, 11_000, 1));
@@ -100,14 +100,14 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> bids = cache.latestBids(BTC);
+			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
 			assertThat(bids.firstKey()).isEqualTo(11_000L);
 			assertThat(bids.lastKey()).isEqualTo(9_000L);
 		}
 
 		@Test
 		@DisplayName("같은 가격 레벨의 여러 BUY 주문은 수량이 합산된다")
-		void latestBids_aggregatesQuantitiesAtSamePrice() {
+		void bids_aggregatesQuantitiesAtSamePrice() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 			book.add(activatedBuy(BTC, 10_000, 3));
@@ -115,41 +115,41 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestBids(BTC).get(10_000L)).isEqualTo(10L);
+			assertThat(cache.getSnapshot(BTC).bids().get(10_000L)).isEqualTo(10L);
 		}
 
 		@Test
 		@DisplayName("SELL 주문은 bids에 포함되지 않는다")
-		void latestBids_doesNotContainSellOrders() {
+		void bids_doesNotContainSellOrders() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestBids(BTC)).isEmpty();
+			assertThat(cache.getSnapshot(BTC).bids()).isEmpty();
 		}
 	}
 
-	// ── latestAsks() ──────────────────────────────────────────────────────
+	// ── asks() ──────────────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("latestAsks()")
-	class LatestAsks {
+	@DisplayName("asks()")
+	class Asks {
 
 		@Test
 		@DisplayName("update 후 SELL 주문 가격이 asks에 포함된다")
-		void latestAsks_afterUpdate_containsAskPrice() {
+		void asks_afterUpdate_containsAskPrice() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestAsks(BTC)).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).asks()).containsKey(10_000L);
 		}
 
 		@Test
 		@DisplayName("asks는 가격 오름차순으로 정렬된다 (최저가 firstKey)")
-		void latestAsks_ascendingOrder() {
+		void asks_ascendingOrder() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 11_000, 1));
 			book.add(activatedSell(BTC, 9_000, 1));
@@ -157,32 +157,32 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> asks = cache.latestAsks(BTC);
+			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
 			assertThat(asks.firstKey()).isEqualTo(9_000L);
 			assertThat(asks.lastKey()).isEqualTo(11_000L);
 		}
 
 		@Test
 		@DisplayName("같은 가격 레벨의 여러 SELL 주문은 수량이 합산된다")
-		void latestAsks_aggregatesQuantitiesAtSamePrice() {
+		void asks_aggregatesQuantitiesAtSamePrice() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 4));
 			book.add(activatedSell(BTC, 10_000, 6));
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestAsks(BTC).get(10_000L)).isEqualTo(10L);
+			assertThat(cache.getSnapshot(BTC).asks().get(10_000L)).isEqualTo(10L);
 		}
 
 		@Test
 		@DisplayName("BUY 주문은 asks에 포함되지 않는다")
-		void latestAsks_doesNotContainBuyOrders() {
+		void asks_doesNotContainBuyOrders() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 
 			cache.update(BTC, book);
 
-			assertThat(cache.latestAsks(BTC)).isEmpty();
+			assertThat(cache.getSnapshot(BTC).asks()).isEmpty();
 		}
 	}
 
@@ -194,7 +194,7 @@ class OrderBookCacheTest {
 
 		@Test
 		@DisplayName("두 번째 update 후 최신 bids 스냅샷이 반환된다")
-		void latestBids_returnsLatestSnapshot() {
+		void bids_returnsLatestSnapshot() {
 			OrderBook book1 = new OrderBook();
 			book1.add(activatedBuy(BTC, 10_000, 5));
 			cache.update(BTC, book1);
@@ -203,14 +203,14 @@ class OrderBookCacheTest {
 			book2.add(activatedBuy(BTC, 12_000, 3));
 			cache.update(BTC, book2);
 
-			NavigableMap<Long, Long> bids = cache.latestBids(BTC);
+			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
 			assertThat(bids).containsKey(12_000L);
 			assertThat(bids).doesNotContainKey(10_000L);
 		}
 
 		@Test
 		@DisplayName("두 번째 update 후 최신 asks 스냅샷이 반환된다")
-		void latestAsks_returnsLatestSnapshot() {
+		void asks_returnsLatestSnapshot() {
 			OrderBook book1 = new OrderBook();
 			book1.add(activatedSell(BTC, 10_000, 5));
 			cache.update(BTC, book1);
@@ -219,7 +219,7 @@ class OrderBookCacheTest {
 			book2.add(activatedSell(BTC, 8_000, 3));
 			cache.update(BTC, book2);
 
-			NavigableMap<Long, Long> asks = cache.latestAsks(BTC);
+			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
 			assertThat(asks).containsKey(8_000L);
 			assertThat(asks).doesNotContainKey(10_000L);
 		}
@@ -233,23 +233,22 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, new OrderBook());
 
-			assertThat(cache.latestBids(BTC)).isEmpty();
-			assertThat(cache.latestAsks(BTC)).isEmpty();
+			assertThat(cache.getSnapshot(BTC).bids()).isEmpty();
+			assertThat(cache.getSnapshot(BTC).asks()).isEmpty();
 		}
 
 		@Test
-		@DisplayName("latestBids·latestAsks는 동일한 스냅샷에서 꺼낸 값이다 (bids·asks 일관성)")
-		void latestBids_and_latestAsks_comeFromSameSnapshot() {
+		@DisplayName("getSnapshot() 단일 호출로 bids·asks가 동일 스냅샷에서 나온다")
+		void getSnapshot_bidsAndAsks_comeFromSameSnapshot() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 9_000, 2));
 			book.add(activatedSell(BTC, 11_000, 3));
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> bids = cache.latestBids(BTC);
-			NavigableMap<Long, Long> asks = cache.latestAsks(BTC);
+			OrderBookSnapshot snapshot = cache.getSnapshot(BTC);
 
-			assertThat(bids).containsKey(9_000L);
-			assertThat(asks).containsKey(11_000L);
+			assertThat(snapshot.bids()).containsKey(9_000L);
+			assertThat(snapshot.asks()).containsKey(11_000L);
 		}
 	}
 
@@ -260,26 +259,26 @@ class OrderBookCacheTest {
 	class Immutability {
 
 		@Test
-		@DisplayName("latestBids() 반환 맵은 수정 불가하다")
-		void latestBids_returnsUnmodifiableMap() {
+		@DisplayName("bids() 반환 맵은 수정 불가하다")
+		void bids_returnsUnmodifiableMap() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> bids = cache.latestBids(BTC);
+			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
 
 			assertThatThrownBy(() -> bids.put(9_000L, 1L))
 					.isInstanceOf(UnsupportedOperationException.class);
 		}
 
 		@Test
-		@DisplayName("latestAsks() 반환 맵은 수정 불가하다")
-		void latestAsks_returnsUnmodifiableMap() {
+		@DisplayName("asks() 반환 맵은 수정 불가하다")
+		void asks_returnsUnmodifiableMap() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> asks = cache.latestAsks(BTC);
+			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
 
 			assertThatThrownBy(() -> asks.put(11_000L, 1L))
 					.isInstanceOf(UnsupportedOperationException.class);
@@ -303,8 +302,8 @@ class OrderBookCacheTest {
 			ethBook.add(activatedBuy(ETH, 2_000, 10));
 			cache.update(ETH, ethBook);
 
-			assertThat(cache.latestBids(BTC)).containsKey(30_000L).doesNotContainKey(2_000L);
-			assertThat(cache.latestBids(ETH)).containsKey(2_000L).doesNotContainKey(30_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(30_000L).doesNotContainKey(2_000L);
+			assertThat(cache.getSnapshot(ETH).bids()).containsKey(2_000L).doesNotContainKey(30_000L);
 		}
 
 		@Test
@@ -316,19 +315,19 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, new OrderBook()); // BTC 갱신
 
-			assertThat(cache.latestBids(ETH)).containsKey(2_000L);
+			assertThat(cache.getSnapshot(ETH).bids()).containsKey(2_000L);
 		}
 
 		@Test
 		@DisplayName("미등록 심볼 조회는 등록된 심볼 스냅샷에 영향을 주지 않는다")
-		void latestBids_unknownSymbol_doesNotAffectRegisteredSymbol() {
+		void getSnapshot_unknownSymbol_doesNotAffectRegisteredSymbol() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 			cache.update(BTC, book);
 
-			cache.latestBids(new Symbol("UNKNOWN")); // 부수 효과 없어야 함
+			cache.getSnapshot(new Symbol("UNKNOWN")); // 부수 효과 없어야 함
 
-			assertThat(cache.latestBids(BTC)).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(10_000L);
 		}
 	}
 }

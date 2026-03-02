@@ -65,8 +65,8 @@ class OrderBookQueryServiceTest {
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
-            assertThat(result.bids()).containsKey(10_000L).containsKey(9_000L);
-            assertThat(result.asks()).containsKey(11_000L);
+            assertThat(result.bids()).hasSize(2).containsEntry(10_000L, 5L).containsEntry(9_000L, 3L);
+            assertThat(result.asks()).hasSize(1).containsEntry(11_000L, 2L);
         }
 
         @Test

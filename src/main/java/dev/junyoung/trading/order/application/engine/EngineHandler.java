@@ -3,12 +3,9 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -42,8 +39,12 @@ public class EngineHandler {
 	public void handle(EngineCommand command) {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
-				List<Trade> trades = engine.placeLimitOrder(c.order());
-				if (!trades.isEmpty()) log.info("Trades executed: {}", trades);
+				Order order = c.order();
+				PlaceResult result = order.isMarket()
+					? engine.placeMarketOrder(order)
+					: engine.placeLimitOrder(order);
+				result.updatedOrders().forEach(orderRepository::save);
+				if (!result.trades().isEmpty()) log.info("Trades executed: {}", result.trades());
 				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.CancelOrder c -> {

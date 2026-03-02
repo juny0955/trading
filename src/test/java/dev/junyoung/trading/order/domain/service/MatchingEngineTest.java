@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.domain.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,7 +20,7 @@ import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @DisplayName("MatchingEngine")
-class MatchingEngineTest {
+public class MatchingEngineTest {
 
 	private OrderBook orderBook;
 	private MatchingEngine engine;

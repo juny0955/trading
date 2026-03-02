@@ -1,0 +1,5 @@
+trading:
+  symbols:
+    - BTC
+    - ETH
+    - TEST

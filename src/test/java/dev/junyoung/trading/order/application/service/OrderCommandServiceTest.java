@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -172,23 +173,12 @@ class OrderCommandServiceTest {
         }
 
         @Test
-        @DisplayName("orderRepository에 주문이 없으면 IllegalArgumentException이 발생한다")
-        void cancelOrder_orderNotFound_throwsIllegalArgumentException() {
+        @DisplayName("orderRepository에 주문이 없으면 OrderNotFoundException이 발생한다")
+        void cancelOrder_orderNotFound_throwsOrderNotFoundException() {
             String orderId = UUID.randomUUID().toString();
             when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class, () -> sut.cancelOrder(orderId));
-        }
-
-        @Test
-        @DisplayName("orderRepository에 주문이 없을 때 예외 메시지가 'Order Not Found'이다")
-        void cancelOrder_orderNotFound_exceptionMessageIsOrderNotFound() {
-            String orderId = UUID.randomUUID().toString();
-            when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> sut.cancelOrder(orderId));
-            assertThat(ex.getMessage()).isEqualTo("Order Not Found");
+            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(orderId));
         }
 
         @Test

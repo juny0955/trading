@@ -6,7 +6,11 @@ import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +32,17 @@ public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCas
     @Override
     public void cancelOrder(String orderId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order Not Found"));
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (order.isMarket()) {
+            throw new OrderNotCancellableException(orderId);
+        }
+
+        OrderStatus status = order.getStatus();
+        if (status == OrderStatus.FILLED || status == OrderStatus.CANCELLED) {
+            throw new OrderAlreadyFinalizedException(orderId);
+        }
+
         engineManager.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId)));
     }
 }

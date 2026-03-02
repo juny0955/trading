@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.config.TradingProperties;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -111,9 +112,9 @@ class EngineManagerTest {
 		}
 
 		@Test
-		@DisplayName("미등록 심볼로 제출하면 IllegalArgumentException이 발생한다")
-		void submit_unknownSymbol_throwsIllegalArgumentException() {
-			assertThrows(IllegalArgumentException.class,
+		@DisplayName("미등록 심볼로 제출하면 UnsupportedSymbolException이 발생한다")
+		void submit_unknownSymbol_throwsUnsupportedSymbolException() {
+			assertThrows(UnsupportedSymbolException.class,
 					() -> engineManager.submit(new Symbol("XRP"), placeOrder("XRP")));
 		}
 

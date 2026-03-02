@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.config.TradingProperties;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +62,7 @@ public class EngineManager {
      */
     public void submit(Symbol symbol, EngineCommand command) {
         EngineContext ctx = contexts.get(symbol);
-        if (ctx == null) throw new IllegalArgumentException(symbol + " not found");
+        if (ctx == null) throw new UnsupportedSymbolException(symbol.value());
         ctx.submit(command);
     }
 }

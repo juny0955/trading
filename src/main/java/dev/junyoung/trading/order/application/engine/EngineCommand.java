@@ -5,6 +5,7 @@ import java.util.concurrent.BlockingQueue;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.service.MatchingEngine;
 
 /**
  * 매칭 엔진에 전달되는 커맨드 타입을 정의한다.

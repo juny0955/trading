@@ -58,7 +58,7 @@ public class EngineManager {
     /**
      * 커맨드를 해당 심볼의 엔진 큐에 위임한다.
      *
-     * @throws IllegalArgumentException 등록되지 않은 심볼인 경우
+     * @throws UnsupportedSymbolException 등록되지 않은 심볼인 경우
      */
     public void submit(Symbol symbol, EngineCommand command) {
         EngineContext ctx = contexts.get(symbol);

@@ -24,8 +24,8 @@ public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCas
     @Override
     public String placeOrder(String symbol, String side, String orderType, Long price, long quantity) {
         Order order = Order.create(symbol, side, orderType, price, quantity);
-        orderRepository.save(order);  // ACCEPTED 상태로 최초 저장 (참조 공유로 이후 상태 변경 자동 반영)
         engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+        orderRepository.save(order);  // ACCEPTED 상태로 최초 저장 (참조 공유로 이후 상태 변경 자동 반영)
         return order.getOrderId().toString();
     }
 

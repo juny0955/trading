@@ -2,6 +2,8 @@ package dev.junyoung.trading.order.application.service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -190,6 +192,31 @@ class OrderCommandServiceTest {
             sut.cancelOrder(orderId);
 
             verify(orderRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MARKET 주문 취소 시 OrderNotCancellableException이 발생한다")
+        void cancelMarketOrder_throwsOrderNotCancellableException() {
+            String orderId = UUID.randomUUID().toString();
+            Order marketOrder = Order.createMarket(Side.BUY, new Symbol("BTC"), new Quantity(5));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
+
+            assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(orderId));
+            verify(engineManager, never()).submit(any(), any());
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED된 주문 취소 시 OrderAlreadyFinalizedException이 발생한다")
+        void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
+            String orderId = UUID.randomUUID().toString();
+            Order order = Order.createLimit(Side.BUY, new Symbol("BTC"), new Price(10_000), new Quantity(5));
+            order.activate();
+            order.cancel(); // → CANCELLED 상태
+
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(orderId));
+            verify(engineManager, never()).submit(any(), any());
         }
     }
 }

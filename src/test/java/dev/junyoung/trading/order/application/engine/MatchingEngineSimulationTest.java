@@ -22,6 +22,7 @@ import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.PlaceResult;
 
 @DisplayName("MatchingEngine 시뮬레이션 — 랜덤 10만 건 불변식 검증")
 class MatchingEngineSimulationTest {
@@ -169,5 +170,57 @@ class MatchingEngineSimulationTest {
             .as("MARKET 주문 최종 상태 위반 건수 (FILLED 또는 CANCELLED 이어야 함)").isEqualTo(0);
         assertThat(stateViolations)
             .as("상태 전이 위반 건수").isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("BTC·ETH 다종목 랜덤 시뮬레이션 — 종목 간 상태 간섭 0건이어야 한다")
+    void multiSymbolSimulation_noInterference() {
+        Symbol btcSym = new Symbol("BTC");
+        Symbol ethSym = new Symbol("ETH");
+        MatchingEngine btcEngine = new MatchingEngine(new OrderBook());
+        MatchingEngine ethEngine = new MatchingEngine(new OrderBook());
+
+        Random random = new Random(SEED);
+        Map<OrderId, Symbol> ownerMap = new HashMap<>();
+        int interferenceViolations = 0;
+        int stateViolations        = 0;
+
+        for (int i = 0; i < ORDER_COUNT / 2; i++) {
+            boolean isBtc  = random.nextBoolean();
+            Symbol symbol  = isBtc ? btcSym : ethSym;
+            MatchingEngine engine = isBtc ? btcEngine : ethEngine;
+
+            Side side = random.nextBoolean() ? Side.BUY : Side.SELL;
+            long qty  = QTY_MIN + random.nextLong(QTY_MAX - QTY_MIN + 1);
+            boolean isMarket = random.nextInt(10) < 3;
+
+            Order order;
+            PlaceResult result;
+            try {
+                if (isMarket) {
+                    order  = Order.createMarket(side, symbol, new Quantity(qty));
+                    result = engine.placeMarketOrder(order);
+                } else {
+                    long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
+                    order  = Order.createLimit(side, symbol, new Price(price), new Quantity(qty));
+                    result = engine.placeLimitOrder(order);
+                }
+            } catch (IllegalStateException e) {
+                stateViolations++;
+                continue;
+            }
+            ownerMap.put(order.getOrderId(), symbol);
+
+            for (Trade trade : result.trades()) {
+                Symbol buyOwner  = ownerMap.get(trade.buyOrderId());
+                Symbol sellOwner = ownerMap.get(trade.sellOrderId());
+                if (buyOwner != null && sellOwner != null && !buyOwner.equals(sellOwner)) {
+                    interferenceViolations++;
+                }
+            }
+        }
+
+        assertThat(interferenceViolations).as("종목 간 체결 간섭 건수").isEqualTo(0);
+        assertThat(stateViolations).as("상태 전이 위반 건수").isEqualTo(0);
     }
 }

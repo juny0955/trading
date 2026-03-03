@@ -18,7 +18,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -134,6 +138,76 @@ class EngineManagerTest {
 
 			assertThrows(IllegalStateException.class,
 					() -> engineManager.submit(new Symbol("BTC"), placeOrder("BTC")));
+		}
+	}
+
+	// ── ThreadConcurrency ────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("스레드 동시성")
+	class ThreadConcurrency {
+
+		@BeforeEach
+		void setUp() {
+			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
+			engineManager = new EngineManager(tradingProperties, orderRepository, orderBookCache);
+			engineManager.start();
+		}
+
+		@Test
+		@DisplayName("N개 스레드가 동시에 submit해도 모든 주문이 정상 수신된다")
+		void concurrentSubmit_allOrdersAccepted() throws InterruptedException {
+			int threadCount = 20;
+			CountDownLatch startGate = new CountDownLatch(1);
+			CountDownLatch doneLatch = new CountDownLatch(threadCount);
+			AtomicInteger successCount = new AtomicInteger(0);
+
+			for (int i = 0; i < threadCount; i++) {
+				new Thread(() -> {
+					try {
+						startGate.await();
+						engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+						successCount.incrementAndGet();
+					} catch (Exception ignored) {
+					} finally {
+						doneLatch.countDown();
+					}
+				}).start();
+			}
+
+			startGate.countDown();
+			assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
+			assertThat(successCount.get()).isEqualTo(threadCount);
+		}
+
+		@Test
+		@DisplayName("BTC·ETH 양쪽에 동시 submit해도 모든 주문이 정상 수신된다")
+		void concurrentSubmit_multipleSymbols_allAccepted() throws InterruptedException {
+			int perSymbol = 10;
+			CountDownLatch startGate = new CountDownLatch(1);
+			CountDownLatch doneLatch = new CountDownLatch(perSymbol * 2);
+			AtomicInteger successCount = new AtomicInteger(0);
+
+			for (int i = 0; i < perSymbol; i++) {
+				new Thread(() -> {
+					try {
+						startGate.await();
+						engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+						successCount.incrementAndGet();
+					} catch (Exception ignored) { } finally { doneLatch.countDown(); }
+				}).start();
+				new Thread(() -> {
+					try {
+						startGate.await();
+						engineManager.submit(new Symbol("ETH"), placeOrder("ETH"));
+						successCount.incrementAndGet();
+					} catch (Exception ignored) { } finally { doneLatch.countDown(); }
+				}).start();
+			}
+
+			startGate.countDown();
+			assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
+			assertThat(successCount.get()).isEqualTo(perSymbol * 2);
 		}
 	}
 

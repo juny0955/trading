@@ -131,7 +131,7 @@ class OrderCommandServiceTest {
 
         @Test
         @DisplayName("orderRepository.save는 engineManager.submit 이후에 호출된다")
-        void placeOrder_savesOrderBeforeSubmittingCommand() {
+        void placeOrder_savesOrderAfterSubmittingCommand() {
             sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             InOrder inOrder = inOrder(orderRepository, engineManager);

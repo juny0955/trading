@@ -1,6 +1,6 @@
 package dev.junyoung.trading.order.adapter.in.rest;
 
-import dev.junyoung.trading.order.adapter.in.rest.reqeust.PlaceOrderRequest;
+import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.response.OrderResponse;
 import dev.junyoung.trading.order.adapter.in.rest.response.PlaceOrderResponse;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
@@ -22,7 +22,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody PlaceOrderRequest request) {
-        String orderId = placeOrderUseCase.placeOrder(request.side(), request.price(), request.quantity());
+        String orderId = placeOrderUseCase.placeOrder(request.symbol(), request.side(), request.orderType(), request.price(), request.quantity());
 
         return ResponseEntity
                 .accepted()

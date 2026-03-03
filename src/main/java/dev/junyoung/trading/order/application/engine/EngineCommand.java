@@ -5,6 +5,7 @@ import java.util.concurrent.BlockingQueue;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.service.MatchingEngine;
 
 /**
  * 매칭 엔진에 전달되는 커맨드 타입을 정의한다.
@@ -19,9 +20,10 @@ public sealed interface EngineCommand
 		permits EngineCommand.PlaceOrder, EngineCommand.CancelOrder, EngineCommand.Shutdown {
 
 	/**
-	 * 지정가 주문 등록 커맨드.
-	 * {@code order}는 {@link OrderStatus#ACCEPTED}
-	 * 상태여야 하며, engine-thread에서 {@link MatchingEngine#placeLimitOrder}로 전달된다.
+	 * 주문 등록 커맨드 (LIMIT / MARKET 공통).
+	 * {@code order}는 {@link OrderStatus#ACCEPTED} 상태여야 하며,
+	 * {@code order.orderType()}에 따라 engine-thread에서
+	 * {@link MatchingEngine#placeLimitOrder} 또는 {@link MatchingEngine#placeMarketOrder}로 분기된다.
 	 */
 	record PlaceOrder(Order order) implements EngineCommand { }
 

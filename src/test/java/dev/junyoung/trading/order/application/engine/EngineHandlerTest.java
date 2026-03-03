@@ -8,12 +8,17 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
+import dev.junyoung.trading.order.domain.service.PlaceResult;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,11 +52,21 @@ class EngineHandlerTest {
 	@Mock
 	private OrderRepository orderRepository;
 
-	@InjectMocks
 	private EngineHandler handler;
 
+	private static final Symbol SYMBOL = new Symbol("BTC");
+
+	@BeforeEach
+	void setUp() {
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, orderRepository);
+	}
+
 	private Order buyOrder(long price, long qty) {
-		return new Order(Side.BUY, new Price(price), new Quantity(qty));
+		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+	}
+
+	private Order marketBuyOrder(long qty) {
+		return Order.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
 	}
 
 	// ── PlaceOrder ──────────────────────────────────────────────────────────
@@ -64,7 +79,7 @@ class EngineHandlerTest {
 		@DisplayName("Order를 MatchingEngine.placeLimitOrder()에 전달한다")
 		void handle_placeOrder_callsPlaceLimitOrder() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(List.of());
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -75,7 +90,7 @@ class EngineHandlerTest {
 		@DisplayName("체결 없이 처리되면 예외 없이 정상 종료한다")
 		void handle_placeOrder_noTrades_doesNotThrow() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(List.of());
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
 		}
@@ -84,10 +99,10 @@ class EngineHandlerTest {
 		@DisplayName("Trade가 발생해도 예외 없이 정상 종료한다")
 		void handle_placeOrder_withTrades_doesNotThrow() {
 			Order taker = buyOrder(10_000, 5);
-			Order maker = new Order(Side.SELL, new Price(10_000), new Quantity(5));
+			Order maker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
 			maker.activate();
 			Trade trade = Trade.of(taker, maker, new Quantity(5));
-			when(engine.placeLimitOrder(taker)).thenReturn(List.of(trade));
+			when(engine.placeLimitOrder(taker)).thenReturn(PlaceResult.of(List.of(), List.of(trade)));
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(taker)));
 		}
@@ -96,7 +111,7 @@ class EngineHandlerTest {
 		@DisplayName("PlaceOrder에 담긴 Order 참조가 그대로 placeLimitOrder에 전달된다")
 		void handle_placeOrder_passesExactOrderReference() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(List.of());
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -109,24 +124,72 @@ class EngineHandlerTest {
 		@DisplayName("placeLimitOrder 완료 후 orderBookCache.update가 orderBook을 인자로 호출된다")
 		void handle_placeOrder_updatesCache() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(List.of());
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(orderBookCache).update(orderBook);
+			verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
 		@DisplayName("orderBookCache.update는 placeLimitOrder 이후에 호출된다")
 		void handle_placeOrder_updatesCacheAfterEngine() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(List.of());
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
 			InOrder inOrder = inOrder(engine, orderBookCache);
 			inOrder.verify(engine).placeLimitOrder(order);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
+		}
+
+		@Test
+		@DisplayName("MARKET 주문이면 placeMarketOrder()에 전달하고 placeLimitOrder()는 호출하지 않는다")
+		void handle_placeOrder_market_callsPlaceMarketOrder() {
+			Order order = marketBuyOrder(5);
+			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(engine).placeMarketOrder(order);
+			verify(engine, never()).placeLimitOrder(any());
+		}
+
+		@Test
+		@DisplayName("LIMIT 주문이면 placeMarketOrder()를 호출하지 않는다")
+		void handle_placeOrder_limit_neverCallsPlaceMarketOrder() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(engine, never()).placeMarketOrder(any());
+		}
+
+		@Test
+		@DisplayName("MARKET 주문 처리 완료 후 orderBookCache.update가 호출된다")
+		void handle_placeOrder_market_updatesCache() {
+			Order order = marketBuyOrder(5);
+			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(orderBookCache).update(SYMBOL, orderBook);
+		}
+
+		@Test
+		@DisplayName("MARKET 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
+		void handle_placeOrder_market_savesUpdatedOrders() {
+			Order order = marketBuyOrder(5);
+			Order filledMaker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
+			filledMaker.activate();
+			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(orderRepository).save(filledMaker);
+			verify(orderRepository).save(order);
 		}
 	}
 
@@ -162,7 +225,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			verify(orderBookCache).update(orderBook);
+			verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -174,7 +237,7 @@ class EngineHandlerTest {
 
 			InOrder inOrder = inOrder(engine, orderBookCache);
 			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -185,7 +248,7 @@ class EngineHandlerTest {
 
 			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(orderBookCache, never()).update(any());
+			verify(orderBookCache, never()).update(any(), any());
 		}
 
 		@Test
@@ -212,7 +275,7 @@ class EngineHandlerTest {
 			InOrder inOrder = inOrder(engine, orderRepository, orderBookCache);
 			inOrder.verify(engine).cancelOrder(orderId);
 			inOrder.verify(orderRepository).save(cancelled);
-			inOrder.verify(orderBookCache).update(orderBook);
+			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -224,6 +287,27 @@ class EngineHandlerTest {
 			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderRepository, never()).save(any());
+		}
+	}
+
+	// ── Shutdown ─────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("Shutdown 커맨드")
+	class ShutdownCommand {
+
+		@Test
+		@DisplayName("Shutdown 커맨드를 수신해도 예외가 발생하지 않는다")
+		void handle_shutdown_doesNotThrow() {
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.Shutdown()));
+		}
+
+		@Test
+		@DisplayName("Shutdown 커맨드를 수신하면 engine, repository, cache를 호출하지 않는다")
+		void handle_shutdown_noInteractions() {
+			handler.handle(new EngineCommand.Shutdown());
+
+			verifyNoInteractions(engine, orderRepository, orderBookCache);
 		}
 	}
 }

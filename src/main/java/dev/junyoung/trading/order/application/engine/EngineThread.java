@@ -5,25 +5,29 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.springframework.stereotype.Component;
-
 /**
  * 매칭 엔진 전용 단일 스레드를 관리하는 컴포넌트.
  *
- * <p>{@link Executors#newSingleThreadExecutor}로 생성된 스레드를 {@code "engine-thread"}로
- * 명명해 스레드 덤프에서 식별하기 쉽게 한다.</p>
+ * <p>{@link Executors#newSingleThreadExecutor}로 생성된 스레드를 {@code "engine-thread-{symbol}"}로
+ * 명명해 스레드 덤프에서 심볼별로 식별하기 쉽게 한다.</p>
  *
  * <p>{@link EngineLoop}가 이 클래스를 통해 스레드를 시작·중단한다.
  * {@link #interrupt()}는 {@code BlockingQueue.take()} 블로킹을 해제하기 위해 사용된다.</p>
  */
-@Component
 public class EngineThread {
 
-	private final ExecutorService executorService = Executors.newSingleThreadExecutor(r -> {
-		Thread thread = new Thread(r);
-		thread.setName("engine-thread");
-		return thread;
-	});
+	private final ExecutorService executorService;
+
+	/**
+	 * @param symbolName 스레드명에 포함될 심볼 이름. 스레드 덤프 식별용.
+	 */
+	public EngineThread(String symbolName) {
+		this.executorService = Executors.newSingleThreadExecutor(r -> {
+			Thread thread = new Thread(r);
+			thread.setName("engine-thread-" + symbolName);
+			return thread;
+		});
+	}
 
 	/**
 	 * 실행 중인 engine-thread의 참조. {@link #interrupt()} 호출 시 사용한다.

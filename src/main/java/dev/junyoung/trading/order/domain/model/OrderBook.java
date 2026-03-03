@@ -37,7 +37,7 @@ public class OrderBook {
 	 */
 	public void add(Order order) {
 		NavigableMap<Price, Deque<Order>> book = bookOf(order.getSide());
-		book.computeIfAbsent(order.getPrice(), _ -> new ArrayDeque<>())
+		book.computeIfAbsent(order.getLimitPriceOrThrow(), _ -> new ArrayDeque<>())
 			.addLast(order);
 
 		index.put(order.getOrderId(), order);
@@ -101,11 +101,11 @@ public class OrderBook {
 		if (order == null) return Optional.empty();
 
 		NavigableMap<Price, Deque<Order>> book = bookOf(order.getSide());
-		Deque<Order> queue = book.get(order.getPrice());
+		Deque<Order> queue = book.get(order.getLimitPriceOrThrow());
 		if (queue == null) return Optional.empty();
 
 		queue.remove(order);
-		if (queue.isEmpty()) book.remove(order.getPrice());
+		if (queue.isEmpty()) book.remove(order.getLimitPriceOrThrow());
 
 		return Optional.of(order);
 	}

@@ -1,9 +1,16 @@
 package dev.junyoung.trading.order.application.service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineLoop;
+import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,13 +35,17 @@ import static org.mockito.Mockito.*;
 class OrderCommandServiceTest {
 
     @Mock
-    private EngineLoop engineLoop;
+    private EngineManager engineManager;
 
     @Mock
     private OrderRepository orderRepository;
 
     @InjectMocks
     private OrderCommandService sut;
+
+    private Order buyOrder(String symbol) {
+        return Order.createLimit(Side.BUY, new Symbol(symbol), new Price(10_000), new Quantity(5));
+    }
 
     // ── placeOrder ────────────────────────────────────────────────────────────
 
@@ -44,42 +56,42 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderId를 UUID 문자열로 반환한다")
         void placeOrder_returnsUuidString() {
-            String result = sut.placeOrder("BUY", 10_000, 5);
+            String result = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
         }
 
         @Test
-        @DisplayName("PlaceOrder 커맨드를 EngineLoop에 제출한다")
+        @DisplayName("PlaceOrder 커맨드를 EngineManager에 제출한다")
         void placeOrder_submitsPlaceOrderCommand() {
-            sut.placeOrder("BUY", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineLoop).submit(captor.capture());
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
             assertThat(captor.getValue()).isInstanceOf(EngineCommand.PlaceOrder.class);
         }
 
         @Test
         @DisplayName("커맨드에 담긴 Order의 side/price/quantity가 입력값과 일치한다")
         void placeOrder_commandContainsCorrectOrderFields() {
-            sut.placeOrder("SELL", 20_000, 3);
+            sut.placeOrder("BTC", "SELL", "LIMIT", 20_000L, 3);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineLoop).submit(captor.capture());
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
             assertThat(cmd.order().getSide().name()).isEqualTo("SELL");
-            assertThat(cmd.order().getPrice().value()).isEqualTo(20_000L);
+            assertThat(cmd.order().getLimitPriceOrThrow().value()).isEqualTo(20_000L);
             assertThat(cmd.order().getQuantity().value()).isEqualTo(3L);
         }
 
         @Test
         @DisplayName("반환된 orderId가 커맨드의 Order orderId와 동일하다")
         void placeOrder_returnedOrderIdMatchesCommandOrderId() {
-            String returnedId = sut.placeOrder("BUY", 10_000, 5);
+            String returnedId = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineLoop).submit(captor.capture());
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
             assertThat(returnedId).isEqualTo(cmd.order().getOrderId().toString());
@@ -89,13 +101,13 @@ class OrderCommandServiceTest {
         @DisplayName("잘못된 side 값이 전달되면 IllegalArgumentException이 발생한다")
         void placeOrder_invalidSide_throwsIllegalArgumentException() {
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.placeOrder("INVALID", 10_000, 5));
+                    () -> sut.placeOrder("BTC", "INVALID", "LIMIT", 10_000L, 5));
         }
 
         @Test
         @DisplayName("생성된 Order를 ACCEPTED 상태로 orderRepository에 저장한다")
         void placeOrder_savesOrderToRepository() {
-            sut.placeOrder("BUY", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
             verify(orderRepository).save(captor.capture());
@@ -103,14 +115,14 @@ class OrderCommandServiceTest {
         }
 
         @Test
-        @DisplayName("orderRepository에 저장되는 Order와 EngineLoop에 제출되는 Order가 동일 객체다")
+        @DisplayName("orderRepository에 저장되는 Order와 EngineManager에 제출되는 Order가 동일 객체다")
         void placeOrder_savedOrderIsSameAsSubmittedOrder() {
-            sut.placeOrder("BUY", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
             ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
             ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
             verify(orderRepository).save(repositoryCaptor.capture());
-            verify(engineLoop).submit(engineCaptor.capture());
+            verify(engineManager).submit(any(Symbol.class), engineCaptor.capture());
 
             Order savedOrder = repositoryCaptor.getValue();
             Order submittedOrder = ((EngineCommand.PlaceOrder) engineCaptor.getValue()).order();
@@ -118,13 +130,13 @@ class OrderCommandServiceTest {
         }
 
         @Test
-        @DisplayName("orderRepository.save는 engineLoop.submit 이전에 호출된다")
+        @DisplayName("orderRepository.save는 engineManager.submit 이전에 호출된다")
         void placeOrder_savesOrderBeforeSubmittingCommand() {
-            sut.placeOrder("BUY", 10_000, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
 
-            InOrder inOrder = inOrder(orderRepository, engineLoop);
+            InOrder inOrder = inOrder(orderRepository, engineManager);
             inOrder.verify(orderRepository).save(any());
-            inOrder.verify(engineLoop).submit(any());
+            inOrder.verify(engineManager).submit(any(), any());
         }
     }
 
@@ -135,14 +147,15 @@ class OrderCommandServiceTest {
     class CancelOrder {
 
         @Test
-        @DisplayName("CancelOrder 커맨드를 EngineLoop에 제출한다")
+        @DisplayName("CancelOrder 커맨드를 EngineManager에 제출한다")
         void cancelOrder_submitsCancelOrderCommand() {
             String orderId = UUID.randomUUID().toString();
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
             sut.cancelOrder(orderId);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineLoop).submit(captor.capture());
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
             assertThat(captor.getValue()).isInstanceOf(EngineCommand.CancelOrder.class);
         }
 
@@ -150,36 +163,60 @@ class OrderCommandServiceTest {
         @DisplayName("커맨드에 담긴 OrderId가 입력값과 일치한다")
         void cancelOrder_commandContainsCorrectOrderId() {
             String orderId = UUID.randomUUID().toString();
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
             sut.cancelOrder(orderId);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineLoop).submit(captor.capture());
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
             assertThat(cmd.orderId().toString()).isEqualTo(orderId);
         }
 
         @Test
-        @DisplayName("잘못된 UUID 형식의 orderId가 전달되면 IllegalArgumentException이 발생한다")
-        void cancelOrder_invalidOrderIdFormat_throwsIllegalArgumentException() {
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.cancelOrder("not-a-valid-uuid"));
+        @DisplayName("orderRepository에 주문이 없으면 OrderNotFoundException이 발생한다")
+        void cancelOrder_orderNotFound_throwsOrderNotFoundException() {
+            String orderId = UUID.randomUUID().toString();
+            when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(orderId));
         }
 
         @Test
-        @DisplayName("null orderId가 전달되면 IllegalArgumentException이 발생한다")
-        void cancelOrder_nullOrderId_throwsIllegalArgumentException() {
-            assertThrows(IllegalArgumentException.class,
-                    () -> sut.cancelOrder(null));
-        }
+        @DisplayName("cancelOrder는 orderRepository.save()를 호출하지 않는다 (취소 저장은 EngineHandler 담당)")
+        void cancelOrder_doesNotSaveToRepository() {
+            String orderId = UUID.randomUUID().toString();
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
-        @Test
-        @DisplayName("orderRepository를 호출하지 않는다 (취소 저장은 EngineHandler 담당)")
-        void cancelOrder_doesNotCallOrderRepository() {
-            sut.cancelOrder(UUID.randomUUID().toString());
+            sut.cancelOrder(orderId);
 
             verify(orderRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("MARKET 주문 취소 시 OrderNotCancellableException이 발생한다")
+        void cancelMarketOrder_throwsOrderNotCancellableException() {
+            String orderId = UUID.randomUUID().toString();
+            Order marketOrder = Order.createMarket(Side.BUY, new Symbol("BTC"), new Quantity(5));
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
+
+            assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(orderId));
+            verify(engineManager, never()).submit(any(), any());
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED된 주문 취소 시 OrderAlreadyFinalizedException이 발생한다")
+        void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
+            String orderId = UUID.randomUUID().toString();
+            Order order = Order.createLimit(Side.BUY, new Symbol("BTC"), new Price(10_000), new Quantity(5));
+            order.activate();
+            order.cancel(); // → CANCELLED 상태
+
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+
+            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(orderId));
+            verify(engineManager, never()).submit(any(), any());
         }
     }
 }

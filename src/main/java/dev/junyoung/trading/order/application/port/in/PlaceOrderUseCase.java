@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.port.in;
 
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
+
 public interface PlaceOrderUseCase {
-    String placeOrder(String symbol, String side, String orderType, String tif, Long price, long quantity);
+    String placeOrder(PlaceOrderCommand command);
 }

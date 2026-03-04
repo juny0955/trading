@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.adapter.in.rest.validation;
 
 import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.validation.annotation.ValidPlaceOrder;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
@@ -20,7 +21,7 @@ public class PlaceOrderValidator implements ConstraintValidator<ValidPlaceOrder,
     @Override
     public boolean isValid(PlaceOrderRequest request, ConstraintValidatorContext context) {
         // orderType 자체가 잘못된 값인 경우 @ValidEnum이 처리하므로 스킵
-        if (request.tif() != null && "MARKET".equals(request.orderType())) {
+        if (request.tif() != null && OrderType.MARKET.name().equals(request.orderType())) {
             context.disableDefaultConstraintViolation();
             context.buildConstraintViolationWithTemplate("TIF is not allowed for MARKET orders")
                     .addPropertyNode("tif")

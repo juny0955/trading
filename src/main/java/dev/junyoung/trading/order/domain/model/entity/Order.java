@@ -50,15 +50,10 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
-    public static Order create(String symbol, String side, String orderType, String tif, Long price, long quantity) {
-        Quantity q = new Quantity(quantity);
-        Symbol sym = new Symbol(symbol);
-        Side s = Side.valueOf(side);
-        TimeInForce t = tif == null ? TimeInForce.defaultValue() : TimeInForce.valueOf(tif);
-
-        return switch (OrderType.valueOf(orderType)) {
-            case MARKET -> Order.createMarket(s, sym, q);
-            case LIMIT  -> Order.createLimit(s, sym, t, new Price(price), q);
+    public static Order create(Symbol symbol, Side side, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
+        return switch (orderType) {
+            case MARKET -> Order.createMarket(side, symbol, quantity);
+            case LIMIT  -> Order.createLimit(side, symbol, tif == null ? TimeInForce.GTC : tif, price, quantity);
         };
     }
 
@@ -82,7 +77,7 @@ public class Order {
     /**
      * LIMIT 주문의 가격을 반환한다.
      *
-     * @throws IllegalStateException MARKET 주문에서 호출 시
+     * @throws BusinessRuleException MARKET 주문에서 호출 시
      */
     public Price getLimitPriceOrThrow() {
         if (orderType.isMarket()) {
@@ -98,7 +93,7 @@ public class Order {
     /**
      * 매칭 엔진 진입 시 호출한다. 상태를 {@link OrderStatus#ACCEPTED}에서 {@link OrderStatus#NEW}로 전이한다.
      *
-     * @throws IllegalStateException 상태가 {@link OrderStatus#ACCEPTED}가 아닌 경우
+     * @throws ConflictException 상태가 {@link OrderStatus#ACCEPTED}가 아닌 경우
      */
     public void activate() {
         if (status != OrderStatus.ACCEPTED) {
@@ -115,7 +110,7 @@ public class Order {
      * </ul>
      *
      * @param executeQty 이번 체결 수량
-     * @throws IllegalStateException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+     * @throws ConflictException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
      */
     public void fill(Quantity executeQty) {
         requireActive();
@@ -126,7 +121,7 @@ public class Order {
     /**
      * 주문을 취소한다. 상태를 {@link OrderStatus#CANCELLED}로 전이한다.
      *
-     * @throws IllegalStateException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+     * @throws ConflictException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
      */
     public void cancel() {
         requireActive();

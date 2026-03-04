@@ -2,15 +2,16 @@ package dev.junyoung.trading.order.application.service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
-import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,14 @@ public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCas
     private final OrderRepository orderRepository;
 
     @Override
-    public String placeOrder(String symbol, String side, String orderType, Long price, long quantity) {
-        Order order = Order.create(symbol, side, orderType, price, quantity);
+    public String placeOrder(PlaceOrderCommand command) {
+        Order order = Order.create(command.symbol(),
+            command.side(),
+            command.orderType(),
+            command.tif(),
+            command.price(),
+            command.quantity()
+        );
         engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
         orderRepository.save(order);  // ACCEPTED 상태로 최초 저장 (참조 공유로 이후 상태 변경 자동 반영)
         return order.getOrderId().toString();

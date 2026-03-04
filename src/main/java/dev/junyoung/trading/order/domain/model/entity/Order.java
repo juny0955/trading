@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.domain.model.entity;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
@@ -21,6 +22,7 @@ public class Order {
     private final Side side;
     private final Symbol symbol;
     private final OrderType orderType;
+    private final TimeInForce tif;
 
     @Getter(AccessLevel.NONE)
     private final Price price; // MARKET 주문은 null
@@ -30,11 +32,12 @@ public class Order {
     private volatile OrderStatus status;
     private final Instant orderedAt;
 
-    private Order(Side side, Symbol symbol, OrderType orderType, Price price, Quantity quantity) {
+    private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
         this.orderId = OrderId.newId();
         this.side = Objects.requireNonNull(side);
         this.symbol = Objects.requireNonNull(symbol);
         this.orderType = Objects.requireNonNull(orderType);
+        this.tif = Objects.requireNonNull(tif);
         this.price = price;
         this.quantity = Objects.requireNonNull(quantity);
 
@@ -47,38 +50,34 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
-    public static Order create(String symbol, String side, String orderType, Long price, long quantity) {
-        Quantity q = new Quantity(quantity);
-        Symbol sym = new Symbol(symbol);
-        Side s = Side.valueOf(side);
-
-        return switch (OrderType.valueOf(orderType)) {
-            case MARKET -> Order.createMarket(s, sym, q);
-            case LIMIT  -> Order.createLimit(s, sym, new Price(price), q);
+    public static Order create(Symbol symbol, Side side, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
+        return switch (orderType) {
+            case MARKET -> Order.createMarket(side, symbol, quantity);
+            case LIMIT  -> Order.createLimit(side, symbol, tif == null ? TimeInForce.GTC : tif, price, quantity);
         };
     }
 
     /**
      * LIMIT 주문을 생성한다.
      *
-     * @throws NullPointerException     price가 null인 경우
+     * @throws NullPointerException price가 null인 경우
      */
-    public static Order createLimit(Side side, Symbol symbol, Price price, Quantity quantity) {
+    public static Order createLimit(Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
         Objects.requireNonNull(price, "price must not be null for LIMIT order");
-        return new Order(side, symbol, OrderType.LIMIT, price, quantity);
+        return new Order(side, symbol, OrderType.LIMIT, tif, price, quantity);
     }
 
     /**
-     * MARKET 주문을 생성한다. price는 항상 null이다.
+     * MARKET 주문을 생성한다. price는 항상 null이다. TIF는 내부적으로 IOC로 처리된다.
      */
     public static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
-        return new Order(side, symbol, OrderType.MARKET, null, quantity);
+        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quantity);
     }
 
     /**
      * LIMIT 주문의 가격을 반환한다.
      *
-     * @throws IllegalStateException MARKET 주문에서 호출 시
+     * @throws BusinessRuleException MARKET 주문에서 호출 시
      */
     public Price getLimitPriceOrThrow() {
         if (orderType.isMarket()) {
@@ -94,7 +93,7 @@ public class Order {
     /**
      * 매칭 엔진 진입 시 호출한다. 상태를 {@link OrderStatus#ACCEPTED}에서 {@link OrderStatus#NEW}로 전이한다.
      *
-     * @throws IllegalStateException 상태가 {@link OrderStatus#ACCEPTED}가 아닌 경우
+     * @throws ConflictException 상태가 {@link OrderStatus#ACCEPTED}가 아닌 경우
      */
     public void activate() {
         if (status != OrderStatus.ACCEPTED) {
@@ -111,7 +110,7 @@ public class Order {
      * </ul>
      *
      * @param executeQty 이번 체결 수량
-     * @throws IllegalStateException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+     * @throws ConflictException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
      */
     public void fill(Quantity executeQty) {
         requireActive();
@@ -122,7 +121,7 @@ public class Order {
     /**
      * 주문을 취소한다. 상태를 {@link OrderStatus#CANCELLED}로 전이한다.
      *
-     * @throws IllegalStateException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+     * @throws ConflictException 활성 상태({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
      */
     public void cancel() {
         requireActive();

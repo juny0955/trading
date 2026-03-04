@@ -1,12 +1,19 @@
 package dev.junyoung.trading.order.adapter.in.rest.request;
 
 import dev.junyoung.trading.common.validation.annotation.ValidEnum;
+import dev.junyoung.trading.order.adapter.in.rest.validation.annotation.ValidPlaceOrder;
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+@ValidPlaceOrder
 public record PlaceOrderRequest(
 	@NotBlank
     String symbol,
@@ -19,10 +26,23 @@ public record PlaceOrderRequest(
 	@ValidEnum(enumClass = OrderType.class)
     String orderType,
 
+	@ValidEnum(enumClass = TimeInForce.class)
+	String tif,
+
     Long price,
 
 	@NotNull
 	@Min(1)
     Long quantity
 ) {
+	public PlaceOrderCommand toCommand() {
+		return new PlaceOrderCommand(
+			new Symbol(symbol),
+			Side.valueOf(side),
+			OrderType.valueOf(orderType),
+			tif == null ? null : TimeInForce.valueOf(tif),
+			price == null ? null : new Price(price),
+			new Quantity(quantity)
+		);
+	}
 }

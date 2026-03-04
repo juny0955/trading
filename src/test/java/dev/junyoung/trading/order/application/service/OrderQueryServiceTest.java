@@ -20,6 +20,7 @@ import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -43,7 +44,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("주문이 존재하면 OrderResult를 반환한다")
         void getOrder_found_returnsOrderResult() {
-            Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
+            Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 
@@ -56,7 +57,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("OrderResult의 side/price/quantity/remaining/status/orderedAt이 Order와 일치한다")
         void getOrder_found_resultFieldsMatchOrder() {
-            Order order = Order.createLimit(Side.SELL, SYMBOL, new Price(50_000), new Quantity(10));
+            Order order = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(50_000), new Quantity(10));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 

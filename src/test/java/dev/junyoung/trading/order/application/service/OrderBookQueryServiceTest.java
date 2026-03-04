@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -36,13 +37,13 @@ class OrderBookQueryServiceTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private Order activatedBuy(long price, long qty) {
-        Order order = Order.createLimit(Side.BUY, BTC, new Price(price), new Quantity(qty));
+        Order order = Order.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
         order.activate();
         return order;
     }
 
     private Order activatedSell(long price, long qty) {
-        Order order = Order.createLimit(Side.SELL, BTC, new Price(price), new Quantity(qty));
+        Order order = Order.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
         order.activate();
         return order;
     }

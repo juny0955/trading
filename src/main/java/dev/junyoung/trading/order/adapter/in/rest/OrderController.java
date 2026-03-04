@@ -30,7 +30,7 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody @Valid PlaceOrderRequest request) {
-        String orderId = placeOrderUseCase.placeOrder(request.symbol(), request.side(), request.orderType(), request.price(), request.quantity());
+        String orderId = placeOrderUseCase.placeOrder(request.toCommand());
 
         return ResponseEntity
                 .accepted()

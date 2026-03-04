@@ -161,13 +161,13 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("LIMIT 주문에서 tif=IOC/FOK/GTC가 허용된다")
         void placeOrder_limitWithExplicitTif_accepted() {
-            for (String tif : new String[]{"GTC", "IOC", "FOK"}) {
-                sut.placeOrder("BTC", "BUY", "LIMIT", tif, 10_000L, 5);
+            for (TimeInForce tif : TimeInForce.values()) {
+                sut.placeOrder("BTC", "BUY", "LIMIT", tif.name(), 10_000L, 5);
 
                 ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
                 verify(engineManager, atLeastOnce()).submit(any(Symbol.class), captor.capture());
                 Order order = ((EngineCommand.PlaceOrder) captor.getValue()).order();
-                assertThat(order.getTif().name()).isEqualTo(tif);
+                assertThat(order.getTif()).isEqualTo(tif);
             }
         }
 

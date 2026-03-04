@@ -8,6 +8,7 @@ import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -44,7 +45,7 @@ class OrderCommandServiceTest {
     private OrderCommandService sut;
 
     private Order buyOrder(String symbol) {
-        return Order.createLimit(Side.BUY, new Symbol(symbol), new Price(10_000), new Quantity(5));
+        return Order.createLimit(Side.BUY, new Symbol(symbol), TimeInForce.GTC, new Price(10_000), new Quantity(5));
     }
 
     // ── placeOrder ────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderId를 UUID 문자열로 반환한다")
         void placeOrder_returnsUuidString() {
-            String result = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            String result = sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
         }
@@ -64,7 +65,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("PlaceOrder 커맨드를 EngineManager에 제출한다")
         void placeOrder_submitsPlaceOrderCommand() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -74,7 +75,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("커맨드에 담긴 Order의 side/price/quantity가 입력값과 일치한다")
         void placeOrder_commandContainsCorrectOrderFields() {
-            sut.placeOrder("BTC", "SELL", "LIMIT", 20_000L, 3);
+            sut.placeOrder("BTC", "SELL", "LIMIT", null, 20_000L, 3);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -88,7 +89,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("반환된 orderId가 커맨드의 Order orderId와 동일하다")
         void placeOrder_returnedOrderIdMatchesCommandOrderId() {
-            String returnedId = sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            String returnedId = sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -101,13 +102,13 @@ class OrderCommandServiceTest {
         @DisplayName("잘못된 side 값이 전달되면 IllegalArgumentException이 발생한다")
         void placeOrder_invalidSide_throwsIllegalArgumentException() {
             assertThrows(IllegalArgumentException.class,
-                    () -> sut.placeOrder("BTC", "INVALID", "LIMIT", 10_000L, 5));
+                    () -> sut.placeOrder("BTC", "INVALID", "LIMIT", null, 10_000L, 5));
         }
 
         @Test
         @DisplayName("생성된 Order를 ACCEPTED 상태로 orderRepository에 저장한다")
         void placeOrder_savesOrderToRepository() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
             verify(orderRepository).save(captor.capture());
@@ -117,7 +118,7 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderRepository에 저장되는 Order와 EngineManager에 제출되는 Order가 동일 객체다")
         void placeOrder_savedOrderIsSameAsSubmittedOrder() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
             ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
@@ -132,11 +133,50 @@ class OrderCommandServiceTest {
         @Test
         @DisplayName("orderRepository.save는 engineManager.submit 이후에 호출된다")
         void placeOrder_savesOrderAfterSubmittingCommand() {
-            sut.placeOrder("BTC", "BUY", "LIMIT", 10_000L, 5);
+            sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
 
             InOrder inOrder = inOrder(orderRepository, engineManager);
             inOrder.verify(engineManager).submit(any(), any());
             inOrder.verify(orderRepository).save(any());
+        }
+    }
+
+    // ── TIF 검증 (MVP3-004) ───────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("TIF 검증")
+    class TifValidation {
+
+        @Test
+        @DisplayName("LIMIT 주문에서 tif=null이면 GTC 기본값으로 생성된다")
+        void placeOrder_limitWithNullTif_defaultsToGtc() {
+            sut.placeOrder("BTC", "BUY", "LIMIT", null, 10_000L, 5);
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            Order order = ((EngineCommand.PlaceOrder) captor.getValue()).order();
+            assertThat(order.getTif()).isEqualTo(TimeInForce.GTC);
+        }
+
+        @Test
+        @DisplayName("LIMIT 주문에서 tif=IOC/FOK/GTC가 허용된다")
+        void placeOrder_limitWithExplicitTif_accepted() {
+            for (String tif : new String[]{"GTC", "IOC", "FOK"}) {
+                sut.placeOrder("BTC", "BUY", "LIMIT", tif, 10_000L, 5);
+
+                ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+                verify(engineManager, atLeastOnce()).submit(any(Symbol.class), captor.capture());
+                Order order = ((EngineCommand.PlaceOrder) captor.getValue()).order();
+                assertThat(order.getTif().name()).isEqualTo(tif);
+            }
+        }
+
+        @Test
+        @DisplayName("MARKET 주문에서 tif=null이면 정상 처리된다")
+        void placeOrder_marketWithoutTif_accepted() {
+            sut.placeOrder("BTC", "BUY", "MARKET", null, null, 5);
+
+            verify(engineManager).submit(any(Symbol.class), any(EngineCommand.class));
         }
     }
 
@@ -209,7 +249,7 @@ class OrderCommandServiceTest {
         @DisplayName("이미 CANCELLED된 주문 취소 시 OrderAlreadyFinalizedException이 발생한다")
         void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
             String orderId = UUID.randomUUID().toString();
-            Order order = Order.createLimit(Side.BUY, new Symbol("BTC"), new Price(10_000), new Quantity(5));
+            Order order = Order.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
             order.activate();
             order.cancel(); // → CANCELLED 상태
 

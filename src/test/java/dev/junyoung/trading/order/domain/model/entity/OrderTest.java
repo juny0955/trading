@@ -12,6 +12,7 @@ import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -24,11 +25,11 @@ class OrderTest {
     private static final Symbol SYMBOL = new Symbol("BTC");
 
     private Order buyOrder(long price, long qty) {
-        return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+        return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
     }
 
     private Order sellOrder(long price, long qty) {
-        return Order.createLimit(Side.SELL, SYMBOL, new Price(price), new Quantity(qty));
+        return Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
     }
 
     /** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
@@ -51,7 +52,7 @@ class OrderTest {
             @Test
             @DisplayName("BUY LIMIT 주문을 정상 생성한다")
             void createBuyLimitOrder() {
-                Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
+                Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 
                 assertThat(order.getOrderId()).isNotNull();
                 assertThat(order.getSide()).isEqualTo(Side.BUY);
@@ -109,28 +110,28 @@ class OrderTest {
             @DisplayName("side = null이면 NullPointerException이 발생한다")
             void rejectNullSide() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.createLimit(null, SYMBOL, new Price(10_000), new Quantity(5)));
+                        .isThrownBy(() -> Order.createLimit(null, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5)));
             }
 
             @Test
             @DisplayName("symbol = null이면 NullPointerException이 발생한다")
             void rejectNullSymbol() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.createLimit(Side.BUY, null, new Price(10_000), new Quantity(5)));
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, null, TimeInForce.GTC, new Price(10_000), new Quantity(5)));
             }
 
             @Test
             @DisplayName("price = null이면 NullPointerException이 발생한다")
             void rejectNullPrice() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, null, new Quantity(5)));
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, null, new Quantity(5)));
             }
 
             @Test
             @DisplayName("quantity = null이면 NullPointerException이 발생한다")
             void rejectNullQuantity() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), null));
+                        .isThrownBy(() -> Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), null));
             }
 
             @Test

@@ -5,6 +5,7 @@ import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
@@ -62,7 +63,7 @@ class EngineHandlerTest {
 	}
 
 	private Order buyOrder(long price, long qty) {
-		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+		return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	private Order marketBuyOrder(long qty) {
@@ -99,7 +100,7 @@ class EngineHandlerTest {
 		@DisplayName("Trade가 발생해도 예외 없이 정상 종료한다")
 		void handle_placeOrder_withTrades_doesNotThrow() {
 			Order taker = buyOrder(10_000, 5);
-			Order maker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
+			Order maker = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			maker.activate();
 			Trade trade = Trade.of(taker, maker, new Quantity(5));
 			when(engine.placeLimitOrder(taker)).thenReturn(PlaceResult.of(List.of(), List.of(trade)));
@@ -182,7 +183,7 @@ class EngineHandlerTest {
 		@DisplayName("MARKET 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
 		void handle_placeOrder_market_savesUpdatedOrders() {
 			Order order = marketBuyOrder(5);
-			Order filledMaker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
+			Order filledMaker = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			filledMaker.activate();
 			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
 

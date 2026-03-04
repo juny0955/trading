@@ -15,6 +15,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -37,24 +38,24 @@ public class MatchingEngineTest {
 
 	/** ACCEPTED 상태 BUY 주문 — 엔진에 직접 전달용 */
 	private Order buyOrder(long price, long qty) {
-		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+		return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	/** ACCEPTED 상태 SELL 주문 — 엔진에 직접 전달용 */
 	private Order sellOrder(long price, long qty) {
-		return Order.createLimit(Side.SELL, SYMBOL, new Price(price), new Quantity(qty));
+		return Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	/** ACCEPTED → activate() → NEW 상태 SELL 주문 — orderBook 사전 등록용 */
 	private Order activatedSellOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.SELL, SYMBOL, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	/** ACCEPTED → activate() → NEW 상태 BUY 주문 — orderBook 사전 등록용 */
 	private Order activatedBuyOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}

@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -39,13 +40,13 @@ class OrderBookCacheTest {
 	// ── 헬퍼 ──────────────────────────────────────────────────────────────
 
 	private Order activatedBuy(Symbol symbol, long price, long qty) {
-		Order order = Order.createLimit(Side.BUY, symbol, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.BUY, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	private Order activatedSell(Symbol symbol, long price, long qty) {
-		Order order = Order.createLimit(Side.SELL, symbol, new Price(price), new Quantity(qty));
+		Order order = Order.createLimit(Side.SELL, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}

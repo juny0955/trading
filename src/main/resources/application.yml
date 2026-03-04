@@ -3,3 +3,7 @@ trading:
     - BTC
     - ETH
     - TEST
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"

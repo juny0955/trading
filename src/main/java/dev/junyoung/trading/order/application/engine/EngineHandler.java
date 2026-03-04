@@ -42,9 +42,7 @@ public class EngineHandler {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
 				Order order = c.order();
-				PlaceResult result = order.isMarket()
-					? engine.placeMarketOrder(order)
-					: engine.placeLimitOrder(order);
+				PlaceResult result = processPlaceOrder(order);
 				result.updatedOrders().forEach(orderRepository::save);
 				if (!result.trades().isEmpty()) log.info("Trades executed: {}", result.trades());
 				orderBookCache.update(symbol, orderBook);
@@ -58,5 +56,27 @@ public class EngineHandler {
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");
 		}
+	}
+
+	/**
+	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.
+	 *
+	 * <ul>
+	 *   <li>시장가({@code isMarket()}): 가격 조건 없이 즉시 체결, 잔량은 취소된다.</li>
+	 *   <li>GTC: 잔량을 호가창에 등록해 이후 체결을 기다린다.</li>
+	 *   <li>IOC: 즉시 체결 가능한 수량만 체결하고 잔량은 취소한다.</li>
+	 *   <li>FOK: 현재 GTC와 동일하게 처리한다 (MVP3-006에서 전용 구현 예정).</li>
+	 * </ul>
+	 */
+	private PlaceResult processPlaceOrder(Order order) {
+		if (order.isMarket()) {
+			return engine.placeMarketOrder(order);
+		}
+
+		return switch (order.getTif()) {
+			case GTC -> engine.placeLimitOrder(order);
+			case IOC -> engine.placeLimitOrderIOC(order);
+			case FOK -> engine.placeLimitOrder(order);	// 이후 FOK 전용 구현
+		};
 	}
 }

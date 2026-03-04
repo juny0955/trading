@@ -40,6 +40,21 @@ public class MatchingEngine {
 	}
 
 	/**
+	 * 지정가 IOC 주문을 처리한다. 가격 조건을 만족하는 반대 사이드 호가와 즉시 체결을 시도한다.
+	 * <ol>
+	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
+	 *   <li>호가창이 빌 때까지 또는 잔량이 0이 될 때까지 체결한다.</li>
+	 *   <li>체결 후 잔량이 남으면 {@link Order#cancel()}을 호출한다. 호가창에는 추가하지 않는다.</li>
+	 * </ol>
+	 *
+	 * @param taker 처리할 지정가 주문 ({@link OrderStatus#ACCEPTED} 상태)
+	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
+	 */
+	public PlaceResult placeLimitOrderIOC(Order taker) {
+		return placeOrder(taker, Order::cancel);
+	}
+
+	/**
 	 * 시장가 주문을 처리한다. 가격 조건 없이 반대 사이드 최우선 호가부터 순차 체결한다.
 	 * <ol>
 	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>

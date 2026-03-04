@@ -42,7 +42,7 @@ public class OrderController {
         cancelOrderUseCase.cancelOrder(orderId);
 
         return ResponseEntity
-                .ok()
+                .accepted()
                 .build();
     }
 

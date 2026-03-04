@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.domain.model.entity;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
@@ -21,6 +22,7 @@ public class Order {
     private final Side side;
     private final Symbol symbol;
     private final OrderType orderType;
+    private final TimeInForce tif;
 
     @Getter(AccessLevel.NONE)
     private final Price price; // MARKET 주문은 null
@@ -30,11 +32,12 @@ public class Order {
     private volatile OrderStatus status;
     private final Instant orderedAt;
 
-    private Order(Side side, Symbol symbol, OrderType orderType, Price price, Quantity quantity) {
+    private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
         this.orderId = OrderId.newId();
         this.side = Objects.requireNonNull(side);
         this.symbol = Objects.requireNonNull(symbol);
         this.orderType = Objects.requireNonNull(orderType);
+        this.tif = Objects.requireNonNull(tif);
         this.price = price;
         this.quantity = Objects.requireNonNull(quantity);
 
@@ -47,32 +50,33 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
-    public static Order create(String symbol, String side, String orderType, Long price, long quantity) {
+    public static Order create(String symbol, String side, String orderType, String tif, Long price, long quantity) {
         Quantity q = new Quantity(quantity);
         Symbol sym = new Symbol(symbol);
         Side s = Side.valueOf(side);
+        TimeInForce t = tif == null ? TimeInForce.defaultValue() : TimeInForce.valueOf(tif);
 
         return switch (OrderType.valueOf(orderType)) {
             case MARKET -> Order.createMarket(s, sym, q);
-            case LIMIT  -> Order.createLimit(s, sym, new Price(price), q);
+            case LIMIT  -> Order.createLimit(s, sym, t, new Price(price), q);
         };
     }
 
     /**
      * LIMIT 주문을 생성한다.
      *
-     * @throws NullPointerException     price가 null인 경우
+     * @throws NullPointerException price가 null인 경우
      */
-    public static Order createLimit(Side side, Symbol symbol, Price price, Quantity quantity) {
+    public static Order createLimit(Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
         Objects.requireNonNull(price, "price must not be null for LIMIT order");
-        return new Order(side, symbol, OrderType.LIMIT, price, quantity);
+        return new Order(side, symbol, OrderType.LIMIT, tif, price, quantity);
     }
 
     /**
-     * MARKET 주문을 생성한다. price는 항상 null이다.
+     * MARKET 주문을 생성한다. price는 항상 null이다. TIF는 내부적으로 IOC로 처리된다.
      */
     public static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
-        return new Order(side, symbol, OrderType.MARKET, null, quantity);
+        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quantity);
     }
 
     /**

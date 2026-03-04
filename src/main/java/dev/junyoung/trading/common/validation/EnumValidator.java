@@ -3,6 +3,7 @@ package dev.junyoung.trading.common.validation;
 import java.util.Arrays;
 import java.util.List;
 
+import dev.junyoung.trading.common.validation.annotation.ValidEnum;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

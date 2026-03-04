@@ -1,6 +1,6 @@
 package dev.junyoung.trading.order.adapter.in.rest.request;
 
-import dev.junyoung.trading.common.validation.ValidEnum;
+import dev.junyoung.trading.common.validation.annotation.ValidEnum;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import jakarta.validation.constraints.Min;

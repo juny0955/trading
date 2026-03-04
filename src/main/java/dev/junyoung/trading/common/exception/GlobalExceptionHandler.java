@@ -20,10 +20,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
         List<ValidationException.FieldError> fieldErrors = e.getBindingResult().getFieldErrors().stream()
                 .map(fe -> new ValidationException.FieldError(
-                        fe.getField(), fe.getDefaultMessage(), fe.getRejectedValue()))
+                        fe.getField(), fe.getDefaultMessage(), null))
                 .toList();
 
-        log.warn("[INVALID_REQUEST] Validation failed: {}", fieldErrors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ErrorResponse.ofValidation("INVALID_REQUEST", "Validation failed", traceId(), fieldErrors));

@@ -93,7 +93,7 @@ public class Order {
         TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         validateInputCombination(side, orderType, price, quoteQty, quantity);
         return switch (orderType) {
-            case LIMIT  -> createLimit(side, symbol, tif != null ? tif : TimeInForce.GTC, price, quantity);
+            case LIMIT  -> createLimit(side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
             case MARKET -> side.isBuy() && quoteQty != null ? createMarketBuyWithQuoteQty(side, symbol, quoteQty) : createMarket(side, symbol, quantity);
         };
     }

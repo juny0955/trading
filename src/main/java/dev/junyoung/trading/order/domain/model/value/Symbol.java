@@ -9,9 +9,9 @@ public record Symbol(
 ) {
     public Symbol {
         Objects.requireNonNull(value, "symbol must not be null");
-        if (value.isBlank()) {
+        if (value.isBlank())
             throw new BusinessRuleException("SYMBOL_BLANK", "symbol must not be blank");
-        }
+
         value = value.toUpperCase();
     }
 }

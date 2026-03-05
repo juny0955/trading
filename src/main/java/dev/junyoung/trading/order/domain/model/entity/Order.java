@@ -22,27 +22,18 @@ import java.util.Objects;
  */
 @Getter
 public class Order {
-    /** 주문 고유 식별자. 생성 시 자동 부여된다. */
     private final OrderId orderId;
-    /** 매수({@link Side#BUY}) 또는 매도({@link Side#SELL}) */
     private final Side side;
-    /** 주문 대상 종목 */
     private final Symbol symbol;
-    /** 주문 유형: 지정가({@link OrderType#LIMIT}) 또는 시장가({@link OrderType#MARKET}) */
     private final OrderType orderType;
-    /** 주문 유효 조건 (GTC / IOC / FOK). MARKET 주문은 내부적으로 IOC로 고정된다. */
     private final TimeInForce tif;
 
     @Getter(AccessLevel.NONE)
     private final Price price; // MARKET 주문은 null
 
-    /** 주문 원래 수량 */
     private final Quantity quantity;
-    /** 미체결 잔량. 체결될 때마다 차감된다. */
     private volatile Quantity remaining;
-    /** 현재 주문 상태. 엔진 스레드와 조회 스레드가 동시에 읽을 수 있어 volatile로 선언한다. */
     private volatile OrderStatus status;
-    /** 주문 접수 시각 */
     private final Instant orderedAt;
 
     /**

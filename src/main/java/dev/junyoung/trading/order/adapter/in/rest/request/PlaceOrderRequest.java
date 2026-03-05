@@ -8,10 +8,10 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 @ValidPlaceOrder
 public record PlaceOrderRequest(
@@ -29,9 +29,12 @@ public record PlaceOrderRequest(
 	@ValidEnum(enumClass = TimeInForce.class)
 	String tif,
 
+	@Min(1)
     Long price,
 
-	@NotNull
+	@Min(1)
+	Long quoteQty,
+
 	@Min(1)
     Long quantity
 ) {
@@ -42,7 +45,8 @@ public record PlaceOrderRequest(
 			OrderType.valueOf(orderType),
 			tif == null ? null : TimeInForce.valueOf(tif),
 			price == null ? null : new Price(price),
-			new Quantity(quantity)
+			quoteQty == null ? null : new QuoteQty(quoteQty),
+			quantity == null ? null : new Quantity(quantity)
 		);
 	}
 }

@@ -6,7 +6,7 @@ public record OrderResult(
     String orderId,
     String side,
     Long price,
-    long quantity,
+    Long quantity,
     long remaining,
     String status,
     Instant orderedAt

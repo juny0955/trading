@@ -7,6 +7,7 @@ import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.common.exception.ConflictException;
@@ -31,6 +32,7 @@ public class Order {
     @Getter(AccessLevel.NONE)
     private final Price price; // MARKET 주문은 null
 
+    private final QuoteQty quoteQty;
     private final Quantity quantity;
     private volatile Quantity remaining;
     private volatile OrderStatus status;
@@ -41,20 +43,25 @@ public class Order {
      *
      * @throws BusinessRuleException quantity가 1 미만인 경우
      */
-    private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
+    private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         this.orderId = OrderId.newId();
         this.side = Objects.requireNonNull(side);
         this.symbol = Objects.requireNonNull(symbol);
         this.orderType = Objects.requireNonNull(orderType);
         this.tif = Objects.requireNonNull(tif);
         this.price = price;
-        this.quantity = Objects.requireNonNull(quantity);
+        this.quantity = quantity;
+        this.quoteQty = quoteQty;
 
-        if (quantity.value() < 1) {
+        if (quantity != null && quantity.value() < 1) {
             throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "quantity must be positive");
         }
 
-        this.remaining = quantity;
+        if (quoteQty != null && quoteQty.value() < 1) {
+            throw new BusinessRuleException("ORDER_INVALID_QUOTEQTY", "quoteQty must be over 1");
+        }
+
+        this.remaining = (quantity != null) ? quantity : new Quantity(0);
         this.status = OrderStatus.ACCEPTED;
         this.orderedAt = Instant.now();
     }
@@ -63,11 +70,39 @@ public class Order {
      * 주문 유형에 따라 LIMIT 또는 MARKET 주문을 생성한다.
      * <p>tif가 null이면 {@link TimeInForce#GTC}로 기본 설정된다.</p>
      */
-    public static Order create(Symbol symbol, Side side, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
+    public static Order create(Symbol symbol, Side side, OrderType orderType, TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         return switch (orderType) {
-            case MARKET -> Order.createMarket(side, symbol, quantity);
+            case MARKET -> {
+                if (side.isBuy()) {
+                    boolean hasQty = quantity != null;
+                    boolean hasQuoteQty = quoteQty != null;
+                    if (hasQty == hasQuoteQty) {
+                        throw new BusinessRuleException(
+                            "ORDER_INVALID_QUANTITY",
+                            "MARKET BUY must specify exactly one of quantity or quoteQty"
+                        );
+                    }
+                    if (hasQuoteQty) {
+                        yield Order.createMarketBuyWithQuoteQty(side, symbol, quoteQty);
+                    }
+                }
+
+                if (side.isSell() && quantity == null) {
+                    throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "MARKET SELL requires quantity");
+                }
+
+                yield Order.createMarket(side, symbol, null, quantity);
+            }
             case LIMIT  -> Order.createLimit(side, symbol, tif == null ? TimeInForce.GTC : tif, price, quantity);
         };
+    }
+
+    /**
+     * quoteQty(예산) 기반 MARKET BUY 주문을 생성한다.
+     * quantity는 null이며 remaining은 0으로 고정된다.
+     */
+    public static Order createMarketBuyWithQuoteQty(Side side, Symbol symbol, QuoteQty quoteQty) {
+        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, null);
     }
 
     /**
@@ -77,14 +112,15 @@ public class Order {
      */
     public static Order createLimit(Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
         Objects.requireNonNull(price, "price must not be null for LIMIT order");
-        return new Order(side, symbol, OrderType.LIMIT, tif, price, quantity);
+        Objects.requireNonNull(quantity, "quantity must not be null for LIMIT order");
+        return new Order(side, symbol, OrderType.LIMIT, tif, price, null, quantity);
     }
 
     /**
      * MARKET 주문을 생성한다. price는 항상 null이다. TIF는 내부적으로 IOC로 처리된다.
      */
-    public static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
-        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quantity);
+    public static Order createMarket(Side side, Symbol symbol, QuoteQty quoteQty, Quantity quantity) {
+        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, quantity);
     }
 
     /**
@@ -102,6 +138,22 @@ public class Order {
     /** {@code true}이면 시장가 주문({@link OrderType#MARKET})이다. */
     public boolean isMarket() {
         return orderType.isMarket();
+    }
+
+    /** {@code true}이면 quoteQty(예산) 기반 MARKET BUY 모드이다. */
+    public boolean isQuoteQtyMode() {
+        return quoteQty != null;
+    }
+
+    /**
+     * quoteQty 모드 MARKET BUY 체결 완료 시 호출한다.
+     * remaining은 변경하지 않고 상태만 {@link OrderStatus#FILLED}로 전이한다.
+     *
+     * @throws ConflictException 활성 상태가 아닌 경우
+     */
+    public void markFilledByMarketBuy() {
+        requireActive();
+        this.status = OrderStatus.FILLED;
     }
 
     /**

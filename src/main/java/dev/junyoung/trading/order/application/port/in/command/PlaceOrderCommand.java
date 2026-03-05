@@ -5,6 +5,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 public record PlaceOrderCommand(
@@ -13,6 +14,7 @@ public record PlaceOrderCommand(
 	OrderType orderType,
 	TimeInForce tif,
 	Price price,
+	QuoteQty quoteQty,
 	Quantity quantity
 ) {
 }

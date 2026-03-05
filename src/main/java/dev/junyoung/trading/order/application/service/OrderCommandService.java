@@ -29,6 +29,7 @@ public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCas
             command.orderType(),
             command.tif(),
             command.price(),
+            command.quoteQty(),
             command.quantity()
         );
         engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));

@@ -14,6 +14,7 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
 
 /**
  * 단일 종목 호가창. bids(매수 내림차순) / asks(매도 오름차순), 동일 가격 FIFO.
@@ -110,6 +111,25 @@ public class OrderBook {
 		return Optional.of(order);
 	}
 
+	/**
+	 * 지정 사이드에서 가격 조건을 만족하는 전체 잔량을 집계한다 (FOK 사전 충족성 검사용).
+	 * - makerSide == SELL (asks 오름차순): price ≤ limitPrice 인 레벨 합산
+	 * - makerSide == BUY  (bids 내림차순): price ≥ limitPrice 인 레벨 합산
+	 *
+	 * @param makerSide  조회할 사이드 (taker의 반대 사이드)
+	 * @param limitPrice taker의 가격 한도
+	 * @return 체결 가능한 총 수량
+	 */
+	public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
+		NavigableMap<Price, Deque<Order>> book = bookOf(makerSide);
+		return new Quantity(
+			book.headMap(limitPrice, true).values().stream()
+				.flatMap(Deque::stream)
+				.mapToLong(o -> o.getRemaining().value())
+				.sum()
+		);
+	}
+
 	/** 매수 호가창 스냅샷. 가격 → 잔량 합계 (내림차순) */
 	public NavigableMap<Price, Long> bidsSnapshot() {
 		return aggregateDepth(bids);
@@ -120,14 +140,20 @@ public class OrderBook {
 		return aggregateDepth(asks);
 	}
 
+	/** side에 해당하는 호가창({@code bids} 또는 {@code asks})을 반환한다. */
 	private NavigableMap<Price, Deque<Order>> bookOf(Side side) {
 		return side == Side.BUY ? bids : asks;
 	}
 
+	/**
+	 * 지정 사이드의 최우선 가격 레벨 엔트리를 반환한다.
+	 * bids는 최고가, asks는 최저가가 {@code firstEntry()}에 위치한다(comparator 기준).
+	 */
 	private Map.Entry<Price, Deque<Order>> bestLevelOf(Side side) {
 		return bookOf(side).firstEntry();
 	}
 
+	/** 레벨 큐가 비어 있으면 해당 가격 레벨을 호가창에서 제거한다. */
 	private void removeEmptyLevel(
 		NavigableMap<Price, Deque<Order>> book,
 		Map.Entry<Price, Deque<Order>> level
@@ -135,10 +161,15 @@ public class OrderBook {
 		if (level.getValue().isEmpty()) book.remove(level.getKey());
 	}
 
+	/** 호가창의 최우선 가격(firstKey)을 반환한다. 비어 있으면 {@link Optional#empty()}. */
 	private Optional<Price> firstKeyOf(NavigableMap<Price, Deque<Order>> book) {
 		return book.isEmpty() ? Optional.empty() : Optional.of(book.firstKey());
 	}
 
+	/**
+	 * 호가창을 순회해 가격 레벨별 잔량 합계 스냅샷을 생성한다.
+	 * 원본 comparator를 그대로 사용하므로 bids는 내림차순, asks는 오름차순으로 반환된다.
+	 */
 	private NavigableMap<Price, Long> aggregateDepth(NavigableMap<Price, Deque<Order>> book) {
 		NavigableMap<Price, Long> snapshot = new TreeMap<>(book.comparator());
 		book.forEach((price, queue) -> {

@@ -76,7 +76,7 @@ public class EngineHandler {
 		return switch (order.getTif()) {
 			case GTC -> engine.placeLimitOrder(order);
 			case IOC -> engine.placeLimitOrderIOC(order);
-			case FOK -> engine.placeLimitOrder(order);	// 이후 FOK 전용 구현
+			case FOK -> engine.placeLimitOrderFOK(order);
 		};
 	}
 }

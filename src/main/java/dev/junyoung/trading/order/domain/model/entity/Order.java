@@ -16,6 +16,10 @@ import lombok.Getter;
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * 주문 엔티티. 주문의 생명주기(ACCEPTED → NEW → FILLED/CANCELLED)를 관리한다.
+ * <p>상태 전이는 {@link #activate()}, {@link #fill(Quantity)}, {@link #cancel()} 메서드를 통해서만 수행된다.</p>
+ */
 @Getter
 public class Order {
     private final OrderId orderId;
@@ -32,6 +36,11 @@ public class Order {
     private volatile OrderStatus status;
     private final Instant orderedAt;
 
+    /**
+     * 주문 객체를 생성한다. 외부에서는 {@link #createLimit} / {@link #createMarket}를 사용한다.
+     *
+     * @throws BusinessRuleException quantity가 1 미만인 경우
+     */
     private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
         this.orderId = OrderId.newId();
         this.side = Objects.requireNonNull(side);
@@ -50,6 +59,10 @@ public class Order {
         this.orderedAt = Instant.now();
     }
 
+    /**
+     * 주문 유형에 따라 LIMIT 또는 MARKET 주문을 생성한다.
+     * <p>tif가 null이면 {@link TimeInForce#GTC}로 기본 설정된다.</p>
+     */
     public static Order create(Symbol symbol, Side side, OrderType orderType, TimeInForce tif, Price price, Quantity quantity) {
         return switch (orderType) {
             case MARKET -> Order.createMarket(side, symbol, quantity);
@@ -86,6 +99,7 @@ public class Order {
         return price;
     }
 
+    /** {@code true}이면 시장가 주문({@link OrderType#MARKET})이다. */
     public boolean isMarket() {
         return orderType.isMarket();
     }
@@ -105,7 +119,7 @@ public class Order {
     /**
      * 체결 수량만큼 미체결 잔량을 차감하고 상태를 전이한다.
      * <ul>
-     *   <li>잔량 &gt; 0 → {@link OrderStatus#PARTIALLY_FILLED}</li>
+     *   <li>잔량 > 0 → {@link OrderStatus#PARTIALLY_FILLED}</li>
      *   <li>잔량 = 0 → {@link OrderStatus#FILLED}</li>
      * </ul>
      *
@@ -128,6 +142,11 @@ public class Order {
         this.status = OrderStatus.CANCELLED;
     }
 
+    /**
+     * 상태가 활성({@link OrderStatus#NEW} / {@link OrderStatus#PARTIALLY_FILLED})인지 검증한다.
+     *
+     * @throws ConflictException 활성 상태가 아닌 경우
+     */
     private void requireActive() {
         if (status != OrderStatus.NEW && status != OrderStatus.PARTIALLY_FILLED) {
             throw new ConflictException("ORDER_INVALID_STATE", "Order is not in an active state: " + status);

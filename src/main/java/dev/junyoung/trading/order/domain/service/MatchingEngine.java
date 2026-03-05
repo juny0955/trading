@@ -55,6 +55,31 @@ public class MatchingEngine {
 	}
 
 	/**
+	 * 지정가 FOK 주문을 처리한다. 전량 즉시 체결 가능한 경우에만 체결한다.
+	 * <ol>
+	 *   <li>반대 사이드에서 가격 조건을 만족하는 총 유동성을 집계한다.</li>
+	 *   <li>유동성이 부족하면 {@link Order#activate()}와 {@link Order#cancel()}을 호출해
+	 *       체결 없이 {@link OrderStatus#CANCELLED}로 전환한다. 호가창에는 추가하지 않는다.</li>
+	 *   <li>유동성이 충분하면 일반 매칭 루프를 실행해 전량 체결한다 (결과는 항상 {@link OrderStatus#FILLED}).</li>
+	 * </ol>
+	 *
+	 * @param taker 처리할 지정가 주문 ({@link OrderStatus#ACCEPTED} 상태)
+	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
+	 */
+	public PlaceResult placeLimitOrderFOK(Order taker) {
+		Side makerSide = taker.getSide().opposite();
+		Quantity availableQty = orderBook.totalAvailableQty(makerSide, taker.getLimitPriceOrThrow());
+
+		if (availableQty.value() < taker.getQuantity().value()) {
+			taker.activate();
+			taker.cancel();
+			return PlaceResult.of(List.of(taker), List.of());
+		}
+
+		return placeOrder(taker, Order::cancel);
+	}
+
+	/**
 	 * 시장가 주문을 처리한다. 가격 조건 없이 반대 사이드 최우선 호가부터 순차 체결한다.
 	 * <ol>
 	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
@@ -90,14 +115,29 @@ public class MatchingEngine {
 
 	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers) {}
 
+	/**
+	 * 주문 처리의 공통 흐름을 실행하는 템플릿 메서드.
+	 * <ol>
+	 *   <li>taker를 활성 상태({@link OrderStatus#NEW})로 전환한다.</li>
+	 *   <li>매칭 루프를 실행해 체결 가능한 maker와 순서대로 체결한다.</li>
+	 *   <li>잔량이 남은 경우 {@code onRemaining} 전략에 따라 처리한다.
+	 *       (예: 호가창 등록 또는 취소)</li>
+	 *   <li>상태가 변경된 모든 주문(maker + taker)과 체결 내역을 {@link PlaceResult}로 반환한다.</li>
+	 * </ol>
+	 *
+	 * @param taker       처리할 주문 ({@link OrderStatus#ACCEPTED} 상태)
+	 * @param onRemaining 체결 후 잔량 처리 전략
+	 *                    ({@code orderBook::add}: 호가창 등록 / {@code Order::cancel}: 즉시 취소)
+	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
+	 */
 	private PlaceResult placeOrder(Order taker, Consumer<Order> onRemaining) {
 		taker.activate();
 		MatchLoopResult loop = runMatchingLoop(taker);
 		if (taker.getRemaining().value() > 0) {
 			onRemaining.accept(taker);
 		}
-		var updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
-		return new PlaceResult(updatedOrders, loop.trades());
+		List<Order> updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
+		return PlaceResult.of(updatedOrders, loop.trades());
 	}
 
 	/**

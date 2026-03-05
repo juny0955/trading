@@ -23,6 +23,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,6 +70,30 @@ class OrderQueryServiceTest {
             assertThat(result.remaining()).isEqualTo(10L);
             assertThat(result.status()).isEqualTo("ACCEPTED");
             assertThat(result.orderedAt()).isEqualTo(order.getOrderedAt());
+        }
+
+        @Test
+        @DisplayName("quoteQty 모드 주문 조회 시 quantity가 null로 반환된다")
+        void getOrder_quoteQtyMode_quantityIsNull() {
+            Order order = Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            when(orderRepository.findById(order.getOrderId().toString()))
+                    .thenReturn(Optional.of(order));
+
+            OrderResult result = sut.getOrder(order.getOrderId().toString());
+
+            assertThat(result.quantity()).isNull();
+        }
+
+        @Test
+        @DisplayName("quoteQty 모드 주문 조회 시 remaining이 0으로 반환된다")
+        void getOrder_quoteQtyMode_remainingIsZero() {
+            Order order = Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            when(orderRepository.findById(order.getOrderId().toString()))
+                    .thenReturn(Optional.of(order));
+
+            OrderResult result = sut.getOrder(order.getOrderId().toString());
+
+            assertThat(result.remaining()).isEqualTo(0L);
         }
 
         @Test

@@ -19,11 +19,13 @@ public class OrderQueryService implements GetOrderUseCase {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
+        Long quantity = order.getQuantity() == null ? null : order.getQuantity().value();
+
         return new OrderResult(
             order.getOrderId().toString(),
             order.getSide().name(),
             order.isMarket() ? null : order.getLimitPriceOrThrow().value(),
-            order.getQuantity().value(),
+            quantity,
             order.getRemaining().value(),
             order.getStatus().name(),
             order.getOrderedAt()

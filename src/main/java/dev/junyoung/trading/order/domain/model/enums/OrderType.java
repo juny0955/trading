@@ -6,4 +6,8 @@ public enum OrderType {
     public boolean isMarket() {
         return this == MARKET;
     }
+
+    public static boolean isMarket(String raw) {
+        return MARKET.name().equals(raw);
+    }
 }

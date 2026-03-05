@@ -95,6 +95,59 @@ public class MatchingEngine {
 	}
 
 	/**
+	 * quoteQty(예산) 기반 MARKET BUY 주문을 처리한다.
+	 * <ol>
+	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
+	 *   <li>예산이 소진되거나 호가창이 빌 때까지 SELL 호가와 체결한다.</li>
+	 *   <li>1건 이상 체결됐으면 {@link Order#markFilledByMarketBuy()}로 FILLED 전이.</li>
+	 *   <li>체결 0건이면 {@link Order#cancel()}로 CANCELLED 전이.</li>
+	 * </ol>
+	 *
+	 * @param taker quoteQty 모드 MARKET BUY 주문 ({@link OrderStatus#ACCEPTED} 상태)
+	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
+	 */
+	public PlaceResult placeMarketBuyOrderWithQuoteQty(Order taker) {
+		taker.activate();
+
+		long remainingQuote = taker.getQuoteQty().value();
+		int executedTradeCount = 0;
+		List<Trade> trades = new ArrayList<>();
+		List<Order> updatedMakers = new ArrayList<>();
+
+		while (true) {
+			Optional<Order> best = orderBook.peek(Side.SELL);
+			if (best.isEmpty()) break;
+
+			Order maker = best.get();
+			long makerPrice = maker.getLimitPriceOrThrow().value();
+			long maxExecQty = remainingQuote / makerPrice;
+			if (maxExecQty == 0) break;
+
+			long execQtyValue = Math.min(maxExecQty, maker.getRemaining().value());
+			Quantity execQty = new Quantity(execQtyValue);
+			trades.add(Trade.of(taker, maker, execQty));
+
+			maker.fill(execQty);
+			remainingQuote -= makerPrice * execQtyValue;
+			executedTradeCount++;
+
+			if (maker.getRemaining().value() == 0) {
+				orderBook.poll(Side.SELL);
+			}
+			updatedMakers.add(maker);
+		}
+
+		if (executedTradeCount > 0) {
+			taker.markFilledByMarketBuy();
+		} else {
+			taker.cancel();
+		}
+
+		List<Order> updatedOrders = Stream.concat(updatedMakers.stream(), Stream.of(taker)).toList();
+		return PlaceResult.of(updatedOrders, trades);
+	}
+
+	/**
 	 * 주문을 취소한다.
 	 * <ol>
 	 *   <li>호가창에서 해당 주문을 제거한다. 이미 체결되어 없는 경우 무시한다.</li>

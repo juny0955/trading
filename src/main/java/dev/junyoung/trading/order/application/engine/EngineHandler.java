@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.PlaceResult;
@@ -70,6 +71,9 @@ public class EngineHandler {
 	 */
 	private PlaceResult processPlaceOrder(Order order) {
 		if (order.isMarket()) {
+			if (order.getSide() == Side.BUY && order.isQuoteQtyMode()) {
+				return engine.placeMarketBuyOrderWithQuoteQty(order);
+			}
 			return engine.placeMarketOrder(order);
 		}
 

@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
@@ -67,7 +68,11 @@ class EngineHandlerTest {
 	}
 
 	private Order marketBuyOrder(long qty) {
-		return Order.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
+		return Order.createMarket(Side.BUY, SYMBOL, null, new Quantity(qty));
+	}
+
+	private Order marketBuyQuoteQtyOrder(long quoteQty) {
+		return Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQty));
 	}
 
 	// ── PlaceOrder ──────────────────────────────────────────────────────────
@@ -191,6 +196,19 @@ class EngineHandlerTest {
 
 			verify(orderRepository).save(filledMaker);
 			verify(orderRepository).save(order);
+		}
+
+		@Test
+		@DisplayName("BUY + quoteQty MARKET 주문이면 placeMarketBuyOrderWithQuoteQty()를 호출한다")
+		void handle_placeOrder_marketBuyQuoteQty_callsQuoteQtyPath() {
+			Order order = marketBuyQuoteQtyOrder(50_000);
+			when(engine.placeMarketBuyOrderWithQuoteQty(order)).thenReturn(PlaceResult.of(List.of(order), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(engine).placeMarketBuyOrderWithQuoteQty(order);
+			verify(engine, never()).placeMarketOrder(any());
+			verify(engine, never()).placeLimitOrder(any());
 		}
 	}
 

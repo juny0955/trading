@@ -57,6 +57,7 @@ class OrderCommandServiceTest {
                 OrderType.LIMIT,
                 null,
                 price == null ? null : new Price(price),
+                null,
                 new Quantity(quantity)
         );
     }
@@ -121,6 +122,7 @@ class OrderCommandServiceTest {
                             OrderType.LIMIT,
                             null,
                             new Price(10_000L),
+                            null,
                             new Quantity(5)
                     )));
         }
@@ -188,6 +190,7 @@ class OrderCommandServiceTest {
                         OrderType.LIMIT,
                         tif,
                         new Price(10_000L),
+                        null,
                         new Quantity(5)
                 ));
 
@@ -205,6 +208,7 @@ class OrderCommandServiceTest {
                     new Symbol("BTC"),
                     Side.BUY,
                     OrderType.MARKET,
+                    null,
                     null,
                     null,
                     new Quantity(5)
@@ -272,7 +276,7 @@ class OrderCommandServiceTest {
         @DisplayName("MARKET 주문 취소 시 OrderNotCancellableException이 발생한다")
         void cancelMarketOrder_throwsOrderNotCancellableException() {
             String orderId = UUID.randomUUID().toString();
-            Order marketOrder = Order.createMarket(Side.BUY, new Symbol("BTC"), new Quantity(5));
+            Order marketOrder = Order.createMarket(Side.BUY, new Symbol("BTC"), null, new Quantity(5));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(orderId));

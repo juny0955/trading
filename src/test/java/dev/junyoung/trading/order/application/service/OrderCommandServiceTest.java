@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.service;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
@@ -47,7 +49,7 @@ class OrderCommandServiceTest {
     private OrderCommandService sut;
 
     private Order buyOrder(String symbol) {
-        return Order.createLimit(Side.BUY, new Symbol(symbol), TimeInForce.GTC, new Price(10_000), new Quantity(5));
+        return OrderFixture.createLimit(Side.BUY, new Symbol(symbol), TimeInForce.GTC, new Price(10_000), new Quantity(5));
     }
 
     private PlaceOrderCommand limitCommand(String symbol, String side, Long price, int quantity) {
@@ -276,7 +278,7 @@ class OrderCommandServiceTest {
         @DisplayName("MARKET 주문 취소 시 OrderNotCancellableException이 발생한다")
         void cancelMarketOrder_throwsOrderNotCancellableException() {
             String orderId = UUID.randomUUID().toString();
-            Order marketOrder = Order.createMarket(Side.BUY, new Symbol("BTC"), null, new Quantity(5));
+            Order marketOrder = OrderFixture.createMarket(Side.BUY, new Symbol("BTC"), new Quantity(5));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(orderId));
@@ -287,7 +289,7 @@ class OrderCommandServiceTest {
         @DisplayName("이미 CANCELLED된 주문 취소 시 OrderAlreadyFinalizedException이 발생한다")
         void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
             String orderId = UUID.randomUUID().toString();
-            Order order = Order.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
+            Order order = OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
             order.activate();
             order.cancel(); // → CANCELLED 상태
 

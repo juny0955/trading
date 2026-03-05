@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -57,11 +59,11 @@ class EngineIndependenceTest {
 
     private static EngineCommand.PlaceOrder btcPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            Order.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
     }
 
     private static EngineCommand.PlaceOrder ethPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            Order.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
     }
 }

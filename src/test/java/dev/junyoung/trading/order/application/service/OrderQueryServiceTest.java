@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.service;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -45,7 +47,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("주문이 존재하면 OrderResult를 반환한다")
         void getOrder_found_returnsOrderResult() {
-            Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+            Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 
@@ -58,7 +60,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("OrderResult의 side/price/quantity/remaining/status/orderedAt이 Order와 일치한다")
         void getOrder_found_resultFieldsMatchOrder() {
-            Order order = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(50_000), new Quantity(10));
+            Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(50_000), new Quantity(10));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 
@@ -75,7 +77,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("quoteQty 모드 주문 조회 시 quantity가 null로 반환된다")
         void getOrder_quoteQtyMode_quantityIsNull() {
-            Order order = Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 
@@ -87,7 +89,7 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("quoteQty 모드 주문 조회 시 remaining이 0으로 반환된다")
         void getOrder_quoteQtyMode_remainingIsZero() {
-            Order order = Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
             when(orderRepository.findById(order.getOrderId().toString()))
                     .thenReturn(Optional.of(order));
 

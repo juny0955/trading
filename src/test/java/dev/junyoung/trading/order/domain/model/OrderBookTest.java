@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.domain.model;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
@@ -32,14 +34,14 @@ class OrderBookTest {
 
 	/** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
 	private Order newBuyOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	/** ACCEPTED → activate() → NEW 상태인 SELL 주문 */
 	private Order newSellOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}

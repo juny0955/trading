@@ -140,14 +140,20 @@ public class OrderBook {
 		return aggregateDepth(asks);
 	}
 
+	/** side에 해당하는 호가창({@code bids} 또는 {@code asks})을 반환한다. */
 	private NavigableMap<Price, Deque<Order>> bookOf(Side side) {
 		return side == Side.BUY ? bids : asks;
 	}
 
+	/**
+	 * 지정 사이드의 최우선 가격 레벨 엔트리를 반환한다.
+	 * bids는 최고가, asks는 최저가가 {@code firstEntry()}에 위치한다(comparator 기준).
+	 */
 	private Map.Entry<Price, Deque<Order>> bestLevelOf(Side side) {
 		return bookOf(side).firstEntry();
 	}
 
+	/** 레벨 큐가 비어 있으면 해당 가격 레벨을 호가창에서 제거한다. */
 	private void removeEmptyLevel(
 		NavigableMap<Price, Deque<Order>> book,
 		Map.Entry<Price, Deque<Order>> level
@@ -155,10 +161,15 @@ public class OrderBook {
 		if (level.getValue().isEmpty()) book.remove(level.getKey());
 	}
 
+	/** 호가창의 최우선 가격(firstKey)을 반환한다. 비어 있으면 {@link Optional#empty()}. */
 	private Optional<Price> firstKeyOf(NavigableMap<Price, Deque<Order>> book) {
 		return book.isEmpty() ? Optional.empty() : Optional.of(book.firstKey());
 	}
 
+	/**
+	 * 호가창을 순회해 가격 레벨별 잔량 합계 스냅샷을 생성한다.
+	 * 원본 comparator를 그대로 사용하므로 bids는 내림차순, asks는 오름차순으로 반환된다.
+	 */
 	private NavigableMap<Price, Long> aggregateDepth(NavigableMap<Price, Deque<Order>> book) {
 		NavigableMap<Price, Long> snapshot = new TreeMap<>(book.comparator());
 		book.forEach((price, queue) -> {

@@ -73,7 +73,7 @@ public class MatchingEngine {
 		if (availableQty.value() < taker.getQuantity().value()) {
 			taker.activate();
 			taker.cancel();
-			return new PlaceResult(List.of(taker), List.of());
+			return PlaceResult.of(List.of(taker), List.of());
 		}
 
 		return placeOrder(taker, Order::cancel);
@@ -137,7 +137,7 @@ public class MatchingEngine {
 			onRemaining.accept(taker);
 		}
 		List<Order> updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
-		return new PlaceResult(updatedOrders, loop.trades());
+		return PlaceResult.of(updatedOrders, loop.trades());
 	}
 
 	/**

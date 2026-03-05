@@ -39,7 +39,7 @@ public class Order {
     /** 주문 원래 수량 */
     private final Quantity quantity;
     /** 미체결 잔량. 체결될 때마다 차감된다. */
-    private Quantity remaining;
+    private volatile Quantity remaining;
     /** 현재 주문 상태. 엔진 스레드와 조회 스레드가 동시에 읽을 수 있어 volatile로 선언한다. */
     private volatile OrderStatus status;
     /** 주문 접수 시각 */

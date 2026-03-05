@@ -14,6 +14,7 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
 
 /**
  * 단일 종목 호가창. bids(매수 내림차순) / asks(매도 오름차순), 동일 가격 FIFO.
@@ -108,6 +109,25 @@ public class OrderBook {
 		if (queue.isEmpty()) book.remove(order.getLimitPriceOrThrow());
 
 		return Optional.of(order);
+	}
+
+	/**
+	 * 지정 사이드에서 가격 조건을 만족하는 전체 잔량을 집계한다 (FOK 사전 충족성 검사용).
+	 * - makerSide == SELL (asks 오름차순): price ≤ limitPrice 인 레벨 합산
+	 * - makerSide == BUY  (bids 내림차순): price ≥ limitPrice 인 레벨 합산
+	 *
+	 * @param makerSide  조회할 사이드 (taker의 반대 사이드)
+	 * @param limitPrice taker의 가격 한도
+	 * @return 체결 가능한 총 수량
+	 */
+	public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
+		NavigableMap<Price, Deque<Order>> book = bookOf(makerSide);
+		return new Quantity(
+			book.headMap(limitPrice, true).values().stream()
+				.flatMap(Deque::stream)
+				.mapToLong(o -> o.getRemaining().value())
+				.sum()
+		);
 	}
 
 	/** 매수 호가창 스냅샷. 가격 → 잔량 합계 (내림차순) */

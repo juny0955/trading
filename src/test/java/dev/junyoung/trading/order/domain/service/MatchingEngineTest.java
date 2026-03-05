@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.domain.service;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,34 +41,34 @@ public class MatchingEngineTest {
 
 	/** ACCEPTED 상태 BUY 주문 — 엔진에 직접 전달용 */
 	private Order buyOrder(long price, long qty) {
-		return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	/** ACCEPTED 상태 SELL 주문 — 엔진에 직접 전달용 */
 	private Order sellOrder(long price, long qty) {
-		return Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	/** ACCEPTED → activate() → NEW 상태 SELL 주문 — orderBook 사전 등록용 */
 	private Order activatedSellOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	/** ACCEPTED → activate() → NEW 상태 BUY 주문 — orderBook 사전 등록용 */
 	private Order activatedBuyOrder(long price, long qty) {
-		Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 		order.activate();
 		return order;
 	}
 
 	private Order marketBuyOrder(long qty) {
-		return Order.createMarket(Side.BUY, SYMBOL, null, new Quantity(qty));
+		return OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
 	}
 
 	private Order marketSellOrder(long qty) {
-		return Order.createMarket(Side.SELL, SYMBOL, null, new Quantity(qty));
+		return OrderFixture.createMarket(Side.SELL, SYMBOL, new Quantity(qty));
 	}
 
 	// ── 매칭 없음 ──────────────────────────────────────────────────────────
@@ -542,11 +544,11 @@ public class MatchingEngineTest {
 	class PlaceLimitOrderIOC {
 
 		private Order iocBuyOrder(long price, long qty) {
-			return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
+			return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
 		}
 
 		private Order iocSellOrder(long price, long qty) {
-			return Order.createLimit(Side.SELL, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
+			return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
 		}
 
 		@Test
@@ -661,11 +663,11 @@ public class MatchingEngineTest {
 	class PlaceLimitOrderFOK {
 
 		private Order fokBuyOrder(long price, long qty) {
-			return Order.createLimit(Side.BUY, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
+			return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
 		}
 
 		private Order fokSellOrder(long price, long qty) {
-			return Order.createLimit(Side.SELL, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
+			return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
 		}
 
 		@Test
@@ -758,7 +760,7 @@ public class MatchingEngineTest {
 	class PlaceMarketBuyOrderWithQuoteQty {
 
 		private Order quoteQtyBuyOrder(long quoteQtyValue) {
-			return Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQtyValue));
+			return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQtyValue));
 		}
 
 		@Test

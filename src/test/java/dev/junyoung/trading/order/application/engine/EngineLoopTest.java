@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -63,7 +65,7 @@ class EngineLoopTest {
 	private static final Symbol SYMBOL = new Symbol("BTC");
 
 	private EngineCommand.PlaceOrder placeOrderCommand() {
-		Order order = Order.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 		return new EngineCommand.PlaceOrder(order);
 	}
 

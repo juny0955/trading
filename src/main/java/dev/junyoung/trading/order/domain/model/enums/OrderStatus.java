@@ -6,4 +6,9 @@ public enum OrderStatus {
     PARTIALLY_FILLED,
     FILLED,
     CANCELLED
+    ;
+
+    public boolean isFinal() {
+        return this == CANCELLED || this == FILLED;
+    }
 }

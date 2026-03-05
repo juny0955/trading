@@ -1,5 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
@@ -68,7 +70,7 @@ class MatchingEngineSimulationTest {
             Side  side  = (random.nextInt(2) == 0) ? Side.BUY : Side.SELL;
             long  price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
             long  qty   = QTY_MIN   + random.nextLong(QTY_MAX   - QTY_MIN   + 1);
-            Order order = Order.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+            Order order = OrderFixture.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 
             submissionSeq.put(order.getOrderId(), i);
             allOrders.add(order);
@@ -139,11 +141,11 @@ class MatchingEngineSimulationTest {
 
             Order order;
             if (isMarket) {
-                order = Order.createMarket(side, SYMBOL, null, new Quantity(qty));
+                order = OrderFixture.createMarket(side, SYMBOL, new Quantity(qty));
                 marketOrders.add(order);
             } else {
                 long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
-                order = Order.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
+                order = OrderFixture.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
             }
             allOrders.add(order);
 
@@ -199,11 +201,11 @@ class MatchingEngineSimulationTest {
             PlaceResult result;
             try {
                 if (isMarket) {
-                    order  = Order.createMarket(side, symbol, null, new Quantity(qty));
+                    order  = OrderFixture.createMarket(side, symbol, new Quantity(qty));
                     result = engine.placeMarketOrder(order);
                 } else {
                     long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
-                    order  = Order.createLimit(side, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
+                    order  = OrderFixture.createLimit(side, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
                     result = engine.placeLimitOrder(order);
                 }
             } catch (IllegalStateException e) {

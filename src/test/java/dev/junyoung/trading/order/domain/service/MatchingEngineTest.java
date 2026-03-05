@@ -18,6 +18,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @DisplayName("MatchingEngine")
@@ -61,11 +62,11 @@ public class MatchingEngineTest {
 	}
 
 	private Order marketBuyOrder(long qty) {
-		return Order.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
+		return Order.createMarket(Side.BUY, SYMBOL, null, new Quantity(qty));
 	}
 
 	private Order marketSellOrder(long qty) {
-		return Order.createMarket(Side.SELL, SYMBOL, new Quantity(qty));
+		return Order.createMarket(Side.SELL, SYMBOL, null, new Quantity(qty));
 	}
 
 	// ── 매칭 없음 ──────────────────────────────────────────────────────────
@@ -747,6 +748,83 @@ public class MatchingEngineTest {
 			Order taker = fokBuyOrder(10_000, 5);
 			PlaceResult result = engine.placeLimitOrderFOK(taker);
 			assertThat(result.updatedOrders()).contains(taker);
+		}
+	}
+
+	// ── placeMarketBuyOrderWithQuoteQty() ─────────────────────────────────
+
+	@Nested
+	@DisplayName("placeMarketBuyOrderWithQuoteQty()")
+	class PlaceMarketBuyOrderWithQuoteQty {
+
+		private Order quoteQtyBuyOrder(long quoteQtyValue) {
+			return Order.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQtyValue));
+		}
+
+		@Test
+		@DisplayName("ask 없음 → 체결 없이 CANCELLED, trades 0건")
+		void noAsk_thenCancelled() {
+			Order taker = quoteQtyBuyOrder(50_000L);
+			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(result.trades()).isEmpty();
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		}
+
+		@Test
+		@DisplayName("ask 1건, 예산 완전 소진 → FILLED, trades 1건")
+		void singleAsk_fullyConsumed_thenFilled() {
+			orderBook.add(activatedSellOrder(10_000, 5)); // 10_000 * 5 = 50_000
+			Order taker = quoteQtyBuyOrder(50_000L);
+			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(result.trades()).hasSize(1);
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+		}
+
+		@Test
+		@DisplayName("ask 여러 건, 예산 소진 → FILLED, trades > 1건")
+		void multipleAsks_budgetExhausted_thenFilled() {
+			Order ask1 = activatedSellOrder(10_000, 2);
+			Order ask2 = activatedSellOrder(10_000, 2);
+			orderBook.add(ask1);
+			orderBook.add(ask2);
+			Order taker = quoteQtyBuyOrder(40_000L); // 10_000 * (2 + 2) = 40_000
+			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(result.trades()).hasSize(2);
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(ask1.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(ask2.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(orderBook.bestAsk()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("예산 < ask 최저가 → 체결 없이 CANCELLED, trades 0건")
+		void budgetLessThanMinAskPrice_thenCancelled() {
+			orderBook.add(activatedSellOrder(10_000, 5));
+			Order taker = quoteQtyBuyOrder(9_999L); // 예산 9_999 < 최저가 10_000
+
+			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(result.trades()).isEmpty();
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		}
+
+		@Test
+		@DisplayName("체결 후 예산 잔여 → FILLED (잔여 예산 무관)")
+		void partialBudgetRemaining_thenFilled() {
+			Order ask = activatedSellOrder(10_000, 3);
+			orderBook.add(ask); // 3건 체결 = 30_000 소진
+			Order taker = quoteQtyBuyOrder(35_000L); // 5_000 잔여
+
+			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().executedQty()).isEqualTo(new Quantity(3));
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(ask.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(orderBook.bestAsk()).isEmpty();
 		}
 	}
 

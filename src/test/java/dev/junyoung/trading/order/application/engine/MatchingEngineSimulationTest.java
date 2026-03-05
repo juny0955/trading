@@ -139,7 +139,7 @@ class MatchingEngineSimulationTest {
 
             Order order;
             if (isMarket) {
-                order = Order.createMarket(side, SYMBOL, new Quantity(qty));
+                order = Order.createMarket(side, SYMBOL, null, new Quantity(qty));
                 marketOrders.add(order);
             } else {
                 long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
@@ -199,7 +199,7 @@ class MatchingEngineSimulationTest {
             PlaceResult result;
             try {
                 if (isMarket) {
-                    order  = Order.createMarket(side, symbol, new Quantity(qty));
+                    order  = Order.createMarket(side, symbol, null, new Quantity(qty));
                     result = engine.placeMarketOrder(order);
                 } else {
                     long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);

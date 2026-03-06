@@ -40,7 +40,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("잘못된 side 입력이면 IllegalArgumentException을 던진다")
     void placeOrder_invalidSide_throwsIllegalArgumentException() {
-        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "INVALID", "LIMIT", null, 10_000L, null, 1L);
+        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "INVALID", "LIMIT", null, 10_000L, null, 1L, null);
 
         assertThatThrownBy(() -> sut.placeOrder(request))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -51,7 +51,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("잘못된 orderType 입력이면 IllegalArgumentException을 던진다")
     void placeOrder_invalidOrderType_throwsIllegalArgumentException() {
-        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "INVALID", null, 10_000L, null, 1L);
+        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "INVALID", null, 10_000L, null, 1L, null);
 
         assertThatThrownBy(() -> sut.placeOrder(request))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -62,7 +62,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("LIMIT + price=null이면 useCase에 위임한다")
     void placeOrder_limitWithoutPrice_delegatesToUseCase() {
-        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, null, null, 1L);
+        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, null, null, 1L, null);
         when(placeOrderUseCase.placeOrder(any())).thenReturn("order-1");
 
         ResponseEntity<PlaceOrderResponse> response = sut.placeOrder(request);
@@ -74,7 +74,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("side/orderType가 모두 잘못되면 IllegalArgumentException을 던진다")
     void placeOrder_invalidSideAndOrderType_throwsIllegalArgumentException() {
-        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "WRONG", "BAD", null, null, null, 1L);
+        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "WRONG", "BAD", null, null, null, 1L, null);
 
         assertThatThrownBy(() -> sut.placeOrder(request))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -85,7 +85,7 @@ class OrderControllerTest {
     @Test
     @DisplayName("유효한 요청이면 useCase에 위임하고 202를 반환한다")
     void placeOrder_validRequest_delegatesToUseCaseAndReturnsAccepted() {
-        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, 10_000L, null, 1L);
+        PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, 10_000L, null, 1L, null);
         when(placeOrderUseCase.placeOrder(any())).thenReturn("order-1");
 
         ResponseEntity<PlaceOrderResponse> response = sut.placeOrder(request);

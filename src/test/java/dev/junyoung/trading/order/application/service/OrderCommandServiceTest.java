@@ -60,7 +60,21 @@ class OrderCommandServiceTest {
                 null,
                 price == null ? null : new Price(price),
                 null,
-                new Quantity(quantity)
+                new Quantity(quantity),
+                null
+        );
+    }
+
+    private PlaceOrderCommand limitCommand(String symbol, String side, Long price, int quantity, String clientOrderId) {
+        return new PlaceOrderCommand(
+                new Symbol(symbol),
+                Side.valueOf(side),
+                OrderType.LIMIT,
+                null,
+                price == null ? null : new Price(price),
+                null,
+                new Quantity(quantity),
+                clientOrderId
         );
     }
 
@@ -125,7 +139,8 @@ class OrderCommandServiceTest {
                             null,
                             new Price(10_000L),
                             null,
-                            new Quantity(5)
+                            new Quantity(5),
+                            null
                     )));
         }
 
@@ -193,7 +208,8 @@ class OrderCommandServiceTest {
                         tif,
                         new Price(10_000L),
                         null,
-                        new Quantity(5)
+                        new Quantity(5),
+                        null
                 ));
 
                 ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
@@ -213,10 +229,73 @@ class OrderCommandServiceTest {
                     null,
                     null,
                     null,
-                    new Quantity(5)
+                    new Quantity(5),
+                    null
             ));
 
             verify(engineManager).submit(any(Symbol.class), any(EngineCommand.class));
+        }
+    }
+
+    // ── clientOrderId 멱등 처리 ───────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("clientOrderId 멱등 처리")
+    class ClientOrderIdIdempotency {
+
+        @Test
+        @DisplayName("clientOrderId가 없으면 동일 파라미터라도 매 호출마다 새 orderId를 반환한다")
+        void placeOrder_withoutClientOrderId_returnsNewOrderIdEachCall() {
+            String firstId = sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, null));
+            String secondId = sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, null));
+
+            assertThat(firstId).isNotEqualTo(secondId);
+        }
+
+        @Test
+        @DisplayName("동일 clientOrderId로 재시도하면 기존 orderId를 반환한다")
+        void placeOrder_duplicateClientOrderId_returnsSameOrderId() {
+            String firstId = sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
+            String secondId = sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
+
+            assertThat(firstId).isEqualTo(secondId);
+            verify(engineManager, times(1)).submit(any(), any());
+        }
+
+        @Test
+        @DisplayName("동일 clientOrderId로 재시도해도 주문이 중복 생성되지 않는다")
+        void placeOrder_duplicateClientOrderId_doesNotCreateDuplicateOrder() {
+            sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
+            sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
+            sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
+
+            verify(orderRepository, times(1)).save(any());
+        }
+
+        @Test
+        @DisplayName("첫 요청이 예외로 실패하면 clientOrderId 맵에서 제거되어 재시도 시 새 주문을 생성한다")
+        void placeOrder_firstRequestFails_retryWithSameClientOrderIdCreatesNewOrder() {
+            doThrow(new RuntimeException("engine error"))
+                    .when(engineManager).submit(any(), any());
+
+            assertThrows(RuntimeException.class,
+                    () -> sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "retry-key")));
+
+            doNothing().when(engineManager).submit(any(), any());
+
+            String result = sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, "retry-key"));
+
+            assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+            verify(engineManager, times(2)).submit(any(), any());
+        }
+
+        @Test
+        @DisplayName("clientOrderId가 빈 문자열이면 멱등성을 적용하지 않는다")
+        void placeOrder_blankClientOrderId_treatedAsNoClientOrderId() {
+            sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, ""));
+            sut.placeOrder(limitCommand("BTC", "BUY", 10_000L, 5, ""));
+
+            verify(engineManager, times(2)).submit(any(), any());
         }
     }
 

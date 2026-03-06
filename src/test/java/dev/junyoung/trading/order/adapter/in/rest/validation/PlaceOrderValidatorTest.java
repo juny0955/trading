@@ -41,7 +41,7 @@ class PlaceOrderValidatorTest {
     }
 
     private PlaceOrderRequest request(String side, String orderType, String tif, Long quoteQty, Long quantity) {
-        return new PlaceOrderRequest("BTC", side, orderType, tif, null, quoteQty, quantity);
+        return new PlaceOrderRequest("BTC", side, orderType, tif, null, quoteQty, quantity, null);
     }
 
     // ── MARKET BUY ────────────────────────────────────────────────────────

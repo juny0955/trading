@@ -15,6 +15,7 @@ public record PlaceOrderCommand(
 	TimeInForce tif,
 	Price price,
 	QuoteQty quoteQty,
-	Quantity quantity
+	Quantity quantity,
+	String clientOrderId
 ) {
 }

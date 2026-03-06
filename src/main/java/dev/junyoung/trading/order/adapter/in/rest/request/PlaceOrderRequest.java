@@ -36,7 +36,9 @@ public record PlaceOrderRequest(
 	Long quoteQty,
 
 	@Min(1)
-    Long quantity
+    Long quantity,
+
+	String clientOrderId
 ) {
 	public PlaceOrderCommand toCommand() {
 		return new PlaceOrderCommand(
@@ -46,7 +48,8 @@ public record PlaceOrderRequest(
 			tif == null ? null : TimeInForce.valueOf(tif),
 			price == null ? null : new Price(price),
 			quoteQty == null ? null : new QuoteQty(quoteQty),
-			quantity == null ? null : new Quantity(quantity)
+			quantity == null ? null : new Quantity(quantity),
+			clientOrderId
 		);
 	}
 }

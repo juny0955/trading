@@ -1,8 +1,10 @@
 package dev.junyoung.trading.order.application.exception.order;
 
 import dev.junyoung.trading.common.exception.ErrorCode;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 
+@AllArgsConstructor
 public enum OrderErrorCode implements ErrorCode {
 
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", "Order not found"),
@@ -11,12 +13,6 @@ public enum OrderErrorCode implements ErrorCode {
     private final HttpStatus status;
     private final String code;
     private final String message;
-
-    OrderErrorCode(HttpStatus status, String code, String message) {
-        this.status = status;
-        this.code = code;
-        this.message = message;
-    }
 
     @Override public HttpStatus status() { return status; }
     @Override public String code() { return code; }

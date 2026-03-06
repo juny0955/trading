@@ -9,6 +9,11 @@ public record OrderResult(
     Long quantity,
     long remaining,
     String status,
-    Instant orderedAt
+    Instant orderedAt,
+    Long requestedQuoteQty,
+    Long requestedQty,
+    Long cumQuoteQty,
+    Long cumBaseQty,
+    Long leftoverQuoteQty
 ) {
 }

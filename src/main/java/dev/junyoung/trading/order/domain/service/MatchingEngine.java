@@ -137,6 +137,7 @@ public class MatchingEngine {
 			trades.add(Trade.of(taker, maker, execQty));
 
 			maker.fill(execQty);
+			taker.accumulate(makerPrice * execQtyValue, execQtyValue);
 			remainingQuote -= makerPrice * execQtyValue;
 			executedTradeCount++;
 

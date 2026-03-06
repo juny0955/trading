@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,14 +87,14 @@ class EngineLoopTest {
 		}
 
 		@Test
-		@DisplayName("큐가 가득 차면 IllegalStateException이 발생한다")
+		@DisplayName("큐가 가득 차면 EngineQueueFullException이 발생한다")
 		void submit_throwsWhenQueueFull() {
 			// QUEUE_CAPACITY(3)만큼 채움
 			loop.submit(placeOrderCommand());
 			loop.submit(placeOrderCommand());
 			loop.submit(placeOrderCommand());
 
-			assertThrows(IllegalStateException.class, () -> loop.submit(placeOrderCommand()));
+			assertThrows(EngineQueueFullException.class, () -> loop.submit(placeOrderCommand()));
 		}
 
 		@Test

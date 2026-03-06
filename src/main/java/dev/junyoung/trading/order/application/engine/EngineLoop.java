@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -82,7 +83,7 @@ public class EngineLoop implements Runnable {
 		submitLock.lock();
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");
-			if (!engineQueue.offer(command)) throw new IllegalStateException("Engine Queue is full");
+			if (!engineQueue.offer(command)) throw new EngineQueueFullException();
 		} finally {
 			submitLock.unlock();
 		}

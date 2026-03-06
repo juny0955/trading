@@ -4,6 +4,7 @@ import dev.junyoung.trading.common.exception.BusinessRuleException;
 
 import java.util.Objects;
 
+/** 거래 심볼 (대문자 정규화). */
 public record Symbol(
     String value
 ) {

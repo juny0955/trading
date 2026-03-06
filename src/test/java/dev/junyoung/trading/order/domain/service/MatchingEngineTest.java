@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.domain.service;
 
 import dev.junyoung.trading.order.fixture.OrderFixture;
+import dev.junyoung.trading.common.exception.ConflictException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -890,26 +891,26 @@ public class MatchingEngineTest {
 		}
 
 		@Test
-		@DisplayName("FILLED 주문 취소 시 IllegalStateException이 발생한다")
-		void filledOrder_throwsIllegalStateException() {
+		@DisplayName("FILLED 주문 취소 시 ConflictException이 발생한다")
+		void filledOrder_throwsConflictException() {
 			orderBook.add(activatedSellOrder(10_000, 5));
 			Order order = buyOrder(10_000, 5);
 			engine.placeLimitOrder(order);
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
 
-			assertThrows(IllegalStateException.class, () -> engine.cancelOrder(order.getOrderId()));
+			assertThrows(ConflictException.class, () -> engine.cancelOrder(order.getOrderId()));
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
-		@DisplayName("이미 CANCELLED된 주문 취소 시 IllegalStateException이 발생한다")
-		void alreadyCancelledOrder_throwsIllegalStateException() {
+		@DisplayName("이미 CANCELLED된 주문 취소 시 ConflictException이 발생한다")
+		void alreadyCancelledOrder_throwsConflictException() {
 			Order order = buyOrder(10_000, 5);
 			engine.placeLimitOrder(order);
 			engine.cancelOrder(order.getOrderId());
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 
-			assertThrows(IllegalStateException.class, () -> engine.cancelOrder(order.getOrderId()));
+			assertThrows(ConflictException.class, () -> engine.cancelOrder(order.getOrderId()));
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 	}

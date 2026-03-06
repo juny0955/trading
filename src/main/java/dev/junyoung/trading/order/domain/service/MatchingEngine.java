@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.domain.service;
 
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
@@ -22,7 +23,15 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class MatchingEngine {
 
+	// -------------------------------------------------------------------------
+	// 생성자
+	// -------------------------------------------------------------------------
+
 	private final OrderBook orderBook;
+
+	// -------------------------------------------------------------------------
+	// 진입점 (public API)
+	// -------------------------------------------------------------------------
 
 	/**
 	 * 지정가 주문을 처리하고 반대 사이드 호가창과 매칭한다.
@@ -131,17 +140,15 @@ public class MatchingEngine {
 			remainingQuote -= makerPrice * execQtyValue;
 			executedTradeCount++;
 
-			if (maker.getRemaining().value() == 0) {
+			if (maker.getRemaining().value() == 0)
 				orderBook.poll(Side.SELL);
-			}
 			updatedMakers.add(maker);
 		}
 
-		if (executedTradeCount > 0) {
+		if (executedTradeCount > 0)
 			taker.markFilledByMarketBuy();
-		} else {
+		else
 			taker.cancel();
-		}
 
 		List<Order> updatedOrders = Stream.concat(updatedMakers.stream(), Stream.of(taker)).toList();
 		return PlaceResult.of(updatedOrders, trades);
@@ -155,18 +162,20 @@ public class MatchingEngine {
 	 * </ol>
 	 *
 	 * @param orderId 취소할 주문 ID
-	 * @throws IllegalStateException 주문이 활성 상태({@link OrderStatus#NEW} /
-	 *                               {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
+	 * @throws ConflictException 주문이 활성 상태({@link OrderStatus#NEW} /
+	 *                           {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
 	 */
 	public Order cancelOrder(OrderId orderId) {
 		Order order = orderBook.remove(orderId)
-			.orElseThrow(() -> new IllegalStateException("Already Processed or Cancelled Order"));
+			.orElseThrow(() -> new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed or Cancelled Order"));
 
 		order.cancel();
 		return order;
 	}
 
-	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers) {}
+	// -------------------------------------------------------------------------
+	// 내부 헬퍼
+	// -------------------------------------------------------------------------
 
 	/**
 	 * 주문 처리의 공통 흐름을 실행하는 템플릿 메서드.
@@ -186,9 +195,9 @@ public class MatchingEngine {
 	private PlaceResult placeOrder(Order taker, Consumer<Order> onRemaining) {
 		taker.activate();
 		MatchLoopResult loop = runMatchingLoop(taker);
-		if (taker.getRemaining().value() > 0) {
+		if (taker.getRemaining().value() > 0)
 			onRemaining.accept(taker);
-		}
+
 		List<Order> updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
 		return PlaceResult.of(updatedOrders, loop.trades());
 	}
@@ -214,9 +223,9 @@ public class MatchingEngine {
 
 			maker.fill(qty);
 			taker.fill(qty);
-			if (maker.getRemaining().value() == 0) {
+			if (maker.getRemaining().value() == 0)
 				orderBook.poll(side);
-			}
+
 			updatedMakers.add(maker);
 		}
 		return new MatchLoopResult(trades, updatedMakers);
@@ -236,4 +245,10 @@ public class MatchingEngine {
 		long mp = maker.getLimitPriceOrThrow().value();
 		return taker.getSide() == Side.BUY ? mp <= tp : mp >= tp;
 	}
+
+	// -------------------------------------------------------------------------
+	// 내부 레코드
+	// -------------------------------------------------------------------------
+
+	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers) {}
 }

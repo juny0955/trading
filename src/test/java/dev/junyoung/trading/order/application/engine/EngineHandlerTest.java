@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -231,12 +232,12 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("엔진이 IllegalStateException을 던지면 그대로 전파된다")
-		void handle_cancelOrder_propagatesIllegalStateException() {
+		@DisplayName("엔진이 ConflictException을 던지면 그대로 전파된다")
+		void handle_cancelOrder_propagatesConflictException() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 		}
 
 		@Test
@@ -265,9 +266,9 @@ class EngineHandlerTest {
 		@DisplayName("엔진이 예외를 던지면 orderBookCache.update는 호출되지 않는다")
 		void handle_cancelOrder_engineThrows_doesNotUpdateCache() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderBookCache, never()).update(any(), any());
 		}
@@ -303,9 +304,9 @@ class EngineHandlerTest {
 		@DisplayName("엔진이 예외를 던지면 orderRepository.save는 호출되지 않는다")
 		void handle_cancelOrder_engineThrows_doesNotSaveToRepository() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderRepository, never()).save(any());
 		}

@@ -4,9 +4,9 @@ import org.springframework.stereotype.Service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
-import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
-import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
+import dev.junyoung.trading.order.application.exception.order.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;

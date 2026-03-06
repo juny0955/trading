@@ -4,9 +4,9 @@ import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
-import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
-import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
+import dev.junyoung.trading.order.application.exception.order.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;

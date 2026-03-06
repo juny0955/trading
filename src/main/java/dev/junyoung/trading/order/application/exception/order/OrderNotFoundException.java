@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.application.exception;
+package dev.junyoung.trading.order.application.exception.order;
 
 import dev.junyoung.trading.common.exception.NotFoundException;
 

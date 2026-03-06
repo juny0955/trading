@@ -2,7 +2,7 @@ package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
-import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.config.TradingProperties;
 import dev.junyoung.trading.order.domain.model.entity.Order;

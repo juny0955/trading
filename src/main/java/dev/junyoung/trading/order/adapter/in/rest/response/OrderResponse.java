@@ -11,7 +11,12 @@ public record OrderResponse(
     Long quantity,
     long remaining,
     String status,
-    Instant orderedAt
+    Instant orderedAt,
+    Long requestedQuoteQty,
+    Long requestedQty,
+    Long cumQuoteQty,
+    Long cumBaseQty,
+    Long leftoverQuoteQty
 ) {
     public static OrderResponse from(OrderResult result) {
         return new OrderResponse(
@@ -21,7 +26,12 @@ public record OrderResponse(
             result.quantity(),
             result.remaining(),
             result.status(),
-            result.orderedAt()
+            result.orderedAt(),
+            result.requestedQuoteQty(),
+            result.requestedQty(),
+            result.cumQuoteQty(),
+            result.cumBaseQty(),
+            result.leftoverQuoteQty()
         );
     }
 }

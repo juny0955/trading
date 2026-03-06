@@ -135,9 +135,11 @@ public class MatchingEngine {
 			long execQtyValue = Math.min(maxExecQty, maker.getRemaining().value());
 			Quantity execQty = new Quantity(execQtyValue);
 			trades.add(Trade.of(taker, maker, execQty));
+			long tradedQuote = Math.multiplyExact(makerPrice, execQtyValue);
 
 			maker.fill(execQty);
-			remainingQuote -= makerPrice * execQtyValue;
+			taker.accumulate(tradedQuote, execQtyValue);
+			remainingQuote = Math.subtractExact(remainingQuote, tradedQuote);
 			executedTradeCount++;
 
 			if (maker.getRemaining().value() == 0)

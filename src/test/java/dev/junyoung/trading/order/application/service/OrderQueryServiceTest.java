@@ -106,5 +106,52 @@ class OrderQueryServiceTest {
 
             assertThrows(OrderNotFoundException.class, () -> sut.getOrder(orderId));
         }
+
+        @Test
+        @DisplayName("LIMIT 주문 조회 시 requestedQty=quantity, requestedQuoteQty/cumQuoteQty/leftoverQuoteQty=null")
+        void getOrder_limitMode_quantityModeFields() {
+            Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+            when(orderRepository.findById(order.getOrderId().toString()))
+                    .thenReturn(Optional.of(order));
+
+            OrderResult result = sut.getOrder(order.getOrderId().toString());
+
+            assertThat(result.requestedQty()).isEqualTo(5L);
+            assertThat(result.requestedQuoteQty()).isNull();
+            assertThat(result.cumQuoteQty()).isNull();
+            assertThat(result.leftoverQuoteQty()).isNull();
+            assertThat(result.cumBaseQty()).isEqualTo(0L); // quantity - remaining = 5 - 5 = 0
+        }
+
+        @Test
+        @DisplayName("quoteQty 모드 주문 조회 시 requestedQuoteQty/cumQuoteQty/leftoverQuoteQty가 올바르게 매핑된다")
+        void getOrder_quoteQtyMode_quoteFieldsMapped() {
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            when(orderRepository.findById(order.getOrderId().toString()))
+                    .thenReturn(Optional.of(order));
+
+            OrderResult result = sut.getOrder(order.getOrderId().toString());
+
+            assertThat(result.requestedQuoteQty()).isEqualTo(50_000L);
+            assertThat(result.requestedQty()).isNull();
+            assertThat(result.cumQuoteQty()).isEqualTo(0L);
+            assertThat(result.cumBaseQty()).isEqualTo(0L);
+            assertThat(result.leftoverQuoteQty()).isEqualTo(50_000L); // 50_000 - 0
+        }
+
+        @Test
+        @DisplayName("quoteQty 모드: leftoverQuoteQty = requestedQuoteQty - cumQuoteQty")
+        void getOrder_quoteQtyMode_leftoverQuoteQtyConsistency() {
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000L));
+            order.accumulate(30_000L, 3L);
+            when(orderRepository.findById(order.getOrderId().toString()))
+                    .thenReturn(Optional.of(order));
+
+            OrderResult result = sut.getOrder(order.getOrderId().toString());
+
+            assertThat(result.cumQuoteQty()).isEqualTo(30_000L);
+            assertThat(result.cumBaseQty()).isEqualTo(3L);
+            assertThat(result.leftoverQuoteQty()).isEqualTo(20_000L); // 50_000 - 30_000
+        }
     }
 }

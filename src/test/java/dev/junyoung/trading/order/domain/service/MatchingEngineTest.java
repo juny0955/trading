@@ -829,6 +829,42 @@ public class MatchingEngineTest {
 			assertThat(ask.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(orderBook.bestAsk()).isEmpty();
 		}
+
+		@Test
+		@DisplayName("단일 ask 체결 후 cumQuoteQty/cumBaseQty가 누적된다")
+		void singleAsk_accumulates_cumQuoteQtyAndCumBaseQty() {
+			orderBook.add(activatedSellOrder(10_000, 5)); // 10_000 * 5 = 50_000
+			Order taker = quoteQtyBuyOrder(50_000L);
+
+			engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(taker.getCumQuoteQty()).isEqualTo(50_000L);
+			assertThat(taker.getCumBaseQty()).isEqualTo(5L);
+		}
+
+		@Test
+		@DisplayName("복수 ask 체결 후 cumQuoteQty/cumBaseQty가 루프마다 누적된다")
+		void multipleAsks_accumulates_acrossAllTrades() {
+			orderBook.add(activatedSellOrder(10_000, 2)); // 20_000
+			orderBook.add(activatedSellOrder(10_000, 2)); // 20_000
+			Order taker = quoteQtyBuyOrder(40_000L);
+
+			engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(taker.getCumQuoteQty()).isEqualTo(40_000L);
+			assertThat(taker.getCumBaseQty()).isEqualTo(4L);
+		}
+
+		@Test
+		@DisplayName("체결 없으면 cumQuoteQty/cumBaseQty는 0")
+		void noFill_cumFieldsAreZero() {
+			Order taker = quoteQtyBuyOrder(50_000L);
+
+			engine.placeMarketBuyOrderWithQuoteQty(taker);
+
+			assertThat(taker.getCumQuoteQty()).isEqualTo(0L);
+			assertThat(taker.getCumBaseQty()).isEqualTo(0L);
+		}
 	}
 
 	// ── cancelOrder() ──────────────────────────────────────────────────────

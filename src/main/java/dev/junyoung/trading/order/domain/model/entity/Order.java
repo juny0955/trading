@@ -1,54 +1,52 @@
 package dev.junyoung.trading.order.domain.model.entity;
 
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
-import dev.junyoung.trading.common.exception.BusinessRuleException;
-import dev.junyoung.trading.common.exception.ConflictException;
+import dev.junyoung.trading.order.domain.model.value.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
- * 주문 엔티티. 주문의 생명주기를 관리한다.
+ * 주문 애그리게이트 루트.
+ * 주문 생명주기와 상태 전이를 관리한다.
  *
  * <pre>
- * ACCEPTED → NEW → PARTIALLY_FILLED ┐
- *                                    ├→ FILLED
- *                 NEW ───────────────┘
- *                 NEW / PARTIALLY_FILLED → CANCELLED
+ * ACCEPTED -> NEW -> PARTIALLY_FILLED -> FILLED
+ * NEW / PARTIALLY_FILLED -> CANCELLED
  * </pre>
  *
- * 외부 진입점은 {@link #create}이며, 상태 전이는 {@link #activate()},
- * {@link #fill(Quantity)}, {@link #cancel()}을 통해서만 수행한다.
+ * 유일한 진입점은
+ * {@link #create(Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
  */
 @Getter
 public class Order {
 
-    private final OrderId     orderId;
-    private final Side        side;
-    private final Symbol      symbol;
-    private final OrderType   orderType;
+    private final OrderId orderId;
+    private final Side side;
+    private final Symbol symbol;
+    private final OrderType orderType;
     private final TimeInForce tif;
 
-    /** MARKET 주문은 null. 외부 접근은 {@link #getLimitPriceOrThrow()} 사용 */
+    /** 시장가 주문에서는 null. */
     @Getter(AccessLevel.NONE)
     private final Price price;
 
     private final QuoteQty quoteQty;
     private final Quantity quantity;
-    private final Instant  orderedAt;
+    private final Instant orderedAt;
 
-    private volatile Quantity    remaining;
+    private volatile Quantity remaining;
     private volatile OrderStatus status;
+    private volatile long cumQuoteQty = 0;
+    private volatile long cumBaseQty = 0;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -57,20 +55,18 @@ public class Order {
     private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif,
         Price price, QuoteQty quoteQty, Quantity quantity) {
 
-        // 필드 할당
-        this.orderId   = OrderId.newId();
-        this.side      = Objects.requireNonNull(side,      "side must not be null");
-        this.symbol    = Objects.requireNonNull(symbol,    "symbol must not be null");
+        this.orderId = OrderId.newId();
+        this.side = Objects.requireNonNull(side, "side must not be null");
+        this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.orderType = Objects.requireNonNull(orderType, "orderType must not be null");
-        this.tif       = Objects.requireNonNull(tif,       "tif must not be null");
-        this.price     = price;
-        this.quoteQty  = quoteQty;
-        this.quantity  = quantity;
+        this.tif = Objects.requireNonNull(tif, "tif must not be null");
+        this.price = price;
+        this.quoteQty = quoteQty;
+        this.quantity = quantity;
         this.remaining = quantity != null ? quantity : new Quantity(0);
-        this.status    = OrderStatus.ACCEPTED;
+        this.status = OrderStatus.ACCEPTED;
         this.orderedAt = Instant.now();
 
-        // 불변 조건 검증
         validateAmounts();
     }
 
@@ -87,31 +83,33 @@ public class Order {
     // -------------------------------------------------------------------------
 
     /**
-     * 주문 유형에 맞는 Order를 생성한다. tif가 null이면 LIMIT 주문에 한해 GTC로 기본 설정된다.
+     * 주문 유형과 사이드 규칙에 따라 주문을 생성한다.
+     * LIMIT 주문에서 TIF가 null이면 {@link TimeInForce#defaultValue()}로 대체한다.
      */
     public static Order create(Symbol symbol, Side side, OrderType orderType,
         TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         validateInputCombination(side, orderType, price, quoteQty, quantity);
         return switch (orderType) {
-            case LIMIT  -> createLimit(side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
-            case MARKET -> side.isBuy() && quoteQty != null ? createMarketBuyWithQuoteQty(side, symbol, quoteQty) : createMarket(side, symbol, quantity);
+            case LIMIT -> createLimit(side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
+            case MARKET -> side.isBuy() && quoteQty != null
+                ? createMarketBuyWithQuoteQty(side, symbol, quoteQty)
+                : createMarket(side, symbol, quantity);
         };
     }
 
     /**
-     * create 진입 시점의 입력값 조합 검증.
-     * orderType / side 조합의 비즈니스 규칙을 검사한다.
-     * 값 자체의 범위 검증({@link #validateAmounts()})과 역할이 다르다.
+     * create 진입점에서 입력 조합의 유효성을 검사한다.
+     * 개별 값의 범위 검사는 {@link #validateAmounts()}에서 처리한다.
      */
     private static void validateInputCombination(Side side, OrderType orderType,
         Price price, QuoteQty quoteQty, Quantity quantity) {
         if (orderType == OrderType.LIMIT) {
-            Objects.requireNonNull(price,    "price must not be null for LIMIT order");
+            Objects.requireNonNull(price, "price must not be null for LIMIT order");
             Objects.requireNonNull(quantity, "quantity must not be null for LIMIT order");
             return;
         }
 
-        // MARKET BUY: quantity, quoteQty 중 정확히 하나만 허용
+        // MARKET BUY: quantity와 quoteQty 중 정확히 하나만 제공해야 한다.
         if (side.isBuy()) {
             boolean hasQuantity = quantity != null;
             boolean hasQuoteQty = quoteQty != null;
@@ -120,28 +118,37 @@ public class Order {
                 throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "MARKET BUY must specify exactly one of quantity or quoteQty");
         }
 
-        // MARKET SELL: quantity 필수
-        if (side.isSell() && quantity == null) {
+        // MARKET SELL: quantity가 필수다.
+        if (side.isSell() && quantity == null)
             throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "MARKET SELL requires quantity");
-        }
     }
 
-    /** LIMIT 주문 생성 */
+    /** 지정가 주문을 생성한다. */
     private static Order createLimit(Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
         return new Order(side, symbol, OrderType.LIMIT, tif, price, null, quantity);
     }
 
-    /** MARKET 주문 생성 (quantity 기반). TIF는 IOC로 고정 */
+    /** 수량 기반 시장가 주문을 생성한다. TIF는 IOC로 고정된다. */
     private static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
         return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, null, quantity);
     }
 
     /**
-     * quoteQty(예산) 기반 MARKET BUY 주문 생성.
-     * quantity는 null이며 체결 완료 시 {@link #markFilledByMarketBuy()}를 사용한다.
+     * quoteQty 기반 시장가 BUY 주문을 생성한다.
+     * quantity는 null이며, 완료 처리는 {@link #markFilledByMarketBuy()}를 통해 이루어진다.
      */
     private static Order createMarketBuyWithQuoteQty(Side side, Symbol symbol, QuoteQty quoteQty) {
         return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, null);
+    }
+
+    // -------------------------------------------------------------------------
+    // 누적
+    // -------------------------------------------------------------------------
+
+    /** quoteQty 모드에서 체결된 quote/base 금액을 누적한다. */
+    public void accumulate(long quoteAmt, long baseQty) {
+        this.cumQuoteQty = Math.addExact(this.cumQuoteQty, quoteAmt);
+        this.cumBaseQty = Math.addExact(this.cumBaseQty, baseQty);
     }
 
     // -------------------------------------------------------------------------
@@ -152,15 +159,23 @@ public class Order {
         return orderType.isMarket();
     }
 
-    /** quoteQty(예산) 기반 MARKET BUY 모드 여부 */
+    /** quoteQty 기반 시장가 BUY 모드이면 true를 반환한다. */
     public boolean isQuoteQtyMode() {
-        return quoteQty != null;
+        return quoteQty != null && side.isBuy() && isMarket();
+    }
+
+    public Optional<Long> getQuantityValue() {
+        return Optional.ofNullable(quantity).map(Quantity::value);
+    }
+
+    public Optional<Long> getPriceValue() {
+        return Optional.ofNullable(price).map(Price::value);
     }
 
     /**
-     * LIMIT 주문의 가격을 반환한다.
+     * 지정가 주문의 가격을 반환한다.
      *
-     * @throws BusinessRuleException MARKET 주문에서 호출 시
+     * @throws BusinessRuleException 시장가 주문에서 호출된 경우
      */
     public Price getLimitPriceOrThrow() {
         if (isMarket())
@@ -174,9 +189,9 @@ public class Order {
     // -------------------------------------------------------------------------
 
     /**
-     * 매칭 엔진 진입 시 호출한다. ACCEPTED → NEW
+     * 주문 상태를 ACCEPTED에서 NEW로 전환한다.
      *
-     * @throws ConflictException 상태가 ACCEPTED가 아닌 경우
+     * @throws ConflictException 현재 상태가 ACCEPTED가 아닌 경우
      */
     public void activate() {
         if (status != OrderStatus.ACCEPTED)
@@ -186,24 +201,24 @@ public class Order {
     }
 
     /**
-     * 체결 수량만큼 잔량을 차감하고 상태를 전이한다.
+     * 체결 수량을 적용하고 상태를 전이한다.
      * <ul>
-     *   <li>잔량 > 0 → PARTIALLY_FILLED</li>
-     *   <li>잔량 = 0 → FILLED</li>
+     *   <li>remaining > 0 → PARTIALLY_FILLED</li>
+     *   <li>remaining = 0 → FILLED</li>
      * </ul>
      *
-     * @throws ConflictException 활성 상태(NEW / PARTIALLY_FILLED)가 아닌 경우
+     * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
     public void fill(Quantity executeQty) {
         requireActive();
         this.remaining = remaining.sub(executeQty);
-        this.status    = remaining.value() > 0 ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED;
+        this.status = remaining.value() > 0 ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED;
     }
 
     /**
-     * quoteQty 모드 MARKET BUY 체결 완료 시 호출한다. remaining은 변경하지 않는다.
+     * quoteQty 시장가 BUY 주문을 remaining 변경 없이 FILLED로 완료한다.
      *
-     * @throws ConflictException 활성 상태가 아닌 경우
+     * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
     public void markFilledByMarketBuy() {
         requireActive();
@@ -211,9 +226,9 @@ public class Order {
     }
 
     /**
-     * 주문을 취소한다. → CANCELLED
+     * 주문을 취소하고 상태를 CANCELLED로 전환한다.
      *
-     * @throws ConflictException 활성 상태(NEW / PARTIALLY_FILLED)가 아닌 경우
+     * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
     public void cancel() {
         requireActive();

@@ -147,8 +147,8 @@ public class Order {
 
     /** quoteQty 모드에서 체결된 quote/base 금액을 누적한다. */
     public void accumulate(long quoteAmt, long baseQty) {
-        this.cumQuoteQty += quoteAmt;
-        this.cumBaseQty += baseQty;
+        this.cumQuoteQty = Math.addExact(this.cumQuoteQty, quoteAmt);
+        this.cumBaseQty = Math.addExact(this.cumBaseQty, baseQty);
     }
 
     // -------------------------------------------------------------------------

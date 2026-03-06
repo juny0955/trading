@@ -23,12 +23,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCase {
 
+    // Phase 3: clientOrderId 단독 유일키(in-memory). Phase 4에서 (accountId, clientOrderId) 복합키로 이관 예정.
     private final ConcurrentHashMap<String, CompletableFuture<OrderId>> clientOrderMap = new ConcurrentHashMap<>();
 
     private final EngineManager engineManager;
     private final OrderRepository orderRepository;
 
     @Override
+    // Phase 3 알려진 제약: 성공 항목을 맵에서 제거하지 않아 재시작 전까지 누적됨
     public String placeOrder(PlaceOrderCommand command) {
         String clientOrderId = command.clientOrderId();
         boolean hasClientOrderId = clientOrderId != null && !clientOrderId.isBlank();
@@ -63,7 +65,7 @@ public class OrderCommandService implements PlaceOrderUseCase, CancelOrderUseCas
 
             OrderId orderId = order.getOrderId();
             if (hasClientOrderId) future.complete(orderId);
-            return orderId.toString(); // Phase 3 알려진 제약: 성공 항목을 맵에서 제거하지 않아 재시작 전까지 누적됨
+            return orderId.toString();
         } catch (Exception e) {
             if (hasClientOrderId) {
                 future.completeExceptionally(e);

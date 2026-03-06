@@ -25,11 +25,19 @@ import java.util.Map;
 @Slf4j
 public class EngineManager {
 
+    // -------------------------------------------------------------------------
+    // 생성자
+    // -------------------------------------------------------------------------
+
     private final TradingProperties tradingProperties;
     private final OrderRepository orderRepository;
     private final OrderBookCache orderBookCache;
 
     private final Map<Symbol, EngineContext> contexts = new HashMap<>();
+
+    // -------------------------------------------------------------------------
+    // 생명주기
+    // -------------------------------------------------------------------------
 
     /** trading.symbols에 정의된 각 심볼의 EngineContext를 생성하고 엔진 스레드를 시작한다. */
     @PostConstruct
@@ -54,6 +62,10 @@ public class EngineManager {
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // 진입점
+    // -------------------------------------------------------------------------
 
     /**
      * 커맨드를 해당 심볼의 엔진 큐에 위임한다.

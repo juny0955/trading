@@ -33,7 +33,7 @@ public class OrderBookCache {
     /**
      * engine-thread에서만 호출. {@link OrderBook}으로부터 새 스냅샷을 생성해 해당 심볼 캐시를 교체한다.
      */
-    public void update(Symbol symbol, OrderBook orderBook) {
+    protected void update(Symbol symbol, OrderBook orderBook) {
         cache.put(symbol, OrderBookSnapshot.from(orderBook));
     }
 

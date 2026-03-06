@@ -17,12 +17,17 @@ import java.util.concurrent.BlockingQueue;
  * 각 컴포넌트는 심볼 단위로 완전히 격리된다.</p>
  */
 public class EngineContext {
+
+    // -------------------------------------------------------------------------
+    // 생성자
+    // -------------------------------------------------------------------------
+
     private static final int QUEUE_CAPACITY = 10_000;
 
     private final EngineLoop engineLoop;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
-    public EngineContext(Symbol symbol, OrderRepository orderRepository, OrderBookCache orderBookCache) {
+    protected EngineContext(Symbol symbol, OrderRepository orderRepository, OrderBookCache orderBookCache) {
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
@@ -31,12 +36,16 @@ public class EngineContext {
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread);
     }
 
+    // -------------------------------------------------------------------------
+    // 진입점
+    // -------------------------------------------------------------------------
+
     /** engine-thread를 시작한다. */
-    public void start() { engineLoop.start(); }
+    protected void start() { engineLoop.start(); }
 
     /** engine-thread를 중단하고 자원을 반납한다. */
-    public void stop() { engineLoop.stop(); }
+    protected void stop() { engineLoop.stop(); }
 
     /** 커맨드를 엔진 큐에 제출한다. */
-    public void submit(EngineCommand engineCommand) { engineLoop.submit(engineCommand); }
+    protected void submit(EngineCommand engineCommand) { engineLoop.submit(engineCommand); }
 }

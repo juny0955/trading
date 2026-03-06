@@ -23,12 +23,20 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class EngineHandler {
 
+	// -------------------------------------------------------------------------
+	// 생성자
+	// -------------------------------------------------------------------------
+
 	/** 이 핸들러가 처리하는 심볼. {@link OrderBookCache} 업데이트 시 키로 사용된다. */
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
 	private final OrderRepository orderRepository;
+
+	// -------------------------------------------------------------------------
+	// 진입점
+	// -------------------------------------------------------------------------
 
 	/**
 	 * 커맨드 타입에 따라 엔진 동작을 실행한다.
@@ -39,7 +47,7 @@ public class EngineHandler {
 	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이 후 명시적 save.</li>
 	 * </ul>
 	 */
-	public void handle(EngineCommand command) {
+	protected void handle(EngineCommand command) {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
 				Order order = c.order();
@@ -59,6 +67,10 @@ public class EngineHandler {
 		}
 	}
 
+	// -------------------------------------------------------------------------
+	// 내부 헬퍼
+	// -------------------------------------------------------------------------
+
 	/**
 	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.
 	 *
@@ -71,9 +83,9 @@ public class EngineHandler {
 	 */
 	private PlaceResult processPlaceOrder(Order order) {
 		if (order.isMarket()) {
-			if (order.getSide() == Side.BUY && order.isQuoteQtyMode()) {
+			if (order.getSide() == Side.BUY && order.isQuoteQtyMode())
 				return engine.placeMarketBuyOrderWithQuoteQty(order);
-			}
+
 			return engine.placeMarketOrder(order);
 		}
 

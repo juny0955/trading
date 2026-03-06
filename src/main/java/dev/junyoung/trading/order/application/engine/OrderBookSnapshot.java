@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -15,11 +16,15 @@ import java.util.TreeMap;
  *
  * <ul>
  *   <li>생성: engine-thread에서 {@link #from(OrderBook)}으로 생성 후 {@link OrderBookCache}에 put.</li>
- *   <li>조회: HTTP 스레드에서 {@link OrderBookCache#getSnapshot(dev.junyoung.trading.order.domain.model.value.Symbol)}으로 참조를 가져온 뒤
+ *   <li>조회: HTTP 스레드에서 {@link OrderBookCache#getSnapshot(Symbol)}으로 참조를 가져온 뒤
  *       {@link #bids()}, {@link #asks()}를 호출.</li>
  * </ul>
  */
 public final class OrderBookSnapshot {
+
+    // -------------------------------------------------------------------------
+    // 팩토리 (진입점)
+    // -------------------------------------------------------------------------
 
     /** 앱 기동 직후 또는 미등록 심볼 조회 시 반환되는 빈 스냅샷. NPE 방지용. */
     public static final OrderBookSnapshot EMPTY = new OrderBookSnapshot(
@@ -51,6 +56,10 @@ public final class OrderBookSnapshot {
             Collections.unmodifiableNavigableMap(asks)
         );
     }
+
+    // -------------------------------------------------------------------------
+    // 조회
+    // -------------------------------------------------------------------------
 
     /** 매수 호가 맵 (가격 내림차순). 불변. */
     public NavigableMap<Long, Long> bids() { return bids; }

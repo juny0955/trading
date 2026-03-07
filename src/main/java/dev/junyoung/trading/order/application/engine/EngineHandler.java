@@ -78,7 +78,7 @@ public class EngineHandler {
 	 *   <li>시장가({@code isMarket()}): 가격 조건 없이 즉시 체결, 잔량은 취소된다.</li>
 	 *   <li>GTC: 잔량을 호가창에 등록해 이후 체결을 기다린다.</li>
 	 *   <li>IOC: 즉시 체결 가능한 수량만 체결하고 잔량은 취소한다.</li>
-	 *   <li>FOK: 현재 GTC와 동일하게 처리한다 (MVP3-006에서 전용 구현 예정).</li>
+ *   <li>FOK: 전량 즉시 체결이 가능할 때만 체결하고, 그렇지 않으면 즉시 취소한다.</li>
 	 * </ul>
 	 */
 	private PlaceResult processPlaceOrder(Order order) {

@@ -3,7 +3,7 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.config.TradingProperties;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
-import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +25,19 @@ import java.util.Map;
 @Slf4j
 public class EngineManager {
 
+    // -------------------------------------------------------------------------
+    // 생성자
+    // -------------------------------------------------------------------------
+
     private final TradingProperties tradingProperties;
     private final OrderRepository orderRepository;
     private final OrderBookCache orderBookCache;
 
     private final Map<Symbol, EngineContext> contexts = new HashMap<>();
+
+    // -------------------------------------------------------------------------
+    // 생명주기
+    // -------------------------------------------------------------------------
 
     /** trading.symbols에 정의된 각 심볼의 EngineContext를 생성하고 엔진 스레드를 시작한다. */
     @PostConstruct
@@ -54,6 +62,10 @@ public class EngineManager {
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // 진입점
+    // -------------------------------------------------------------------------
 
     /**
      * 커맨드를 해당 심볼의 엔진 큐에 위임한다.

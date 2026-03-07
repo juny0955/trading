@@ -16,12 +16,16 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class EngineThread {
 
+	// -------------------------------------------------------------------------
+	// 생성자
+	// -------------------------------------------------------------------------
+
 	private final ExecutorService executorService;
 
 	/**
 	 * @param symbolName 스레드명에 포함될 심볼 이름. 스레드 덤프 식별용.
 	 */
-	public EngineThread(String symbolName) {
+	protected EngineThread(String symbolName) {
 		this.executorService = Executors.newSingleThreadExecutor(r -> {
 			Thread thread = new Thread(r);
 			thread.setName("engine-thread-" + symbolName);
@@ -35,11 +39,15 @@ public class EngineThread {
 	 */
 	private final AtomicReference<Thread> threadRef = new AtomicReference<>();
 
+	// -------------------------------------------------------------------------
+	// 진입점
+	// -------------------------------------------------------------------------
+
 	/**
 	 * engine-thread에서 {@code runnable}을 실행한다.
 	 * 실행 시작 시 {@code threadRef}에 현재 스레드를 등록하고, 종료 시 초기화한다.
 	 */
-	public void start(Runnable runnable) {
+	protected void start(Runnable runnable) {
 		executorService.submit(() -> {
 			threadRef.set(Thread.currentThread());
 			try {
@@ -54,7 +62,7 @@ public class EngineThread {
 	 * engine-thread에 인터럽트를 전달한다.
 	 * 주로 {@code BlockingQueue.take()}의 블로킹을 해제하기 위해 호출된다.
 	 */
-	public void interrupt() {
+	protected void interrupt() {
 		Thread thread = threadRef.get();
 		if (thread != null) thread.interrupt();
 	}
@@ -62,12 +70,11 @@ public class EngineThread {
 	/**
 	 * ExecutorService를 종료한다. 5초 내 종료되지 않으면 강제 중단한다.
 	 */
-	public void shutDown() {
+	protected void shutDown() {
 		executorService.shutdown();
 		try {
-			if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+			if (!executorService.awaitTermination(5, TimeUnit.SECONDS))
 				executorService.shutdownNow();
-			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			executorService.shutdownNow();

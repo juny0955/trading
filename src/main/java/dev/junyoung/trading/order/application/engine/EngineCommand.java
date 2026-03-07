@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.engine;
 
 import java.util.concurrent.BlockingQueue;
 
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -29,7 +30,7 @@ public sealed interface EngineCommand
 
 	/**
 	 * 주문 취소 커맨드.
-	 * {@code orderId}에 해당하는 주문이 호가창에 없으면 {@link IllegalStateException}이 발생한다.
+	 * {@code orderId}에 해당하는 주문이 호가창에 없으면 {@link ConflictException}이 발생한다.
 	 */
 	record CancelOrder(OrderId orderId) implements EngineCommand { }
 

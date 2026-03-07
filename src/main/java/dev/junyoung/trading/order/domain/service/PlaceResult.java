@@ -20,6 +20,11 @@ public record PlaceResult(List<Order> updatedOrders, List<Trade> trades) {
 		trades = List.copyOf(trades);
 	}
 
+	// -------------------------------------------------------------------------
+	// 팩토리 (진입점)
+	// -------------------------------------------------------------------------
+
+	/** 상태가 변경된 주문 목록과 체결 내역으로 결과를 생성한다. */
 	public static PlaceResult of(List<Order> updatedOrders, List<Trade> trades) {
 		return new PlaceResult(updatedOrders, trades);
 	}

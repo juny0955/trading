@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.PlaceResult;
@@ -22,12 +23,20 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class EngineHandler {
 
+	// -------------------------------------------------------------------------
+	// 생성자
+	// -------------------------------------------------------------------------
+
 	/** 이 핸들러가 처리하는 심볼. {@link OrderBookCache} 업데이트 시 키로 사용된다. */
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
 	private final OrderRepository orderRepository;
+
+	// -------------------------------------------------------------------------
+	// 진입점
+	// -------------------------------------------------------------------------
 
 	/**
 	 * 커맨드 타입에 따라 엔진 동작을 실행한다.
@@ -38,13 +47,11 @@ public class EngineHandler {
 	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이 후 명시적 save.</li>
 	 * </ul>
 	 */
-	public void handle(EngineCommand command) {
+	protected void handle(EngineCommand command) {
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> {
 				Order order = c.order();
-				PlaceResult result = order.isMarket()
-					? engine.placeMarketOrder(order)
-					: engine.placeLimitOrder(order);
+				PlaceResult result = processPlaceOrder(order);
 				result.updatedOrders().forEach(orderRepository::save);
 				if (!result.trades().isEmpty()) log.info("Trades executed: {}", result.trades());
 				orderBookCache.update(symbol, orderBook);
@@ -58,5 +65,34 @@ public class EngineHandler {
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");
 		}
+	}
+
+	// -------------------------------------------------------------------------
+	// 내부 헬퍼
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.
+	 *
+	 * <ul>
+	 *   <li>시장가({@code isMarket()}): 가격 조건 없이 즉시 체결, 잔량은 취소된다.</li>
+	 *   <li>GTC: 잔량을 호가창에 등록해 이후 체결을 기다린다.</li>
+	 *   <li>IOC: 즉시 체결 가능한 수량만 체결하고 잔량은 취소한다.</li>
+ *   <li>FOK: 전량 즉시 체결이 가능할 때만 체결하고, 그렇지 않으면 즉시 취소한다.</li>
+	 * </ul>
+	 */
+	private PlaceResult processPlaceOrder(Order order) {
+		if (order.isMarket()) {
+			if (order.getSide() == Side.BUY && order.isQuoteQtyMode())
+				return engine.placeMarketBuyOrderWithQuoteQty(order);
+
+			return engine.placeMarketOrder(order);
+		}
+
+		return switch (order.getTif()) {
+			case GTC -> engine.placeLimitOrder(order);
+			case IOC -> engine.placeLimitOrderIOC(order);
+			case FOK -> engine.placeLimitOrderFOK(order);
+		};
 	}
 }

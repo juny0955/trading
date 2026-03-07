@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,6 +23,10 @@ import java.util.concurrent.locks.ReentrantLock;
 @Slf4j
 public class EngineLoop implements Runnable {
 
+	// -------------------------------------------------------------------------
+	// 생성자
+	// -------------------------------------------------------------------------
+
 	private final BlockingQueue<EngineCommand> engineQueue;
 	private final EngineHandler engineHandler;
 	private final EngineThread engineThread;
@@ -38,8 +43,12 @@ public class EngineLoop implements Runnable {
 	 */
 	private final ReentrantLock submitLock = new ReentrantLock();
 
+	// -------------------------------------------------------------------------
+	// 진입점
+	// -------------------------------------------------------------------------
+
 	/** engine-thread를 시작한다. {@link EngineContext}의 생성자에서 호출된다. */
-	public void start() {
+	protected void start() {
 		engineThread.start(this);
 	}
 
@@ -70,15 +79,19 @@ public class EngineLoop implements Runnable {
 	 *
 	 * @throws IllegalStateException 엔진이 종료 중이거나 큐가 가득 찬 경우 (용량: {@code ArrayBlockingQueue(10_000)})
 	 */
-	public void submit(EngineCommand command) {
+	protected void submit(EngineCommand command) {
 		submitLock.lock();
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");
-			if (!engineQueue.offer(command)) throw new IllegalStateException("Engine Queue is full");
+			if (!engineQueue.offer(command)) throw new EngineQueueFullException();
 		} finally {
 			submitLock.unlock();
 		}
 	}
+
+	// -------------------------------------------------------------------------
+	// 루프 본체
+	// -------------------------------------------------------------------------
 
 	/**
 	 * engine-thread에서 실행되는 이벤트 루프 본체.
@@ -90,9 +103,9 @@ public class EngineLoop implements Runnable {
 		while (!Thread.currentThread().isInterrupted()) {
 			try {
 				EngineCommand command = engineQueue.take(); // 커맨드가 올 때까지 블로킹
-				if (command instanceof EngineCommand.Shutdown) {
+				if (command instanceof EngineCommand.Shutdown)
 					break;
-				}
+
 				engineHandler.handle(command);
 			} catch (InterruptedException e) {
 				// stop()에서 interrupt()를 호출했을 때 발생 → 루프 정상 종료

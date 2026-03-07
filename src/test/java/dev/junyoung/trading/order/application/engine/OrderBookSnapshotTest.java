@@ -1,8 +1,11 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -19,13 +22,13 @@ class OrderBookSnapshotTest {
     private static final Symbol BTC = new Symbol("BTC");
 
     private Order activatedBuy(long price, long qty) {
-        Order order = Order.createLimit(Side.BUY, BTC, new Price(price), new Quantity(qty));
+        Order order = OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
         order.activate();
         return order;
     }
 
     private Order activatedSell(long price, long qty) {
-        Order order = Order.createLimit(Side.SELL, BTC, new Price(price), new Quantity(qty));
+        Order order = OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
         order.activate();
         return order;
     }

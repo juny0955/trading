@@ -1,10 +1,13 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
+import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.config.TradingProperties;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -58,7 +61,7 @@ class EngineManagerTest {
 
 	private EngineCommand.PlaceOrder placeOrder(String symbol) {
 		Symbol sym = new Symbol(symbol);
-		Order order = Order.createLimit(Side.BUY, sym, new Price(10_000), new Quantity(5));
+		Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 		return new EngineCommand.PlaceOrder(order);
 	}
 

@@ -1,13 +1,18 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
@@ -62,11 +67,15 @@ class EngineHandlerTest {
 	}
 
 	private Order buyOrder(long price, long qty) {
-		return Order.createLimit(Side.BUY, SYMBOL, new Price(price), new Quantity(qty));
+		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
 	private Order marketBuyOrder(long qty) {
-		return Order.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
+		return OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
+	}
+
+	private Order marketBuyQuoteQtyOrder(long quoteQty) {
+		return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQty));
 	}
 
 	// ── PlaceOrder ──────────────────────────────────────────────────────────
@@ -99,7 +108,7 @@ class EngineHandlerTest {
 		@DisplayName("Trade가 발생해도 예외 없이 정상 종료한다")
 		void handle_placeOrder_withTrades_doesNotThrow() {
 			Order taker = buyOrder(10_000, 5);
-			Order maker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
+			Order maker = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			maker.activate();
 			Trade trade = Trade.of(taker, maker, new Quantity(5));
 			when(engine.placeLimitOrder(taker)).thenReturn(PlaceResult.of(List.of(), List.of(trade)));
@@ -182,7 +191,7 @@ class EngineHandlerTest {
 		@DisplayName("MARKET 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
 		void handle_placeOrder_market_savesUpdatedOrders() {
 			Order order = marketBuyOrder(5);
-			Order filledMaker = Order.createLimit(Side.SELL, SYMBOL, new Price(10_000), new Quantity(5));
+			Order filledMaker = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			filledMaker.activate();
 			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
 
@@ -190,6 +199,19 @@ class EngineHandlerTest {
 
 			verify(orderRepository).save(filledMaker);
 			verify(orderRepository).save(order);
+		}
+
+		@Test
+		@DisplayName("BUY + quoteQty MARKET 주문이면 placeMarketBuyOrderWithQuoteQty()를 호출한다")
+		void handle_placeOrder_marketBuyQuoteQty_callsQuoteQtyPath() {
+			Order order = marketBuyQuoteQtyOrder(50_000);
+			when(engine.placeMarketBuyOrderWithQuoteQty(order)).thenReturn(PlaceResult.of(List.of(order), List.of()));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(engine).placeMarketBuyOrderWithQuoteQty(order);
+			verify(engine, never()).placeMarketOrder(any());
+			verify(engine, never()).placeLimitOrder(any());
 		}
 	}
 
@@ -210,12 +232,12 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("엔진이 IllegalStateException을 던지면 그대로 전파된다")
-		void handle_cancelOrder_propagatesIllegalStateException() {
+		@DisplayName("엔진이 ConflictException을 던지면 그대로 전파된다")
+		void handle_cancelOrder_propagatesConflictException() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 		}
 
 		@Test
@@ -244,9 +266,9 @@ class EngineHandlerTest {
 		@DisplayName("엔진이 예외를 던지면 orderBookCache.update는 호출되지 않는다")
 		void handle_cancelOrder_engineThrows_doesNotUpdateCache() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderBookCache, never()).update(any(), any());
 		}
@@ -282,9 +304,9 @@ class EngineHandlerTest {
 		@DisplayName("엔진이 예외를 던지면 orderRepository.save는 호출되지 않는다")
 		void handle_cancelOrder_engineThrows_doesNotSaveToRepository() {
 			OrderId orderId = OrderId.newId();
-			doThrow(new IllegalStateException("Already Processed")).when(engine).cancelOrder(orderId);
+			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(IllegalStateException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(orderRepository, never()).save(any());
 		}

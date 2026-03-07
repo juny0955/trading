@@ -1,5 +1,8 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -62,7 +66,7 @@ class EngineLoopTest {
 	private static final Symbol SYMBOL = new Symbol("BTC");
 
 	private EngineCommand.PlaceOrder placeOrderCommand() {
-		Order order = Order.createLimit(Side.BUY, SYMBOL, new Price(10_000), new Quantity(5));
+		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 		return new EngineCommand.PlaceOrder(order);
 	}
 
@@ -83,14 +87,14 @@ class EngineLoopTest {
 		}
 
 		@Test
-		@DisplayName("큐가 가득 차면 IllegalStateException이 발생한다")
+		@DisplayName("큐가 가득 차면 EngineQueueFullException이 발생한다")
 		void submit_throwsWhenQueueFull() {
 			// QUEUE_CAPACITY(3)만큼 채움
 			loop.submit(placeOrderCommand());
 			loop.submit(placeOrderCommand());
 			loop.submit(placeOrderCommand());
 
-			assertThrows(IllegalStateException.class, () -> loop.submit(placeOrderCommand()));
+			assertThrows(EngineQueueFullException.class, () -> loop.submit(placeOrderCommand()));
 		}
 
 		@Test

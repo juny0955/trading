@@ -1,5 +1,14 @@
 package dev.junyoung.trading.order.adapter.in.rest;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.response.OrderResponse;
 import dev.junyoung.trading.order.adapter.in.rest.response.PlaceOrderResponse;
@@ -7,9 +16,8 @@ import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/orders")
@@ -21,8 +29,8 @@ public class OrderController {
     private final GetOrderUseCase getOrderUseCase;
 
     @PostMapping
-    public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody PlaceOrderRequest request) {
-        String orderId = placeOrderUseCase.placeOrder(request.symbol(), request.side(), request.orderType(), request.price(), request.quantity());
+    public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody @Valid PlaceOrderRequest request) {
+        String orderId = placeOrderUseCase.placeOrder(request.toCommand());
 
         return ResponseEntity
                 .accepted()
@@ -34,7 +42,7 @@ public class OrderController {
         cancelOrderUseCase.cancelOrder(orderId);
 
         return ResponseEntity
-                .ok()
+                .accepted()
                 .build();
     }
 

@@ -253,7 +253,7 @@ latency 계산을 위해 각 주문 처리 단계별 timestamp를 structured log
 
 목적:
 
-* `thread-per-symbol` 구조의 확장성 확인
+* 심볼 증가 시 엔진/큐/DB 처리 편차와 확장 한계 확인
 
 입력 예:
 

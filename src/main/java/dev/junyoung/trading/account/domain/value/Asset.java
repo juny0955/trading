@@ -1,5 +1,7 @@
 package dev.junyoung.trading.account.domain.value;
 
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+
 import java.util.Objects;
 
 public record Asset(
@@ -7,5 +9,9 @@ public record Asset(
 ) {
 	public Asset {
 		Objects.requireNonNull(value, "asset must not be null");
+		if (value.isBlank())
+			throw new BusinessRuleException("ASSET_BLANK", "asset must not be blank");
+
+		value = value.trim().toUpperCase();
 	}
 }

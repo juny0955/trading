@@ -12,12 +12,12 @@ import lombok.Getter;
  * 거래의 소유 주체 계정.
  *
  * <p>Account는 {@link AccountId}로 식별되며,
- * 자산별 잔고({@link Balance})를 {@link Asset} 키로 관리한다.
+ * KRW 및 거래 심볼 자산별 잔고({@link Balance})를 {@link Asset} 키로 관리한다.
  *
  * <p>Lock 규칙:
  * <ul>
- *   <li>주문 접수 단계: quote 또는 base 중 단일 asset 행만 잠근다.</li>
- *   <li>정산 단계: 복수 asset 행을 잠글 경우 asset 이름 알파벳 오름차순으로
+ *   <li>주문 접수 단계: BUY는 KRW 행, SELL은 주문 심볼 자산 행만 잠근다.</li>
+ *   <li>정산 단계: KRW와 주문 심볼 자산 행을 함께 잠글 경우 asset 이름 알파벳 오름차순으로
  *       획득한다 (예: BTC → KRW). 교차 lock으로 인한 데드락을 방지한다.</li>
  * </ul>
  */

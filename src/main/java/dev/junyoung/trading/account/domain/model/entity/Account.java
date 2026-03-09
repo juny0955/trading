@@ -1,11 +1,11 @@
-package dev.junyoung.trading.account.domain.model;
+package dev.junyoung.trading.account.domain.model.entity;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
-import dev.junyoung.trading.account.domain.value.AccountId;
-import dev.junyoung.trading.account.domain.value.Asset;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.account.domain.model.value.Asset;
 import lombok.Getter;
 
 /**

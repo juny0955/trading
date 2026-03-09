@@ -1,5 +1,4 @@
 trading:
-  cash: KRW
   symbols:
     - BTC
     - ETH

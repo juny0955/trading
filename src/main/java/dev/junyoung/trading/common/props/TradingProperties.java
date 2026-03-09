@@ -11,6 +11,5 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public class TradingProperties {
-    private final String cash;
     private final List<String> symbols;
 }

@@ -23,6 +23,7 @@ import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.PlaceResult;
@@ -50,6 +51,21 @@ class MatchingEngineSimulationTest {
     /** taker 사이드 기준으로 Trade에서 maker OrderId 추출 */
     private OrderId getMakerId(Trade trade, Side takerSide) {
         return takerSide == Side.BUY ? trade.sellOrderId() : trade.buyOrderId();
+    }
+
+    private Order createSupportedMarketOrder(Side side, Symbol symbol, long qty) {
+        if (side == Side.BUY) {
+            long quoteQty = Math.multiplyExact(qty, PRICE_MAX);
+            return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, symbol, new QuoteQty(quoteQty));
+        }
+        return OrderFixture.createMarketSell(symbol, new Quantity(qty));
+    }
+
+    private PlaceResult placeSupportedMarketOrder(MatchingEngine engine, Order order) {
+        if (order.getSide() == Side.BUY) {
+            return engine.placeMarketBuyOrderWithQuoteQty(order);
+        }
+        return engine.placeMarketSellOrder(order);
     }
 
     @Test
@@ -141,7 +157,7 @@ class MatchingEngineSimulationTest {
 
             Order order;
             if (isMarket) {
-                order = OrderFixture.createMarket(side, SYMBOL, new Quantity(qty));
+                order = createSupportedMarketOrder(side, SYMBOL, qty);
                 marketOrders.add(order);
             } else {
                 long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
@@ -150,7 +166,7 @@ class MatchingEngineSimulationTest {
             allOrders.add(order);
 
             try {
-                if (isMarket) engine.placeMarketOrder(order);
+                if (isMarket) placeSupportedMarketOrder(engine, order);
                 else          engine.placeLimitOrder(order);
             } catch (IllegalStateException e) {
                 stateViolations++;
@@ -201,8 +217,8 @@ class MatchingEngineSimulationTest {
             PlaceResult result;
             try {
                 if (isMarket) {
-                    order  = OrderFixture.createMarket(side, symbol, new Quantity(qty));
-                    result = engine.placeMarketOrder(order);
+                    order  = createSupportedMarketOrder(side, symbol, qty);
+                    result = placeSupportedMarketOrder(engine, order);
                 } else {
                     long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
                     order  = OrderFixture.createLimit(side, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));

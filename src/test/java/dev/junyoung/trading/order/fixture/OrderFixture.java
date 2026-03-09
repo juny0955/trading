@@ -19,9 +19,9 @@ public class OrderFixture {
         return Order.create(symbol, side, OrderType.LIMIT, tif, price, null, quantity);
     }
 
-    /** MARKET 주문 생성 (quantity 기반) */
-    public static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
-        return Order.create(symbol, side, OrderType.MARKET, null, null, null, quantity);
+    /** MARKET SELL 주문 생성 (quantity 기반) */
+    public static Order createMarketSell(Symbol symbol, Quantity quantity) {
+        return Order.create(symbol, Side.SELL, OrderType.MARKET, null, null, null, quantity);
     }
 
     /** quoteQty 기반 MARKET BUY 주문 생성 */

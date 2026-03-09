@@ -15,6 +15,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -228,8 +229,8 @@ class OrderCommandServiceTest {
                     OrderType.MARKET,
                     null,
                     null,
+                    new QuoteQty(50_000),
                     null,
-                    new Quantity(5),
                     null
             ));
 
@@ -357,7 +358,7 @@ class OrderCommandServiceTest {
         @DisplayName("MARKET 주문 취소 시 OrderNotCancellableException이 발생한다")
         void cancelMarketOrder_throwsOrderNotCancellableException() {
             String orderId = UUID.randomUUID().toString();
-            Order marketOrder = OrderFixture.createMarket(Side.BUY, new Symbol("BTC"), new Quantity(5));
+            Order marketOrder = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, new Symbol("BTC"), new QuoteQty(50_000));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(orderId));

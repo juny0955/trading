@@ -91,9 +91,9 @@ public class Order {
         validateInputCombination(side, orderType, price, quoteQty, quantity);
         return switch (orderType) {
             case LIMIT -> createLimit(side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
-            case MARKET -> side.isBuy() && quoteQty != null
+            case MARKET -> side.isBuy()
                 ? createMarketBuyWithQuoteQty(side, symbol, quoteQty)
-                : createMarket(side, symbol, quantity);
+                : createMarketSell(side, symbol, quantity);
         };
     }
 
@@ -109,13 +109,12 @@ public class Order {
             return;
         }
 
-        // MARKET BUY: quantity와 quoteQty 중 정확히 하나만 제공해야 한다.
+        // MARKET BUY: quoteQty 필수, quantity 불가.
         if (side.isBuy()) {
-            boolean hasQuantity = quantity != null;
-            boolean hasQuoteQty = quoteQty != null;
-
-            if (hasQuantity == hasQuoteQty)
-                throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "MARKET BUY must specify exactly one of quantity or quoteQty");
+            if (quoteQty == null)
+                throw new BusinessRuleException("ORDER_INVALID_QUOTEQTY", "MARKET BUY requires quoteQty");
+            if (quantity != null)
+                throw new BusinessRuleException("ORDER_INVALID_QUANTITY", "MARKET BUY does not support quantity mode");
         }
 
         // MARKET SELL: quantity가 필수다.
@@ -128,8 +127,8 @@ public class Order {
         return new Order(side, symbol, OrderType.LIMIT, tif, price, null, quantity);
     }
 
-    /** 수량 기반 시장가 주문을 생성한다. TIF는 IOC로 고정된다. */
-    private static Order createMarket(Side side, Symbol symbol, Quantity quantity) {
+    /** MARKET SELL 주문을 생성한다. TIF는 IOC로 고정된다. */
+    private static Order createMarketSell(Side side, Symbol symbol, Quantity quantity) {
         return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, null, quantity);
     }
 

@@ -70,8 +70,8 @@ class EngineHandlerTest {
 		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
-	private Order marketBuyOrder(long qty) {
-		return OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(qty));
+	private Order marketSellOrder(long qty) {
+		return OrderFixture.createMarketSell(SYMBOL, new Quantity(qty));
 	}
 
 	private Order marketBuyQuoteQtyOrder(long quoteQty) {
@@ -154,33 +154,33 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("MARKET 주문이면 placeMarketOrder()에 전달하고 placeLimitOrder()는 호출하지 않는다")
-		void handle_placeOrder_market_callsPlaceMarketOrder() {
-			Order order = marketBuyOrder(5);
-			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+		@DisplayName("MARKET SELL 주문이면 placeMarketSellOrder()에 전달하고 placeLimitOrder()는 호출하지 않는다")
+		void handle_placeOrder_marketSell_callsPlaceMarketSellOrder() {
+			Order order = marketSellOrder(5);
+			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(engine).placeMarketOrder(order);
+			verify(engine).placeMarketSellOrder(order);
 			verify(engine, never()).placeLimitOrder(any());
 		}
 
 		@Test
-		@DisplayName("LIMIT 주문이면 placeMarketOrder()를 호출하지 않는다")
-		void handle_placeOrder_limit_neverCallsPlaceMarketOrder() {
+		@DisplayName("LIMIT 주문이면 placeMarketSellOrder()를 호출하지 않는다")
+		void handle_placeOrder_limit_neverCallsPlaceMarketSellOrder() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(engine, never()).placeMarketOrder(any());
+			verify(engine, never()).placeMarketSellOrder(any());
 		}
 
 		@Test
-		@DisplayName("MARKET 주문 처리 완료 후 orderBookCache.update가 호출된다")
-		void handle_placeOrder_market_updatesCache() {
-			Order order = marketBuyOrder(5);
-			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+		@DisplayName("MARKET SELL 주문 처리 완료 후 orderBookCache.update가 호출된다")
+		void handle_placeOrder_marketSell_updatesCache() {
+			Order order = marketSellOrder(5);
+			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -188,12 +188,12 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("MARKET 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
-		void handle_placeOrder_market_savesUpdatedOrders() {
-			Order order = marketBuyOrder(5);
-			Order filledMaker = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+		@DisplayName("MARKET SELL 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
+		void handle_placeOrder_marketSell_savesUpdatedOrders() {
+			Order order = marketSellOrder(5);
+			Order filledMaker = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			filledMaker.activate();
-			when(engine.placeMarketOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
+			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -210,7 +210,7 @@ class EngineHandlerTest {
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
 			verify(engine).placeMarketBuyOrderWithQuoteQty(order);
-			verify(engine, never()).placeMarketOrder(any());
+			verify(engine, never()).placeMarketSellOrder(any());
 			verify(engine, never()).placeLimitOrder(any());
 		}
 	}

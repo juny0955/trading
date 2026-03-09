@@ -75,7 +75,7 @@ public class EngineHandler {
 	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.
 	 *
 	 * <ul>
-	 *   <li>시장가({@code isMarket()}): 가격 조건 없이 즉시 체결, 잔량은 취소된다.</li>
+	 *   <li>시장가({@code isMarket()}): BUY는 quoteQty 예산 모드만 지원하고, SELL은 가격 조건 없이 즉시 체결 후 잔량이 취소된다.</li>
 	 *   <li>GTC: 잔량을 호가창에 등록해 이후 체결을 기다린다.</li>
 	 *   <li>IOC: 즉시 체결 가능한 수량만 체결하고 잔량은 취소한다.</li>
  *   <li>FOK: 전량 즉시 체결이 가능할 때만 체결하고, 그렇지 않으면 즉시 취소한다.</li>
@@ -86,7 +86,7 @@ public class EngineHandler {
 			if (order.getSide() == Side.BUY && order.isQuoteQtyMode())
 				return engine.placeMarketBuyOrderWithQuoteQty(order);
 
-			return engine.placeMarketOrder(order);
+			return engine.placeMarketSellOrder(order);
 		}
 
 		return switch (order.getTif()) {

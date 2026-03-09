@@ -151,12 +151,12 @@ class OrderTest {
         class MarketCreation {
 
             @Test
-            @DisplayName("BUY MARKET 주문을 정상 생성한다")
-            void createBuyMarketOrder() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            @DisplayName("SELL MARKET 주문을 정상 생성한다")
+            void createSellMarketOrder() {
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
                 assertThat(order.getOrderId()).isNotNull();
-                assertThat(order.getSide()).isEqualTo(Side.BUY);
+                assertThat(order.getSide()).isEqualTo(Side.SELL);
                 assertThat(order.getSymbol()).isEqualTo(SYMBOL);
                 assertThat(order.getOrderType()).isEqualTo(OrderType.MARKET);
                 assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
@@ -167,14 +167,14 @@ class OrderTest {
             @Test
             @DisplayName("MARKET 주문에서 getLimitPriceOrThrow()를 호출하면 BusinessRuleException이 발생한다")
             void marketOrderThrowsOnGetPrice() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThrows(BusinessRuleException.class, order::getLimitPriceOrThrow);
             }
 
             @Test
             @DisplayName("isMarket()은 MARKET 주문에서 true를 반환한다")
             void isMarketReturnsTrueForMarketOrder() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThat(order.isMarket()).isTrue();
             }
 
@@ -189,14 +189,14 @@ class OrderTest {
             @DisplayName("MARKET 주문 side = null이면 NullPointerException이 발생한다")
             void rejectNullSide() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> OrderFixture.createMarket(null, SYMBOL, new Quantity(5)));
+                        .isThrownBy(() -> Order.create(SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
             @DisplayName("MARKET 주문 symbol = null이면 NullPointerException이 발생한다")
             void rejectNullSymbol() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> OrderFixture.createMarket(Side.BUY, null, new Quantity(5)));
+                        .isThrownBy(() -> OrderFixture.createMarketSell(null, new Quantity(5)));
             }
 
             @Test
@@ -207,10 +207,17 @@ class OrderTest {
             }
 
             @Test
-            @DisplayName("MARKET BUY + quantity/quoteQty 둘 다 null이면 BusinessRuleException이 발생한다")
-            void rejectMarketBuyWhenBothQuantityAndQuoteQtyAreNull() {
+            @DisplayName("MARKET BUY + quoteQty=null이면 BusinessRuleException이 발생한다")
+            void rejectMarketBuyWhenQuoteQtyIsNull() {
                 assertThrows(BusinessRuleException.class, () ->
                     Order.create(SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
+            }
+
+            @Test
+            @DisplayName("MARKET BUY + quantity가 입력되면 BusinessRuleException이 발생한다")
+            void rejectMarketBuyWhenQuantityIsProvided() {
+                assertThrows(BusinessRuleException.class, () ->
+                    Order.create(SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -253,9 +260,9 @@ class OrderTest {
             }
 
             @Test
-            @DisplayName("isQuoteQtyMode() — quantity 기반 주문이면 false")
-            void isQuoteQtyMode_returnsFalse_whenQuantityBased() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            @DisplayName("isQuoteQtyMode() — MARKET SELL이면 false")
+            void isQuoteQtyMode_returnsFalse_whenMarketSell() {
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThat(order.isQuoteQtyMode()).isFalse();
             }
         }
@@ -592,7 +599,7 @@ class OrderTest {
         @Test
         @DisplayName("MARKET 주문 ACCEPTED → NEW → FILLED 전체 흐름")
         void marketOrder_fullLifecycle_Filled() {
-            Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
 
@@ -606,7 +613,7 @@ class OrderTest {
         @Test
         @DisplayName("MARKET 주문 유동성 부족 → PARTIALLY_FILLED → CANCELLED 전체 흐름")
         void marketOrder_fullLifecycle_PartialThenCancelled() {
-            Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
             order.activate();
             order.fill(new Quantity(3));

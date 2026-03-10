@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
@@ -51,7 +52,7 @@ class OrderQueryServiceTest {
         @DisplayName("동일 account의 주문이면 OrderResult를 반환한다")
         void getOrder_found_returnsOrderResult() {
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -64,7 +65,7 @@ class OrderQueryServiceTest {
         @DisplayName("OrderResult 필드는 Order와 일치한다")
         void getOrder_found_resultFieldsMatchOrder() {
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.SELL, SYMBOL, TimeInForce.GTC, new Price(50_000), new Quantity(10));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -81,7 +82,7 @@ class OrderQueryServiceTest {
         @DisplayName("다른 account의 주문이면 OrderNotFoundException이 발생한다")
         void getOrder_otherAccountOrder_throwsOrderNotFoundException() {
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             assertThrows(OrderNotFoundException.class, () -> sut.getOrder(OTHER_ACCOUNT_ID, order.getOrderId().toString()));
@@ -91,7 +92,7 @@ class OrderQueryServiceTest {
         @DisplayName("quoteQty 모드 주문 조회 시 quantity는 null이다")
         void getOrder_quoteQtyMode_quantityIsNull() {
             Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -103,7 +104,7 @@ class OrderQueryServiceTest {
         @DisplayName("quoteQty 모드 주문 조회 시 remaining은 0이다")
         void getOrder_quoteQtyMode_remainingIsZero() {
             Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -114,17 +115,17 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("주문이 없으면 OrderNotFoundException이 발생한다")
         void getOrder_notFound_throwsOrderNotFoundException() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-            assertThrows(OrderNotFoundException.class, () -> sut.getOrder(ACCOUNT_ID_RAW, orderId));
+            assertThrows(OrderNotFoundException.class, () -> sut.getOrder(ACCOUNT_ID_RAW, orderId.toString()));
         }
 
         @Test
         @DisplayName("LIMIT 주문 조회 시 quantity 모드 파생 필드를 계산한다")
         void getOrder_limitMode_quantityModeFields() {
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -140,7 +141,7 @@ class OrderQueryServiceTest {
         @DisplayName("quoteQty 모드 주문 조회 시 quote 파생 필드를 계산한다")
         void getOrder_quoteQtyMode_quoteFieldsMapped() {
             Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L));
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());
@@ -157,7 +158,7 @@ class OrderQueryServiceTest {
         void getOrder_quoteQtyMode_leftoverQuoteQtyConsistency() {
             Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L));
             order.accumulate(30_000L, 3L);
-            when(orderRepository.findById(order.getOrderId().toString()))
+            when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 
             OrderResult result = sut.getOrder(ACCOUNT_ID_RAW, order.getOrderId().toString());

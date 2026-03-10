@@ -33,7 +33,11 @@ public record OrderId(
             throw new BusinessRuleException("ORDER_ID_INVALID", "OrderId cannot be null or blank");
         }
 
-        return new OrderId(UUID.fromString(raw));
+        try {
+            return new OrderId(UUID.fromString(raw));
+        } catch (IllegalArgumentException e) {
+            throw new BusinessRuleException("ORDER_ID_INVALID", "Invalid OrderId format");
+        }
     }
 
     @Override

@@ -22,6 +22,10 @@ public record AccountId(
 			throw new BusinessRuleException("ACCOUNT_ID_INVALID", "AccountId cannot be null or blank");
 		}
 
-		return new AccountId(UUID.fromString(raw));
+		try {
+			return new AccountId(UUID.fromString(raw));
+		} catch (IllegalArgumentException e) {
+			throw new BusinessRuleException("ACCOUNT_ID_INVALID", "Invalid AccountId format");
+		}
 	}
 }

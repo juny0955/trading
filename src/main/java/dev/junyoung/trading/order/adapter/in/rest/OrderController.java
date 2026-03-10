@@ -20,7 +20,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/orders")
+@RequestMapping("/accounts/{accountId}/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
@@ -29,8 +29,11 @@ public class OrderController {
     private final GetOrderUseCase getOrderUseCase;
 
     @PostMapping
-    public ResponseEntity<PlaceOrderResponse> placeOrder(@RequestBody @Valid PlaceOrderRequest request) {
-        String orderId = placeOrderUseCase.placeOrder(request.toCommand());
+    public ResponseEntity<PlaceOrderResponse> placeOrder(
+        @PathVariable String accountId,
+        @RequestBody @Valid PlaceOrderRequest request
+    ) {
+        String orderId = placeOrderUseCase.placeOrder(request.toCommand(accountId));
 
         return ResponseEntity
                 .accepted()
@@ -38,8 +41,11 @@ public class OrderController {
     }
 
     @DeleteMapping("/{orderId}")
-    public ResponseEntity<Void> cancelOrder(@PathVariable String orderId) {
-        cancelOrderUseCase.cancelOrder(orderId);
+    public ResponseEntity<Void> cancelOrder(
+        @PathVariable String accountId,
+        @PathVariable String orderId
+    ) {
+        cancelOrderUseCase.cancelOrder(accountId, orderId);
 
         return ResponseEntity
                 .accepted()
@@ -47,8 +53,11 @@ public class OrderController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrder(@PathVariable String orderId) {
-        OrderResult result = getOrderUseCase.getOrder(orderId);
+    public ResponseEntity<OrderResponse> getOrder(
+        @PathVariable String accountId,
+        @PathVariable String orderId
+    ) {
+        OrderResult result = getOrderUseCase.getOrder(accountId, orderId);
         return ResponseEntity
                 .ok(OrderResponse.from(result));
     }

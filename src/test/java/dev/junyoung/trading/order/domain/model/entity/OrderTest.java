@@ -189,7 +189,7 @@ class OrderTest {
             @DisplayName("MARKET 주문 side = null이면 NullPointerException이 발생한다")
             void rejectNullSide() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.create(SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
+                        .isThrownBy(() -> Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -203,21 +203,21 @@ class OrderTest {
             @DisplayName("MARKET SELL + quantity=null이면 BusinessRuleException이 발생한다")
             void rejectNullQuantityForMarketSell() {
                 assertThrows(BusinessRuleException.class, () ->
-                        Order.create(SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
+                        Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
             }
 
             @Test
             @DisplayName("MARKET BUY + quoteQty=null이면 BusinessRuleException이 발생한다")
             void rejectMarketBuyWhenQuoteQtyIsNull() {
                 assertThrows(BusinessRuleException.class, () ->
-                    Order.create(SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
+                    Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
             }
 
             @Test
             @DisplayName("MARKET BUY + quantity가 입력되면 BusinessRuleException이 발생한다")
             void rejectMarketBuyWhenQuantityIsProvided() {
                 assertThrows(BusinessRuleException.class, () ->
-                    Order.create(SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
+                    Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -225,6 +225,7 @@ class OrderTest {
             void rejectMarketBuyWhenBothQuantityAndQuoteQtyAreProvided() {
                 assertThrows(BusinessRuleException.class, () ->
                     Order.create(
+                        OrderFixture.DEFAULT_ACCOUNT_ID,
                         SYMBOL,
                         Side.BUY,
                         OrderType.MARKET,

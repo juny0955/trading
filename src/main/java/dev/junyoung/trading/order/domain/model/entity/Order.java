@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.domain.model.entity;
 
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
@@ -24,11 +25,12 @@ import java.util.Optional;
  * </pre>
  *
  * 유일한 진입점은
- * {@link #create(Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
+ * {@link #create(AccountId, Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
  */
 @Getter
 public class Order {
 
+    private final AccountId accountId;
     private final OrderId orderId;
     private final Side side;
     private final Symbol symbol;
@@ -52,10 +54,10 @@ public class Order {
     // 생성자
     // -------------------------------------------------------------------------
 
-    private Order(Side side, Symbol symbol, OrderType orderType, TimeInForce tif,
-        Price price, QuoteQty quoteQty, Quantity quantity) {
-
+    private Order(AccountId accountId, Side side, Symbol symbol, OrderType orderType,
+          TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         this.orderId = OrderId.newId();
+        this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
         this.side = Objects.requireNonNull(side, "side must not be null");
         this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.orderType = Objects.requireNonNull(orderType, "orderType must not be null");
@@ -86,14 +88,14 @@ public class Order {
      * 주문 유형과 사이드 규칙에 따라 주문을 생성한다.
      * LIMIT 주문에서 TIF가 null이면 {@link TimeInForce#defaultValue()}로 대체한다.
      */
-    public static Order create(Symbol symbol, Side side, OrderType orderType,
-        TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
+    public static Order create(AccountId accountId, Symbol symbol, Side side, OrderType orderType,
+            TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         validateInputCombination(side, orderType, price, quoteQty, quantity);
         return switch (orderType) {
-            case LIMIT -> createLimit(side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
+            case LIMIT -> createLimit(accountId, side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
             case MARKET -> side.isBuy()
-                ? createMarketBuyWithQuoteQty(side, symbol, quoteQty)
-                : createMarketSell(side, symbol, quantity);
+                ? createMarketBuyWithQuoteQty(accountId, side, symbol, quoteQty)
+                : createMarketSell(accountId, side, symbol, quantity);
         };
     }
 
@@ -123,21 +125,21 @@ public class Order {
     }
 
     /** 지정가 주문을 생성한다. */
-    private static Order createLimit(Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
-        return new Order(side, symbol, OrderType.LIMIT, tif, price, null, quantity);
+    private static Order createLimit(AccountId accountId, Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
+        return new Order(accountId, side, symbol, OrderType.LIMIT, tif, price, null, quantity);
     }
 
     /** MARKET SELL 주문을 생성한다. TIF는 IOC로 고정된다. */
-    private static Order createMarketSell(Side side, Symbol symbol, Quantity quantity) {
-        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, null, quantity);
+    private static Order createMarketSell(AccountId accountId, Side side, Symbol symbol, Quantity quantity) {
+        return new Order(accountId, side, symbol, OrderType.MARKET, TimeInForce.IOC, null, null, quantity);
     }
 
     /**
      * quoteQty 기반 시장가 BUY 주문을 생성한다.
      * quantity는 null이며, 완료 처리는 {@link #markFilledByMarketBuy()}를 통해 이루어진다.
      */
-    private static Order createMarketBuyWithQuoteQty(Side side, Symbol symbol, QuoteQty quoteQty) {
-        return new Order(side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, null);
+    private static Order createMarketBuyWithQuoteQty(AccountId accountId, Side side, Symbol symbol, QuoteQty quoteQty) {
+        return new Order(accountId, side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, null);
     }
 
     // -------------------------------------------------------------------------

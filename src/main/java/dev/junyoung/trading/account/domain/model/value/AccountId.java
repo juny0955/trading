@@ -1,5 +1,7 @@
 package dev.junyoung.trading.account.domain.model.value;
 
+import dev.junyoung.trading.common.exception.BusinessRuleException;
+
 import java.util.Objects;
 import java.util.UUID;
 
@@ -13,5 +15,17 @@ public record AccountId(
 	/* 새로운 무작위 UUID로 식별자를 생성한다. */
 	public static AccountId newId() {
 		return new AccountId(UUID.randomUUID());
+	}
+
+	public static AccountId from(String raw) {
+		if (raw == null || raw.isBlank()) {
+			throw new BusinessRuleException("ACCOUNT_ID_INVALID", "AccountId cannot be null or blank");
+		}
+
+		try {
+			return new AccountId(UUID.fromString(raw));
+		} catch (IllegalArgumentException e) {
+			throw new BusinessRuleException("ACCOUNT_ID_INVALID", "Invalid AccountId format");
+		}
 	}
 }

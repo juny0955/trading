@@ -1,13 +1,13 @@
 package dev.junyoung.trading.order.adapter.out.persistence;
 
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import org.springframework.stereotype.Repository;
-
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+
+@Deprecated
 public class MemoryOrderRepository implements OrderRepository {
 
     private final ConcurrentHashMap<String, Order> orders = new ConcurrentHashMap<>();
@@ -18,7 +18,7 @@ public class MemoryOrderRepository implements OrderRepository {
     }
 
     @Override
-    public Optional<Order> findById(String id) {
-        return Optional.ofNullable(orders.get(id));
+    public Optional<Order> findById(OrderId id) {
+        return Optional.ofNullable(orders.get(id.toString()));
     }
 }

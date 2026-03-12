@@ -46,10 +46,10 @@ public class Order {
     private final Quantity quantity;
     private final Instant orderedAt;
 
-    private volatile Quantity remaining;
-    private volatile OrderStatus status;
-    private volatile long cumQuoteQty = 0;
-    private volatile long cumBaseQty = 0;
+    private Quantity remaining;
+    private OrderStatus status;
+    private long cumQuoteQty;
+    private long cumBaseQty;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -118,40 +118,25 @@ public class Order {
         };
     }
 
-    public static Order restore(
-        OrderId orderId,
-        AccountId accountId,
-        String clientOrderId,
-        Symbol symbol,
-        Side side,
-        OrderType orderType,
-        TimeInForce tif,
-        Price price,
-        QuoteQty quoteQty,
-        Quantity quantity,
-        Quantity remaining,
-        OrderStatus status,
-        Instant orderedAt,
-        long cumQuoteQty,
-        long cumBaseQty
-    ) {
-        validateInputCombination(side, orderType, price, quoteQty, quantity);
+    public static Order restore(OrderState state) {
+        Objects.requireNonNull(state, "state must not be null");
+        validateInputCombination(state.side(), state.orderType(), state.price(), state.quoteQty(), state.quantity());
         return new Order(
-            orderId,
-            accountId,
-            clientOrderId,
-            side,
-            symbol,
-            orderType,
-            tif,
-            price,
-            quoteQty,
-            quantity,
-            orderedAt,
-            remaining,
-            status,
-            cumQuoteQty,
-            cumBaseQty
+            state.orderId(),
+            state.accountId(),
+            state.clientOrderId(),
+            state.side(),
+            state.symbol(),
+            state.orderType(),
+            state.tif(),
+            state.price(),
+            state.quoteQty(),
+            state.quantity(),
+            state.orderedAt(),
+            state.remaining(),
+            state.status(),
+            state.cumQuoteQty(),
+            state.cumBaseQty()
         );
     }
 
@@ -347,5 +332,24 @@ public class Order {
     private void requireActive() {
         if (status != OrderStatus.NEW && status != OrderStatus.PARTIALLY_FILLED)
             throw new ConflictException("ORDER_INVALID_STATE", "Order is not in an active state: " + status);
+    }
+
+    public record OrderState(
+        OrderId orderId,
+        AccountId accountId,
+        String clientOrderId,
+        Side side,
+        Symbol symbol,
+        OrderType orderType,
+        TimeInForce tif,
+        Price price,
+        QuoteQty quoteQty,
+        Quantity quantity,
+        Instant orderedAt,
+        Quantity remaining,
+        OrderStatus status,
+        long cumQuoteQty,
+        long cumBaseQty
+    ) {
     }
 }

@@ -32,8 +32,8 @@ CREATE TABLE orders (
     cum_quote_qty BIGINT NOT NULL DEFAULT 0,
     accepted_seq BIGINT,
     ordered_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_orders_account
         FOREIGN KEY (account_id) REFERENCES accounts (account_id),
     CONSTRAINT uq_orders_account_client_order_id

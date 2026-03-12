@@ -1,9 +1,8 @@
-package dev.junyoung.trading.order.adapter.out.persistence;
+package dev.junyoung.trading.order.adapter.out.persistence.jdbc;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,9 +33,7 @@ public class JdbcOrderRepository implements OrderRepository {
 
 	@Override
 	public void save(Order order) {
-		Instant now = Instant.now();
 		Timestamp orderedAt = Timestamp.from(order.getOrderedAt());
-		Timestamp updatedAt = Timestamp.from(now);
 
 		jdbcTemplate.update(
 			OrderQuery.UPSERT_SQL.getSql(),
@@ -55,9 +52,7 @@ public class JdbcOrderRepository implements OrderRepository {
 			order.getCumBaseQty(),
 			order.getCumQuoteQty(),
 			null,
-			orderedAt,
-			orderedAt,
-			updatedAt
+			orderedAt
 		);
 	}
 
@@ -69,23 +64,23 @@ public class JdbcOrderRepository implements OrderRepository {
 	}
 
 	private Order mapOrder(ResultSet rs, int rowNum) throws SQLException {
-		return Order.restore(
+		return Order.restore(new Order.OrderState(
 			new OrderId(rs.getObject("order_id", UUID.class)),
 			new AccountId(rs.getObject("account_id", UUID.class)),
 			rs.getString("client_order_id"),
-			new Symbol(rs.getString("symbol")),
 			Side.valueOf(rs.getString("side")),
+			new Symbol(rs.getString("symbol")),
 			OrderType.valueOf(rs.getString("order_type")),
 			TimeInForce.valueOf(rs.getString("tif")),
 			nullablePrice(rs),
 			nullableQuoteQty(rs),
 			nullableQuantity(rs),
+			rs.getTimestamp("ordered_at").toInstant(),
 			new Quantity(rs.getLong("remaining_qty")),
 			OrderStatus.valueOf(rs.getString("status")),
-			rs.getTimestamp("ordered_at").toInstant(),
 			rs.getLong("cum_quote_qty"),
 			rs.getLong("cum_base_qty")
-		);
+		));
 	}
 
 	private Price nullablePrice(ResultSet rs) throws SQLException {

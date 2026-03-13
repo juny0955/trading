@@ -5,6 +5,7 @@ import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -22,6 +23,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private record PlaceOrderIdempotencyKey(AccountId accountId, String clientOrderId) {}
     private final ConcurrentHashMap<PlaceOrderIdempotencyKey, CompletableFuture<OrderId>> clientOrderMap = new ConcurrentHashMap<>();
 
+    private final AcceptedSeqGenerator acceptedSeqGenerator;
     private final EngineManager engineManager;
     private final OrderRepository orderRepository;
 
@@ -44,12 +46,13 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         }
 
         try {
-            Order order = createOrder(command);
+            OrderId orderId = OrderId.newId();
+            long acceptedSeq = acceptedSeqGenerator.next();
+            Order order = createOrder(orderId, acceptedSeq, command);
 
-            engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
             orderRepository.save(order);  // ACCEPTED 상태로 최초 저장 (참조 공유로 이후 상태 변경 자동 반영)
+            engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
 
-            OrderId orderId = order.getOrderId();
             // 후행 중복 요청이 동일 orderId를 받을 수 있도록 완료 결과를 남긴다.
             future.complete(orderId);
             return orderId.toString();
@@ -61,10 +64,12 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         }
     }
 
-    private Order createOrder(PlaceOrderCommand command) {
+    private Order createOrder(OrderId orderId, long acceptedSeq, PlaceOrderCommand command) {
         return Order.create(
+            orderId,
             command.accountId(),
             command.clientOrderId(),
+            acceptedSeq,
             command.symbol(),
             command.side(),
             command.orderType(),

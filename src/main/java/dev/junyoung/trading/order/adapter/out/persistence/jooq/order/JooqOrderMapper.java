@@ -18,6 +18,7 @@ final class JooqOrderMapper {
             new OrderId(record.getOrderId()),
             new AccountId(record.getAccountId()),
             record.getClientOrderId(),
+            record.getAcceptedSeq(),
             Side.valueOf(record.getSide()),
             new Symbol(record.getSymbol()),
             OrderType.valueOf(record.getOrderType()),
@@ -40,6 +41,7 @@ final class JooqOrderMapper {
         record.setOrderId(order.getOrderId().value());
         record.setAccountId(order.getAccountId().value());
         record.setClientOrderId(order.getClientOrderId());
+        record.setAcceptedSeq(order.getAcceptedSeq());
         record.setSymbol(order.getSymbol().value());
         record.setSide(order.getSide().name());
         record.setOrderType(order.getOrderType().name());

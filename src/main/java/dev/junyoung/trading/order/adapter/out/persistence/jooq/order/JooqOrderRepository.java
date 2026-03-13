@@ -23,24 +23,21 @@ public class JooqOrderRepository implements OrderRepository {
         OrdersRecord record = JooqOrderMapper.toRecord(dslContext, order);
 
         dslContext.insertInto(Tables.ORDERS)
-                .set(record)
-                .onConflict(Tables.ORDERS.ORDER_ID)
-                .doUpdate()
-                .set(Tables.ORDERS.STATUS, record.getStatus())
-                .set(Tables.ORDERS.PRICE, record.getPrice())
-                .set(Tables.ORDERS.QUANTITY, record.getQuantity())
-                .set(Tables.ORDERS.REMAINING_QTY, record.getRemainingQty())
-                .set(Tables.ORDERS.QUOTE_QTY, record.getQuoteQty())
-                .set(Tables.ORDERS.CUM_BASE_QTY, record.getCumBaseQty())
-                .set(Tables.ORDERS.CUM_QUOTE_QTY, record.getCumQuoteQty())
-                .set(Tables.ORDERS.UPDATED_AT, Instant.now())
-                .execute();
+            .set(record)
+            .onConflict(Tables.ORDERS.ORDER_ID)
+            .doUpdate()
+            .set(Tables.ORDERS.STATUS, record.getStatus())
+            .set(Tables.ORDERS.REMAINING_QTY, record.getRemainingQty())
+            .set(Tables.ORDERS.CUM_BASE_QTY, record.getCumBaseQty())
+            .set(Tables.ORDERS.CUM_QUOTE_QTY, record.getCumQuoteQty())
+            .set(Tables.ORDERS.UPDATED_AT, Instant.now())
+            .execute();
     }
 
     @Override
     public Optional<Order> findById(OrderId id) {
         return dslContext.selectFrom(Tables.ORDERS)
-                .where(Tables.ORDERS.ORDER_ID.eq(id.value()))
-                .fetchOptional(JooqOrderMapper::toDomain);
+            .where(Tables.ORDERS.ORDER_ID.eq(id.value()))
+            .fetchOptional(JooqOrderMapper::toDomain);
     }
 }

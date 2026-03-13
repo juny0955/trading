@@ -25,19 +25,8 @@ final class JooqAccountMapper {
 
     static Account toDomain(AccountsRecord accountsRecord, Result<BalancesRecord> balancesRecords) {
         Map<Asset, Balance> balances = balancesRecords.stream()
-            .map(r ->
-                Balance.restore(
-                    new Asset(r.getAsset()),
-                    r.getAvailable(),
-                    r.getHeld(),
-                    r.getCreatedAt(),
-                    r.getUpdatedAt()
-                )
-            ).collect(Collectors.toMap(
-                Balance::getAsset,
-                Function.identity()
-            ));
-
+            .map(JooqBalanceMapper::toDomain)
+            .collect(Collectors.toMap(Balance::getAsset, Function.identity()));
 
         return Account.restore(
             new AccountId(accountsRecord.getAccountId()),

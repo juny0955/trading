@@ -1,6 +1,7 @@
 package dev.junyoung.trading.account.adapter.out.persistence.jooq;
 
 import dev.junyoung.trading.account.domain.model.entity.Balance;
+import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.records.BalancesRecord;
 import org.jooq.DSLContext;
@@ -19,5 +20,15 @@ final class JooqBalanceMapper {
         record.setCreatedAt(balance.getCreatedAt());
         record.setUpdatedAt(Instant.now());
         return record;
+    }
+
+    static Balance toDomain(BalancesRecord record) {
+        return Balance.restore(
+            new Asset(record.getAsset()),
+            record.getAvailable(),
+            record.getHeld(),
+            record.getCreatedAt(),
+            record.getUpdatedAt()
+        );
     }
 }

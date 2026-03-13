@@ -169,7 +169,7 @@ public class MatchingEngineTest {
 
 			assertThat(trade.buyOrderId()).isEqualTo(taker.getOrderId());
 			assertThat(trade.sellOrderId()).isEqualTo(maker.getOrderId());
-			assertThat(trade.executedQty()).isEqualTo(new Quantity(5));
+			assertThat(trade.quantity()).isEqualTo(new Quantity(5));
 		}
 
 		@Test
@@ -206,7 +206,7 @@ public class MatchingEngineTest {
 			List<Trade> trades = engine.placeLimitOrder(taker).trades();
 
 			assertThat(trades).hasSize(1);
-			assertThat(trades.getFirst().executedQty()).isEqualTo(new Quantity(3));
+			assertThat(trades.getFirst().quantity()).isEqualTo(new Quantity(3));
 			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(taker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 			assertThat(taker.getRemaining()).isEqualTo(new Quantity(7));
@@ -224,7 +224,7 @@ public class MatchingEngineTest {
 			List<Trade> trades = engine.placeLimitOrder(taker).trades();
 
 			assertThat(trades).hasSize(1);
-			assertThat(trades.getFirst().executedQty()).isEqualTo(new Quantity(3));
+			assertThat(trades.getFirst().quantity()).isEqualTo(new Quantity(3));
 			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 			assertThat(maker.getRemaining()).isEqualTo(new Quantity(7));
@@ -251,8 +251,8 @@ public class MatchingEngineTest {
 			List<Trade> trades = engine.placeLimitOrder(taker).trades();
 
 			assertThat(trades).hasSize(2);
-			assertThat(trades.get(0).executedQty()).isEqualTo(new Quantity(3));
-			assertThat(trades.get(1).executedQty()).isEqualTo(new Quantity(4));
+			assertThat(trades.get(0).quantity()).isEqualTo(new Quantity(3));
+			assertThat(trades.get(1).quantity()).isEqualTo(new Quantity(4));
 			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(ask1.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(ask2.getStatus()).isEqualTo(OrderStatus.FILLED);
@@ -526,7 +526,7 @@ public class MatchingEngineTest {
 			Order taker = iocBuyOrder(10_000, 10);
 			PlaceResult result = engine.placeLimitOrderIOC(taker);
 			assertThat(result.trades()).hasSize(1);
-			assertThat(result.trades().getFirst().executedQty()).isEqualTo(new Quantity(3));
+			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
 			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 			assertThat(taker.getRemaining()).isEqualTo(new Quantity(7));
@@ -761,7 +761,7 @@ public class MatchingEngineTest {
 			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
 
 			assertThat(result.trades()).hasSize(1);
-			assertThat(result.trades().getFirst().executedQty()).isEqualTo(new Quantity(3));
+			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
 			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(ask.getStatus()).isEqualTo(OrderStatus.FILLED);
 			assertThat(orderBook.bestAsk()).isEmpty();

@@ -65,6 +65,10 @@ public class Balance {
 		return new Balance(asset, available, held, now, now);
 	}
 
+	public static Balance restore(Asset asset, long available, long held, Instant createdAt, Instant updatedAt) {
+		return new Balance(asset, available, held, createdAt, updatedAt);
+	}
+
 	// -------------------------------------------------------------------------
 	// 조회
 	// -------------------------------------------------------------------------

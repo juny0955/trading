@@ -1,5 +1,6 @@
 package dev.junyoung.trading.account.domain.model.entity;
 
+import java.time.Instant;
 import java.util.Objects;
 
 import dev.junyoung.trading.account.domain.model.value.Asset;
@@ -30,11 +31,14 @@ public class Balance {
 	/** 주문 예약으로 잠긴 자산 수량. 항상 0 이상이다. */
 	private final long held;
 
+	private final Instant createdAt;
+	private Instant updatedAt;
+
 	// -------------------------------------------------------------------------
 	// 생성자
 	// -------------------------------------------------------------------------
 
-	Balance(Asset asset, long available, long held) {
+	Balance(Asset asset, long available, long held, Instant createdAt, Instant updatedAt) {
 		this.asset = Objects.requireNonNull(asset, "asset must not be null");
 
 		if (available < 0) throw new BusinessRuleException("BALANCE_INVALID_AVAILABLE", "available must be non-negative");
@@ -42,6 +46,8 @@ public class Balance {
 
 		this.available = available;
 		this.held = held;
+		this.createdAt = createdAt;
+		this.updatedAt = updatedAt;
 	}
 
 	// -------------------------------------------------------------------------
@@ -55,7 +61,8 @@ public class Balance {
 	 * @throws BusinessRuleException available 또는 held 가 음수인 경우
 	 */
 	public static Balance of(Asset asset, long available, long held) {
-		return new Balance(asset, available, held);
+		Instant now = Instant.now();
+		return new Balance(asset, available, held, now, now);
 	}
 
 	// -------------------------------------------------------------------------

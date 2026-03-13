@@ -44,12 +44,15 @@ public class Order {
 
     private final QuoteQty quoteQty;
     private final Quantity quantity;
-    private final Instant orderedAt;
 
     private Quantity remaining;
     private OrderStatus status;
-    private long cumQuoteQty;
-    private long cumBaseQty;
+    private QuoteQty cumQuoteQty;
+    private Quantity cumBaseQty;
+
+    private final Instant orderedAt;
+    private final Instant createdAt;
+    private final Instant updatedAt;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -66,11 +69,13 @@ public class Order {
         Price price,
         QuoteQty quoteQty,
         Quantity quantity,
-        Instant orderedAt,
         Quantity remaining,
         OrderStatus status,
-        long cumQuoteQty,
-        long cumBaseQty
+        QuoteQty cumQuoteQty,
+        Quantity cumBaseQty,
+        Instant orderedAt,
+        Instant createdAt,
+        Instant updatedAt
     ) {
         this.orderId = Objects.requireNonNull(orderId, "orderId must not be null");
         this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
@@ -82,11 +87,13 @@ public class Order {
         this.price = price;
         this.quoteQty = quoteQty;
         this.quantity = quantity;
-        this.orderedAt = Objects.requireNonNull(orderedAt, "orderedAt must not be null");
         this.remaining = Objects.requireNonNull(remaining, "remaining must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
-        this.cumQuoteQty = cumQuoteQty;
-        this.cumBaseQty = cumBaseQty;
+        this.cumQuoteQty = Objects.requireNonNull(cumQuoteQty, "cumQuoteQty must not be null");
+        this.cumBaseQty = Objects.requireNonNull(cumBaseQty, "cumBaseQty must not be null");
+        this.orderedAt = Objects.requireNonNull(orderedAt, "orderedAt must not be null");
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
 
         validateAmounts();
     }
@@ -118,25 +125,45 @@ public class Order {
         };
     }
 
-    public static Order restore(OrderState state) {
-        Objects.requireNonNull(state, "state must not be null");
-        validateInputCombination(state.side(), state.orderType(), state.price(), state.quoteQty(), state.quantity());
+    /** 저장소에 보관된 주문 상태를 aggregate로 복원한다. */
+    public static Order restore(
+        OrderId orderId,
+        AccountId accountId,
+        String clientOrderId,
+        Side side,
+        Symbol symbol,
+        OrderType orderType,
+        TimeInForce tif,
+        Price price,
+        QuoteQty quoteQty,
+        Quantity quantity,
+        Quantity remaining,
+        OrderStatus status,
+        QuoteQty cumQuoteQty,
+        Quantity cumBaseQty,
+        Instant orderedAt,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        validateInputCombination(side, orderType, price, quoteQty, quantity);
         return new Order(
-            state.orderId(),
-            state.accountId(),
-            state.clientOrderId(),
-            state.side(),
-            state.symbol(),
-            state.orderType(),
-            state.tif(),
-            state.price(),
-            state.quoteQty(),
-            state.quantity(),
-            state.orderedAt(),
-            state.remaining(),
-            state.status(),
-            state.cumQuoteQty(),
-            state.cumBaseQty()
+            orderId,
+            accountId,
+            clientOrderId,
+            side,
+            symbol,
+            orderType,
+            tif,
+            price,
+            quoteQty,
+            quantity,
+            remaining,
+            status,
+            cumQuoteQty,
+            cumBaseQty,
+            orderedAt,
+            createdAt,
+            updatedAt
         );
     }
 
@@ -178,11 +205,13 @@ public class Order {
             price,
             null,
             quantity,
-            Instant.now(),
             quantity,
             OrderStatus.ACCEPTED,
-            0,
-            0
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
         );
     }
 
@@ -199,11 +228,13 @@ public class Order {
             null,
             null,
             quantity,
-            Instant.now(),
             quantity,
             OrderStatus.ACCEPTED,
-            0,
-            0
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
         );
     }
 
@@ -223,11 +254,13 @@ public class Order {
             null,
             quoteQty,
             null,
-            Instant.now(),
             new Quantity(0),
             OrderStatus.ACCEPTED,
-            0,
-            0
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
         );
     }
 
@@ -237,8 +270,8 @@ public class Order {
 
     /** quoteQty 모드에서 체결된 quote/base 금액을 누적한다. */
     public void accumulate(long quoteAmt, long baseQty) {
-        this.cumQuoteQty = Math.addExact(this.cumQuoteQty, quoteAmt);
-        this.cumBaseQty = Math.addExact(this.cumBaseQty, baseQty);
+        this.cumQuoteQty = this.cumQuoteQty.add(quoteAmt);
+        this.cumBaseQty = this.cumBaseQty.add(baseQty);
     }
 
     // -------------------------------------------------------------------------
@@ -332,24 +365,5 @@ public class Order {
     private void requireActive() {
         if (status != OrderStatus.NEW && status != OrderStatus.PARTIALLY_FILLED)
             throw new ConflictException("ORDER_INVALID_STATE", "Order is not in an active state: " + status);
-    }
-
-    public record OrderState(
-        OrderId orderId,
-        AccountId accountId,
-        String clientOrderId,
-        Side side,
-        Symbol symbol,
-        OrderType orderType,
-        TimeInForce tif,
-        Price price,
-        QuoteQty quoteQty,
-        Quantity quantity,
-        Instant orderedAt,
-        Quantity remaining,
-        OrderStatus status,
-        long cumQuoteQty,
-        long cumBaseQty
-    ) {
     }
 }

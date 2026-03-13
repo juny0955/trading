@@ -6,7 +6,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.jooq.jooq-codegen-gradle") version "3.20.8"
+    id("org.jooq.jooq-codegen-gradle") version "3.19.30"
 }
 
 group = "dev.junyoung"

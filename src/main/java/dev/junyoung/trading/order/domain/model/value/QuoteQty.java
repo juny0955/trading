@@ -10,4 +10,8 @@ public record QuoteQty(
 		if (value < 0)
 			throw new BusinessRuleException("QUOTE_QTY_NEGATIVE", "value must be positive");
 	}
+
+	public QuoteQty add(long executeQuoteQty) {
+		return new QuoteQty(Math.addExact(value, executeQuoteQty));
+	}
 }

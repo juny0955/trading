@@ -60,8 +60,8 @@ public class OrderQueryService implements GetOrderUseCase {
 
     private DerivedFields deriveQuoteModeFields(Order order) {
         Long requestedQuoteQty = order.getQuoteQty().value();
-        Long cumQuoteQty = order.getCumQuoteQty();
-        Long cumBaseQty = order.getCumBaseQty();
+        Long cumQuoteQty = order.getCumQuoteQty().value();
+        Long cumBaseQty = order.getCumBaseQty().value();
         Long leftoverQuoteQty = requestedQuoteQty - cumQuoteQty;
 
         return DerivedFields.ofQuoteMode(requestedQuoteQty, cumQuoteQty, cumBaseQty, leftoverQuoteQty);

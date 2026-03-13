@@ -16,4 +16,8 @@ public record Quantity(
     public Quantity sub(Quantity executeQty) {
         return new Quantity(value - executeQty.value());
     }
+
+    public Quantity add(long executeQty) {
+        return new Quantity(Math.addExact(value, executeQty));
+    }
 }

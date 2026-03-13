@@ -45,4 +45,8 @@ public class Account {
 		this.balances = balances == null ? Map.of() : Map.copyOf(balances);
 		this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
 	}
+
+    public static Account restore(AccountId accountId, Map<Asset, Balance> balances, Instant createdAt) {
+		return new Account(accountId, balances, createdAt);
+    }
 }

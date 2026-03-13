@@ -26,12 +26,11 @@ public record OrderId(
     /**
      * UUID 문자열로부터 식별자를 생성한다.
      *
-     * @throws dev.junyoung.trading.common.exception.BusinessRuleException raw가 null·공백이거나 UUID 형식이 아닌 경우
+     * @throws BusinessRuleException raw가 null·공백이거나 UUID 형식이 아닌 경우
      */
     public static OrderId from(String raw) {
-        if (raw == null || raw.isBlank()) {
+        if (raw == null || raw.isBlank())
             throw new BusinessRuleException("ORDER_ID_INVALID", "OrderId cannot be null or blank");
-        }
 
         try {
             return new OrderId(UUID.fromString(raw));

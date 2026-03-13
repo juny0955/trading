@@ -13,6 +13,7 @@ import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
@@ -64,10 +65,10 @@ class CancelOrderServiceTest {
         @Test
         @DisplayName("동일 account 소유 주문이면 CancelOrder 커맨드를 엔진에 제출한다")
         void cancelOrder_submitsCancelOrderCommand() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
-            sut.cancelOrder(ACCOUNT_ID_RAW, orderId);
+            sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -77,44 +78,44 @@ class CancelOrderServiceTest {
         @Test
         @DisplayName("취소 커맨드의 orderId는 입력값과 일치한다")
         void cancelOrder_commandContainsCorrectOrderId() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
-            sut.cancelOrder(ACCOUNT_ID_RAW, orderId);
+            sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
-            assertThat(cmd.orderId().toString()).isEqualTo(orderId);
+            assertThat(cmd.orderId()).isEqualTo(orderId);
         }
 
         @Test
         @DisplayName("주문이 없으면 OrderNotFoundException이 발생한다")
         void cancelOrder_orderNotFound_throwsOrderNotFoundException() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
-            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId));
+            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
         }
 
         @Test
         @DisplayName("다른 account의 주문이면 OrderNotFoundException이 발생한다")
         void cancelOrder_otherAccountOrder_throwsOrderNotFoundException() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
-            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(OTHER_ACCOUNT_ID, orderId));
+            assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(OTHER_ACCOUNT_ID, orderId.toString()));
             verify(engineManager, never()).submit(any(), any());
         }
 
         @Test
         @DisplayName("취소 요청 자체는 저장소에 다시 저장하지 않는다")
         void cancelOrder_doesNotSaveToRepository() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
-            sut.cancelOrder(ACCOUNT_ID_RAW, orderId);
+            sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
             verify(orderRepository, never()).save(any());
         }
@@ -122,25 +123,25 @@ class CancelOrderServiceTest {
         @Test
         @DisplayName("MARKET 주문은 취소할 수 없다")
         void cancelMarketOrder_throwsOrderNotCancellableException() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             Order marketOrder = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), new QuoteQty(50_000));
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
-            assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId));
+            assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
             verify(engineManager, never()).submit(any(), any());
         }
 
         @Test
         @DisplayName("이미 종료된 주문은 취소할 수 없다")
         void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
-            String orderId = UUID.randomUUID().toString();
+            OrderId orderId = new OrderId(UUID.randomUUID());
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
             order.activate();
             order.cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId));
+            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
             verify(engineManager, never()).submit(any(), any());
         }
     }

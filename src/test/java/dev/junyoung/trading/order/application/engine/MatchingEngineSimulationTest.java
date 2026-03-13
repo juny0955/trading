@@ -104,8 +104,8 @@ class MatchingEngineSimulationTest {
 
             // ── 불변식 1: 가격 우선 위반 ──────────────────────────────────
             for (int t = 1; t < trades.size(); t++) {
-                long prev = trades.get(t - 1).executionPrice().value();
-                long curr = trades.get(t).executionPrice().value();
+                long prev = trades.get(t - 1).price().value();
+                long curr = trades.get(t).price().value();
                 // BUY taker: ask 오름차순 체결 → curr >= prev
                 if (side == Side.BUY  && curr < prev) pricePriorityViolations++;
                 // SELL taker: bid 내림차순 체결 → curr <= prev
@@ -114,8 +114,8 @@ class MatchingEngineSimulationTest {
 
             // ── 불변식 2: FIFO 위반 ───────────────────────────────────────
             for (int t = 1; t < trades.size(); t++) {
-                if (trades.get(t - 1).executionPrice().value()
-                        != trades.get(t).executionPrice().value()) continue;
+                if (trades.get(t - 1).price().value()
+                        != trades.get(t).price().value()) continue;
 
                 Integer prevSeq = submissionSeq.get(getMakerId(trades.get(t - 1), side));
                 Integer currSeq = submissionSeq.get(getMakerId(trades.get(t),     side));

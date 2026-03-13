@@ -64,6 +64,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private Order createOrder(PlaceOrderCommand command) {
         return Order.create(
             command.accountId(),
+            command.clientOrderId(),
             command.symbol(),
             command.side(),
             command.orderType(),

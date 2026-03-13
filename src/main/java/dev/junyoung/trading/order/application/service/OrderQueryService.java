@@ -6,6 +6,7 @@ import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +18,7 @@ public class OrderQueryService implements GetOrderUseCase {
 
     @Override
     public OrderResult getOrder(String accountId, String orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findById(OrderId.from(orderId))
             .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (!order.getAccountId().equals(AccountId.from(accountId)))
@@ -59,8 +60,8 @@ public class OrderQueryService implements GetOrderUseCase {
 
     private DerivedFields deriveQuoteModeFields(Order order) {
         Long requestedQuoteQty = order.getQuoteQty().value();
-        Long cumQuoteQty = order.getCumQuoteQty();
-        Long cumBaseQty = order.getCumBaseQty();
+        Long cumQuoteQty = order.getCumQuoteQty().value();
+        Long cumBaseQty = order.getCumBaseQty().value();
         Long leftoverQuoteQty = requestedQuoteQty - cumQuoteQty;
 
         return DerivedFields.ofQuoteMode(requestedQuoteQty, cumQuoteQty, cumBaseQty, leftoverQuoteQty);

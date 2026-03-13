@@ -25,13 +25,14 @@ import java.util.Optional;
  * </pre>
  *
  * 유일한 진입점은
- * {@link #create(AccountId, Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
+ * {@link #create(AccountId, String, Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
  */
 @Getter
 public class Order {
 
-    private final AccountId accountId;
     private final OrderId orderId;
+    private final AccountId accountId;
+    private final String clientOrderId;
     private final Side side;
     private final Symbol symbol;
     private final OrderType orderType;
@@ -43,21 +44,42 @@ public class Order {
 
     private final QuoteQty quoteQty;
     private final Quantity quantity;
-    private final Instant orderedAt;
 
-    private volatile Quantity remaining;
-    private volatile OrderStatus status;
-    private volatile long cumQuoteQty = 0;
-    private volatile long cumBaseQty = 0;
+    private Quantity remaining;
+    private OrderStatus status;
+    private QuoteQty cumQuoteQty;
+    private Quantity cumBaseQty;
+
+    private final Instant orderedAt;
+    private final Instant createdAt;
+    private final Instant updatedAt;
 
     // -------------------------------------------------------------------------
     // 생성자
     // -------------------------------------------------------------------------
 
-    private Order(AccountId accountId, Side side, Symbol symbol, OrderType orderType,
-          TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
-        this.orderId = OrderId.newId();
+    private Order(
+        OrderId orderId,
+        AccountId accountId,
+        String clientOrderId,
+        Side side,
+        Symbol symbol,
+        OrderType orderType,
+        TimeInForce tif,
+        Price price,
+        QuoteQty quoteQty,
+        Quantity quantity,
+        Quantity remaining,
+        OrderStatus status,
+        QuoteQty cumQuoteQty,
+        Quantity cumBaseQty,
+        Instant orderedAt,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        this.orderId = Objects.requireNonNull(orderId, "orderId must not be null");
         this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
+        this.clientOrderId = Objects.requireNonNull(clientOrderId, "clientOrderId must not be null");
         this.side = Objects.requireNonNull(side, "side must not be null");
         this.symbol = Objects.requireNonNull(symbol, "symbol must not be null");
         this.orderType = Objects.requireNonNull(orderType, "orderType must not be null");
@@ -65,9 +87,13 @@ public class Order {
         this.price = price;
         this.quoteQty = quoteQty;
         this.quantity = quantity;
-        this.remaining = quantity != null ? quantity : new Quantity(0);
-        this.status = OrderStatus.ACCEPTED;
-        this.orderedAt = Instant.now();
+        this.remaining = Objects.requireNonNull(remaining, "remaining must not be null");
+        this.status = Objects.requireNonNull(status, "status must not be null");
+        this.cumQuoteQty = Objects.requireNonNull(cumQuoteQty, "cumQuoteQty must not be null");
+        this.cumBaseQty = Objects.requireNonNull(cumBaseQty, "cumBaseQty must not be null");
+        this.orderedAt = Objects.requireNonNull(orderedAt, "orderedAt must not be null");
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
 
         validateAmounts();
     }
@@ -88,15 +114,57 @@ public class Order {
      * 주문 유형과 사이드 규칙에 따라 주문을 생성한다.
      * LIMIT 주문에서 TIF가 null이면 {@link TimeInForce#defaultValue()}로 대체한다.
      */
-    public static Order create(AccountId accountId, Symbol symbol, Side side, OrderType orderType,
+    public static Order create(AccountId accountId, String clientOrderId, Symbol symbol, Side side, OrderType orderType,
             TimeInForce tif, Price price, QuoteQty quoteQty, Quantity quantity) {
         validateInputCombination(side, orderType, price, quoteQty, quantity);
         return switch (orderType) {
-            case LIMIT -> createLimit(accountId, side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
+            case LIMIT -> createLimit(accountId, clientOrderId, side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
             case MARKET -> side.isBuy()
-                ? createMarketBuyWithQuoteQty(accountId, side, symbol, quoteQty)
-                : createMarketSell(accountId, side, symbol, quantity);
+                ? createMarketBuyWithQuoteQty(accountId, clientOrderId, side, symbol, quoteQty)
+                : createMarketSell(accountId, clientOrderId, side, symbol, quantity);
         };
+    }
+
+    /** 저장소에 보관된 주문 상태를 aggregate로 복원한다. */
+    public static Order restore(
+        OrderId orderId,
+        AccountId accountId,
+        String clientOrderId,
+        Side side,
+        Symbol symbol,
+        OrderType orderType,
+        TimeInForce tif,
+        Price price,
+        QuoteQty quoteQty,
+        Quantity quantity,
+        Quantity remaining,
+        OrderStatus status,
+        QuoteQty cumQuoteQty,
+        Quantity cumBaseQty,
+        Instant orderedAt,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        validateInputCombination(side, orderType, price, quoteQty, quantity);
+        return new Order(
+            orderId,
+            accountId,
+            clientOrderId,
+            side,
+            symbol,
+            orderType,
+            tif,
+            price,
+            quoteQty,
+            quantity,
+            remaining,
+            status,
+            cumQuoteQty,
+            cumBaseQty,
+            orderedAt,
+            createdAt,
+            updatedAt
+        );
     }
 
     /**
@@ -125,21 +193,75 @@ public class Order {
     }
 
     /** 지정가 주문을 생성한다. */
-    private static Order createLimit(AccountId accountId, Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
-        return new Order(accountId, side, symbol, OrderType.LIMIT, tif, price, null, quantity);
+    private static Order createLimit(AccountId accountId, String clientOrderId, Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
+        return new Order(
+            OrderId.newId(),
+            accountId,
+            clientOrderId,
+            side,
+            symbol,
+            OrderType.LIMIT,
+            tif,
+            price,
+            null,
+            quantity,
+            quantity,
+            OrderStatus.ACCEPTED,
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
+        );
     }
 
     /** MARKET SELL 주문을 생성한다. TIF는 IOC로 고정된다. */
-    private static Order createMarketSell(AccountId accountId, Side side, Symbol symbol, Quantity quantity) {
-        return new Order(accountId, side, symbol, OrderType.MARKET, TimeInForce.IOC, null, null, quantity);
+    private static Order createMarketSell(AccountId accountId, String clientOrderId, Side side, Symbol symbol, Quantity quantity) {
+        return new Order(
+            OrderId.newId(),
+            accountId,
+            clientOrderId,
+            side,
+            symbol,
+            OrderType.MARKET,
+            TimeInForce.IOC,
+            null,
+            null,
+            quantity,
+            quantity,
+            OrderStatus.ACCEPTED,
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
+        );
     }
 
     /**
      * quoteQty 기반 시장가 BUY 주문을 생성한다.
      * quantity는 null이며, 완료 처리는 {@link #markFilledByMarketBuy()}를 통해 이루어진다.
      */
-    private static Order createMarketBuyWithQuoteQty(AccountId accountId, Side side, Symbol symbol, QuoteQty quoteQty) {
-        return new Order(accountId, side, symbol, OrderType.MARKET, TimeInForce.IOC, null, quoteQty, null);
+    private static Order createMarketBuyWithQuoteQty(AccountId accountId, String clientOrderId, Side side, Symbol symbol, QuoteQty quoteQty) {
+        return new Order(
+            OrderId.newId(),
+            accountId,
+            clientOrderId,
+            side,
+            symbol,
+            OrderType.MARKET,
+            TimeInForce.IOC,
+            null,
+            quoteQty,
+            null,
+            new Quantity(0),
+            OrderStatus.ACCEPTED,
+            new QuoteQty(0),
+            new Quantity(0),
+            Instant.now(),
+            null,
+            null
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -148,8 +270,8 @@ public class Order {
 
     /** quoteQty 모드에서 체결된 quote/base 금액을 누적한다. */
     public void accumulate(long quoteAmt, long baseQty) {
-        this.cumQuoteQty = Math.addExact(this.cumQuoteQty, quoteAmt);
-        this.cumBaseQty = Math.addExact(this.cumBaseQty, baseQty);
+        this.cumQuoteQty = this.cumQuoteQty.add(quoteAmt);
+        this.cumBaseQty = this.cumBaseQty.add(baseQty);
     }
 
     // -------------------------------------------------------------------------

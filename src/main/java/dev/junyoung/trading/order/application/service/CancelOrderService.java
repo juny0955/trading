@@ -23,7 +23,7 @@ public class CancelOrderService implements CancelOrderUseCase {
 
     @Override
     public void cancelOrder(String accountId, String orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findById(OrderId.from(orderId))
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (!order.getAccountId().equals(AccountId.from(accountId)))

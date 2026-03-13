@@ -775,8 +775,8 @@ public class MatchingEngineTest {
 
 			engine.placeMarketBuyOrderWithQuoteQty(taker);
 
-			assertThat(taker.getCumQuoteQty()).isEqualTo(50_000L);
-			assertThat(taker.getCumBaseQty()).isEqualTo(5L);
+			assertThat(taker.getCumQuoteQty().value()).isEqualTo(50_000L);
+			assertThat(taker.getCumBaseQty().value()).isEqualTo(5L);
 		}
 
 		@Test
@@ -788,8 +788,8 @@ public class MatchingEngineTest {
 
 			engine.placeMarketBuyOrderWithQuoteQty(taker);
 
-			assertThat(taker.getCumQuoteQty()).isEqualTo(40_000L);
-			assertThat(taker.getCumBaseQty()).isEqualTo(4L);
+			assertThat(taker.getCumQuoteQty().value()).isEqualTo(40_000L);
+			assertThat(taker.getCumBaseQty().value()).isEqualTo(4L);
 		}
 
 		@Test
@@ -799,8 +799,8 @@ public class MatchingEngineTest {
 
 			engine.placeMarketBuyOrderWithQuoteQty(taker);
 
-			assertThat(taker.getCumQuoteQty()).isEqualTo(0L);
-			assertThat(taker.getCumBaseQty()).isEqualTo(0L);
+			assertThat(taker.getCumQuoteQty().value()).isEqualTo(0L);
+			assertThat(taker.getCumBaseQty().value()).isEqualTo(0L);
 		}
 	}
 

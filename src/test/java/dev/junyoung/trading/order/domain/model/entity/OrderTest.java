@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -189,7 +190,7 @@ class OrderTest {
             @DisplayName("MARKET 주문 side = null이면 NullPointerException이 발생한다")
             void rejectNullSide() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
+                        .isThrownBy(() -> Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -203,21 +204,21 @@ class OrderTest {
             @DisplayName("MARKET SELL + quantity=null이면 BusinessRuleException이 발생한다")
             void rejectNullQuantityForMarketSell() {
                 assertThrows(BusinessRuleException.class, () ->
-                        Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
+                        Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
             }
 
             @Test
             @DisplayName("MARKET BUY + quoteQty=null이면 BusinessRuleException이 발생한다")
             void rejectMarketBuyWhenQuoteQtyIsNull() {
                 assertThrows(BusinessRuleException.class, () ->
-                    Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
+                    Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
             }
 
             @Test
             @DisplayName("MARKET BUY + quantity가 입력되면 BusinessRuleException이 발생한다")
             void rejectMarketBuyWhenQuantityIsProvided() {
                 assertThrows(BusinessRuleException.class, () ->
-                    Order.create(OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
+                    Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -225,8 +226,10 @@ class OrderTest {
             void rejectMarketBuyWhenBothQuantityAndQuoteQtyAreProvided() {
                 assertThrows(BusinessRuleException.class, () ->
                     Order.create(
+                        OrderId.newId(),
                         OrderFixture.DEFAULT_ACCOUNT_ID,
                         OrderFixture.DEFAULT_CLIENT_ORDER_ID,
+                        1L,
                         SYMBOL,
                         Side.BUY,
                         OrderType.MARKET,

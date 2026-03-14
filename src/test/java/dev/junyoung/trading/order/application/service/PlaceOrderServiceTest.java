@@ -1,20 +1,13 @@
 package dev.junyoung.trading.order.application.service;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import java.util.UUID;
 
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineManager;
-import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.OrderType;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,16 +18,20 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.order.application.engine.EngineCommand;
+import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PlaceOrderService")
@@ -47,6 +44,9 @@ class PlaceOrderServiceTest {
 
     @Mock
     private EngineManager engineManager;
+
+    @Mock
+    private AcceptedSeqGenerator acceptedSeqGenerator;
 
     @Mock
     private OrderRepository orderRepository;
@@ -143,13 +143,13 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("engine submit 이후에 order를 저장한다")
-        void placeOrder_savesOrderAfterSubmittingCommand() {
+        @DisplayName("order를 저장한 이후에 engine에 submit한다")
+        void placeOrder_savesOrderBeforeSubmittingCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
 
             InOrder inOrder = inOrder(orderRepository, engineManager);
-            inOrder.verify(engineManager).submit(any(), any());
             inOrder.verify(orderRepository).save(any());
+            inOrder.verify(engineManager).submit(any(), any());
         }
     }
 

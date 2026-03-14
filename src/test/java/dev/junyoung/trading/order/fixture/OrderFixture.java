@@ -5,6 +5,7 @@ import java.util.UUID;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
@@ -28,7 +29,7 @@ public class OrderFixture {
     }
 
     public static Order createLimit(AccountId accountId, Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
-        return Order.create(accountId, DEFAULT_CLIENT_ORDER_ID, symbol, side, OrderType.LIMIT, tif, price, null, quantity);
+        return Order.create(OrderId.newId(), accountId, DEFAULT_CLIENT_ORDER_ID, 1L, symbol, side, OrderType.LIMIT, tif, price, null, quantity);
     }
 
     /** MARKET SELL 주문 생성 (quantity 기반) */
@@ -37,7 +38,7 @@ public class OrderFixture {
     }
 
     public static Order createMarketSell(AccountId accountId, Symbol symbol, Quantity quantity) {
-        return Order.create(accountId, DEFAULT_CLIENT_ORDER_ID, symbol, Side.SELL, OrderType.MARKET, null, null, null, quantity);
+        return Order.create(OrderId.newId(), accountId, DEFAULT_CLIENT_ORDER_ID, 1L, symbol, Side.SELL, OrderType.MARKET, null, null, null, quantity);
     }
 
     /** quoteQty 기반 MARKET BUY 주문 생성 */
@@ -46,6 +47,6 @@ public class OrderFixture {
     }
 
     public static Order createMarketBuyWithQuoteQty(AccountId accountId, Side side, Symbol symbol, QuoteQty quoteQty) {
-        return Order.create(accountId, DEFAULT_CLIENT_ORDER_ID, symbol, side, OrderType.MARKET, null, null, quoteQty, null);
+        return Order.create(OrderId.newId(), accountId, DEFAULT_CLIENT_ORDER_ID, 1L, symbol, side, OrderType.MARKET, null, null, quoteQty, null);
     }
 }

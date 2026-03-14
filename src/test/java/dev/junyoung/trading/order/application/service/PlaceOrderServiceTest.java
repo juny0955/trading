@@ -1,7 +1,6 @@
 package dev.junyoung.trading.order.application.service;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentCaptor.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -17,17 +16,20 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
@@ -50,6 +52,9 @@ class PlaceOrderServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private IdempotencyKeyRepository idempotencyKeyRepository;
 
     @InjectMocks
     private PlaceOrderService sut;
@@ -75,9 +80,9 @@ class PlaceOrderServiceTest {
         @Test
         @DisplayName("orderId를 UUID 문자열로 반환한다")
         void placeOrder_returnsUuidString() {
-            String result = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-001"));
+            OrderId result = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-001"));
 
-            assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+            assertThat(result.toString()).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
         }
 
         @Test
@@ -108,13 +113,13 @@ class PlaceOrderServiceTest {
         @Test
         @DisplayName("반환된 orderId는 생성된 Order의 orderId와 같다")
         void placeOrder_returnedOrderIdMatchesCommandOrderId() {
-            String returnedId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-004"));
+            OrderId returnedId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-004"));
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
-            assertThat(returnedId).isEqualTo(cmd.order().getOrderId().toString());
+            assertThat(returnedId).isEqualTo(cmd.order().getOrderId());
         }
 
         @Test
@@ -147,7 +152,8 @@ class PlaceOrderServiceTest {
         void placeOrder_savesOrderBeforeSubmittingCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
 
-            InOrder inOrder = inOrder(orderRepository, engineManager);
+            InOrder inOrder = inOrder(idempotencyKeyRepository, orderRepository, engineManager);
+            inOrder.verify(idempotencyKeyRepository).save(any(), any(), any());
             inOrder.verify(orderRepository).save(any());
             inOrder.verify(engineManager).submit(any(), any());
         }
@@ -217,8 +223,14 @@ class PlaceOrderServiceTest {
         @Test
         @DisplayName("동일 accountId와 clientOrderId 요청은 같은 orderId를 반환한다")
         void placeOrder_duplicateClientOrderId_returnsSameOrderId() {
-            String firstId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
-            String secondId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
+            OrderId firstId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
+
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(ACCOUNT_ID, "idempotent-key-001"))
+                    .thenReturn(firstId);
+
+            OrderId secondId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
 
             assertThat(firstId).isEqualTo(secondId);
             verify(engineManager, times(1)).submit(any(), any());
@@ -227,6 +239,12 @@ class PlaceOrderServiceTest {
         @Test
         @DisplayName("동일 accountId와 clientOrderId 재시도는 주문을 중복 생성하지 않는다")
         void placeOrder_duplicateClientOrderId_doesNotCreateDuplicateOrder() {
+            doNothing()
+                    .doThrow(new DuplicateKeyException("duplicate"))
+                    .doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
+
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-002"));
@@ -237,8 +255,8 @@ class PlaceOrderServiceTest {
         @Test
         @DisplayName("서로 다른 account는 같은 clientOrderId를 사용해도 충돌하지 않는다")
         void placeOrder_sameClientOrderIdDifferentAccounts_createsDifferentOrders() {
-            String firstId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
-            String secondId = sut.placeOrder(limitCommand(OTHER_ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
+            OrderId firstId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
+            OrderId secondId = sut.placeOrder(limitCommand(OTHER_ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
 
             assertThat(firstId).isNotEqualTo(secondId);
             verify(engineManager, times(2)).submit(any(), any());
@@ -246,19 +264,26 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("첫 요청이 실패하면 같은 키로 재시도할 수 있다")
-        void placeOrder_firstRequestFails_retryWithSameClientOrderIdCreatesNewOrder() {
-            doThrow(new RuntimeException("engine error"))
-                    .doNothing()
-                    .when(engineManager).submit(any(), any());
+        @DisplayName("DuplicateKeyException 발생 시 orderRepository와 engineManager는 호출되지 않는다")
+        void placeOrder_duplicateKey_doesNotCallOrderRepositoryOrEngine() {
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
 
-            assertThrows(RuntimeException.class,
-                    () -> sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "retry-key")));
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "dup-key"));
 
-            String result = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "retry-key"));
+            verify(orderRepository, never()).save(any());
+            verify(engineManager, never()).submit(any(), any());
+        }
 
-            assertThat(result).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-            verify(engineManager, times(2)).submit(any(), any());
+        @Test
+        @DisplayName("idempotencyKey는 올바른 accountId와 clientOrderId로 저장된다")
+        void placeOrder_idempotencyKeySavedWithCorrectFields() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "check-key"));
+
+            ArgumentCaptor<OrderId> orderIdCaptor = ArgumentCaptor.forClass(OrderId.class);
+            verify(idempotencyKeyRepository).save(eq(ACCOUNT_ID), orderIdCaptor.capture(), eq("check-key"));
+            assertThat(orderIdCaptor.getValue()).isNotNull();
         }
     }
 }

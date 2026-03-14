@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,7 @@ class OrderControllerTest {
 
     private static final String ACCOUNT_ID = "11111111-1111-1111-1111-111111111111";
     private static final String ORDER_ID = "order-1";
+    private static final OrderId PLACE_ORDER_ID = OrderId.newId();
 
     @Mock
     private PlaceOrderUseCase placeOrderUseCase;
@@ -72,13 +74,13 @@ class OrderControllerTest {
     @DisplayName("정상 요청이면 account scope 커맨드를 위임하고 202를 반환한다")
     void placeOrder_validRequest_delegatesToUseCaseAndReturnsAccepted() {
         PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, 10_000L, null, 1L, "client-001");
-        when(placeOrderUseCase.placeOrder(any())).thenReturn(ORDER_ID);
+        when(placeOrderUseCase.placeOrder(any())).thenReturn(PLACE_ORDER_ID);
 
         ResponseEntity<PlaceOrderResponse> response = sut.placeOrder(ACCOUNT_ID, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().orderId()).isEqualTo(ORDER_ID);
+        assertThat(response.getBody().orderId()).isEqualTo(PLACE_ORDER_ID.value());
         verify(placeOrderUseCase).placeOrder(any());
     }
 
@@ -86,7 +88,7 @@ class OrderControllerTest {
     @DisplayName("생성 요청은 path의 accountId를 커맨드로 전달한다")
     void placeOrder_passesAccountIdToCommand() {
         PlaceOrderRequest request = new PlaceOrderRequest("BTC", "BUY", "LIMIT", null, 10_000L, null, 1L, "client-001");
-        when(placeOrderUseCase.placeOrder(any())).thenReturn(ORDER_ID);
+        when(placeOrderUseCase.placeOrder(any())).thenReturn(PLACE_ORDER_ID);
 
         sut.placeOrder(ACCOUNT_ID, request);
 

@@ -19,13 +19,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
-import dev.junyoung.trading.account.application.exception.AccountNotFoundException;
+import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
+import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -61,6 +63,9 @@ class PlaceOrderServiceTest {
 
     @Mock
     private AccountQueryPort accountQueryPort;
+
+    @Mock
+    private HoldReservationPort holdReservationPort;
 
     @InjectMocks
     private PlaceOrderService sut;
@@ -159,13 +164,14 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("멱등성 검사 → 계좌 검증 → 주문 저장 → 엔진 제출 순서로 실행한다")
+        @DisplayName("멱등성 검사 → 계좌 검증 → hold 예약 → 주문 저장 → 엔진 제출 순서로 실행한다")
         void placeOrder_savesOrderBeforeSubmittingCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
 
-            InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, orderRepository, engineManager);
+            InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, holdReservationPort, orderRepository, engineManager);
             inOrder.verify(idempotencyKeyRepository).save(any(), any(), any());
             inOrder.verify(accountQueryPort).existsById(any());
+            inOrder.verify(holdReservationPort).reserve(any(), any(), anyLong());
             inOrder.verify(orderRepository).save(any());
             inOrder.verify(engineManager).submit(any(), any());
         }
@@ -379,6 +385,60 @@ class PlaceOrderServiceTest {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "acct-004"));
 
             verify(accountQueryPort, never()).existsById(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("balance hold")
+    class BalanceHold {
+
+        @Test
+        @DisplayName("LIMIT BUY: holdReservationPort.reserve()가 KRW와 price*quantity로 호출된다")
+        void placeOrder_limitBuy_reservesKrwWithPriceTimesQuantity() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 3, "hold-001"));
+
+            verify(holdReservationPort).reserve(eq(ACCOUNT_ID), eq(new Asset("KRW")), eq(30_000L));
+        }
+
+        @Test
+        @DisplayName("LIMIT SELL: holdReservationPort.reserve()가 심볼 자산과 quantity로 호출된다")
+        void placeOrder_limitSell_reservesSymbolAssetWithQuantity() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "SELL", 10_000L, 3, "hold-002"));
+
+            verify(holdReservationPort).reserve(eq(ACCOUNT_ID), eq(new Asset("BTC")), eq(3L));
+        }
+
+        @Test
+        @DisplayName("잔고 홀드는 orderRepository.save() 전에 호출된다")
+        void placeOrder_holdReservedBeforeOrderSave() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "hold-003"));
+
+            InOrder inOrder = inOrder(holdReservationPort, orderRepository);
+            inOrder.verify(holdReservationPort).reserve(any(), any(), anyLong());
+            inOrder.verify(orderRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("계좌가 없으면 holdReservationPort를 호출하지 않는다")
+        void placeOrder_accountNotFound_doesNotCallHoldReservation() {
+            when(accountQueryPort.existsById(ACCOUNT_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "hold-004")))
+                    .isInstanceOf(AccountNotFoundException.class);
+
+            verify(holdReservationPort, never()).reserve(any(), any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("중복 키 early-return 시 holdReservationPort를 호출하지 않는다")
+        void placeOrder_duplicateKey_doesNotCallHoldReservation() {
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "hold-005"));
+
+            verify(holdReservationPort, never()).reserve(any(), any(), anyLong());
         }
     }
 }

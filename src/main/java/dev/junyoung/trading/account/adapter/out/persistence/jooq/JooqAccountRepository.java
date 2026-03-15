@@ -6,6 +6,7 @@ import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.records.AccountsRecord;
 import dev.junyoung.trading.jooq.tables.records.BalancesRecord;
+import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.jooq.Result;
@@ -17,7 +18,7 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-public class JooqAccountRepository implements AccountRepository {
+public class JooqAccountRepository implements AccountRepository, AccountQueryPort {
 
     private final DSLContext dslContext;
 
@@ -62,5 +63,13 @@ public class JooqAccountRepository implements AccountRepository {
                 .fetch();
 
         return Optional.of(JooqAccountMapper.toDomain(accountsRecord, balancesRecords));
+    }
+
+    @Override
+    public boolean existsById(AccountId accountId) {
+        return dslContext.fetchExists(
+            Tables.ACCOUNTS,
+            Tables.ACCOUNTS.ACCOUNT_ID.eq(accountId.value())
+        );
     }
 }

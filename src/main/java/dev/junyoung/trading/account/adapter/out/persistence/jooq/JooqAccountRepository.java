@@ -1,5 +1,13 @@
 package dev.junyoung.trading.account.adapter.out.persistence.jooq;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.jooq.DSLContext;
+import org.jooq.Result;
+import org.jooq.impl.DSL;
+import org.springframework.stereotype.Repository;
+
 import dev.junyoung.trading.account.application.port.out.AccountRepository;
 import dev.junyoung.trading.account.domain.model.entity.Account;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
@@ -8,13 +16,6 @@ import dev.junyoung.trading.jooq.tables.records.AccountsRecord;
 import dev.junyoung.trading.jooq.tables.records.BalancesRecord;
 import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
 import lombok.RequiredArgsConstructor;
-import org.jooq.DSLContext;
-import org.jooq.Result;
-import org.jooq.impl.DSL;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor

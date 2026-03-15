@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,11 +19,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
+import dev.junyoung.trading.account.application.exception.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -56,8 +59,16 @@ class PlaceOrderServiceTest {
     @Mock
     private IdempotencyKeyRepository idempotencyKeyRepository;
 
+    @Mock
+    private AccountQueryPort accountQueryPort;
+
     @InjectMocks
     private PlaceOrderService sut;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(accountQueryPort.existsById(any())).thenReturn(true);
+    }
 
     private PlaceOrderCommand limitCommand(AccountId accountId, String symbol, String side, Long price, int quantity, String clientOrderId) {
         return new PlaceOrderCommand(
@@ -148,12 +159,13 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("order를 저장한 이후에 engine에 submit한다")
+        @DisplayName("멱등성 검사 → 계좌 검증 → 주문 저장 → 엔진 제출 순서로 실행한다")
         void placeOrder_savesOrderBeforeSubmittingCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
 
-            InOrder inOrder = inOrder(idempotencyKeyRepository, orderRepository, engineManager);
+            InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, orderRepository, engineManager);
             inOrder.verify(idempotencyKeyRepository).save(any(), any(), any());
+            inOrder.verify(accountQueryPort).existsById(any());
             inOrder.verify(orderRepository).save(any());
             inOrder.verify(engineManager).submit(any(), any());
         }
@@ -284,6 +296,89 @@ class PlaceOrderServiceTest {
             ArgumentCaptor<OrderId> orderIdCaptor = ArgumentCaptor.forClass(OrderId.class);
             verify(idempotencyKeyRepository).save(eq(ACCOUNT_ID), orderIdCaptor.capture(), eq("check-key"));
             assertThat(orderIdCaptor.getValue()).isNotNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("accepted seq")
+    class AcceptedSeqValidation {
+
+        @Test
+        @DisplayName("주문 생성 시 acceptedSeqGenerator.next()를 호출한다")
+        void placeOrder_callsAcceptedSeqGenerator() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "seq-001"));
+
+            verify(acceptedSeqGenerator).next();
+        }
+
+        @Test
+        @DisplayName("acceptedSeqGenerator가 반환한 값이 Order에 설정된다")
+        void placeOrder_acceptedSeqIsSetOnOrder() {
+            when(acceptedSeqGenerator.next()).thenReturn(42L);
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "seq-002"));
+
+            ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+            verify(orderRepository).save(captor.capture());
+            assertThat(captor.getValue().getAcceptedSeq()).isEqualTo(42L);
+        }
+
+        @Test
+        @DisplayName("중복 키 early-return 시 acceptedSeqGenerator를 호출하지 않는다")
+        void placeOrder_duplicateKey_skipsAcceptedSeqGenerator() {
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "seq-003"));
+
+            verify(acceptedSeqGenerator, never()).next();
+        }
+    }
+
+    @Nested
+    @DisplayName("account validation")
+    class AccountValidation {
+
+        @Test
+        @DisplayName("존재하지 않는 accountId로 주문 시 AccountNotFoundException을 던진다")
+        void placeOrder_accountNotFound_throwsException() {
+            when(accountQueryPort.existsById(ACCOUNT_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "acct-001")))
+                    .isInstanceOf(AccountNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("계좌가 없으면 orderRepository와 engineManager를 호출하지 않는다")
+        void placeOrder_accountNotFound_doesNotSaveOrSubmit() {
+            when(accountQueryPort.existsById(ACCOUNT_ID)).thenReturn(false);
+
+            assertThatThrownBy(() -> sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "acct-002")))
+                    .isInstanceOf(AccountNotFoundException.class);
+
+            verify(orderRepository, never()).save(any());
+            verify(engineManager, never()).submit(any(), any());
+        }
+
+        @Test
+        @DisplayName("existsById는 command의 accountId로 호출된다")
+        void placeOrder_existsById_calledWithCorrectAccountId() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "acct-003"));
+
+            verify(accountQueryPort).existsById(ACCOUNT_ID);
+        }
+
+        @Test
+        @DisplayName("중복 키 early-return 시 accountQueryPort를 호출하지 않는다")
+        void placeOrder_duplicateKey_skipsAccountValidation() {
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "acct-004"));
+
+            verify(accountQueryPort, never()).existsById(any());
         }
     }
 }

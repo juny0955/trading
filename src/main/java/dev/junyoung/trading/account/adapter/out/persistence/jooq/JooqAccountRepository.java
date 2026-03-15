@@ -34,7 +34,7 @@ public class JooqAccountRepository implements AccountRepository, AccountQueryPor
         List<BalancesRecord> balancesRecords = account.getBalances().values().stream()
             .map(b -> JooqBalanceMapper.toRecord(
                 dslContext,
-                account.getAccountId().value(),
+                account.getAccountId(),
                 b
             ))
             .toList();

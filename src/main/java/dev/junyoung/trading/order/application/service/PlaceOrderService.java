@@ -4,17 +4,20 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import dev.junyoung.trading.account.application.exception.AccountNotFoundException;
+import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
+import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -25,6 +28,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final AcceptedSeqGenerator acceptedSeqGenerator;
     private final AccountQueryPort accountQueryPort;
+    private final HoldReservationPort holdReservationPort;
     private final OrderRepository orderRepository;
     private final EngineManager engineManager;
 
@@ -37,16 +41,22 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             return idempotencyKeyRepository.findOrderId(command.accountId(), command.clientOrderId());
         }
 
-        if (!accountQueryPort.existsById(command.accountId()))
-            throw new AccountNotFoundException(command.accountId().toString());
+        validateAccount(command.accountId());
 
         long acceptedSeq = acceptedSeqGenerator.next();
         Order order = createOrder(orderId, acceptedSeq, command);
 
+        BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
+        holdReservationPort.reserve(order.getAccountId(), holdSpec.asset(), holdSpec.amount());
         orderRepository.save(order);
         engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
 
         return order.getOrderId();
+    }
+
+    private void validateAccount(AccountId accountId) {
+        if (!accountQueryPort.existsById(accountId))
+            throw new AccountNotFoundException(accountId.toString());
     }
 
     private Order createOrder(OrderId orderId, long acceptedSeq, PlaceOrderCommand command) {

@@ -8,4 +8,6 @@ import dev.junyoung.trading.account.domain.model.value.Asset;
 
 public interface BalanceRepository {
     Optional<Balance> findByAccountIdAndAsset(AccountId accountId, Asset asset);
+    Optional<Balance> findByAccountIdAndAssetForUpdate(AccountId accountId, Asset asset);
+    void save(AccountId accountId, Balance balance);
 }

@@ -1,4 +1,4 @@
-package dev.junyoung.trading.account.application.exception;
+package dev.junyoung.trading.account.application.exception.balance;
 
 import org.springframework.http.HttpStatus;
 
@@ -6,8 +6,8 @@ import dev.junyoung.trading.common.exception.ErrorCode;
 import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
-public enum AccountErrorCode implements ErrorCode {
-	ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "Account not found"),
+public enum BalanceErrorCode implements ErrorCode {
+	BALANCE_NOT_FOUND(HttpStatus.NOT_FOUND, "BALANCE_NOT_FOUND", "Account not found"),
 	;
 
 	private final HttpStatus status;

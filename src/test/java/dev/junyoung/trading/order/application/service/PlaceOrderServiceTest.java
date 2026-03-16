@@ -5,8 +5,11 @@ import static org.mockito.ArgumentCaptor.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,6 +21,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
@@ -72,7 +77,27 @@ class PlaceOrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        TransactionSynchronizationManager.initSynchronization();
         lenient().when(accountQueryPort.existsById(any())).thenReturn(true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    /**
+     * 등록된 afterCommit 콜백을 모두 실행한다.
+     * clear → re-init 으로 이후 추가 호출에서도 등록이 가능하다.
+     */
+    private void triggerAfterCommit() {
+        List<TransactionSynchronization> synchronizations =
+                new ArrayList<>(TransactionSynchronizationManager.getSynchronizations());
+        TransactionSynchronizationManager.clearSynchronization();
+        TransactionSynchronizationManager.initSynchronization();
+        synchronizations.forEach(TransactionSynchronization::afterCommit);
     }
 
     private PlaceOrderCommand limitCommand(AccountId accountId, String symbol, String side, Long price, int quantity, String clientOrderId) {
@@ -105,6 +130,7 @@ class PlaceOrderServiceTest {
         @DisplayName("PlaceOrder 커맨드를 EngineManager에 제출한다")
         void placeOrder_submitsPlaceOrderCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-002"));
+            triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -115,6 +141,7 @@ class PlaceOrderServiceTest {
         @DisplayName("생성된 주문은 accountId와 입력 필드를 유지한다")
         void placeOrder_commandContainsCorrectOrderFields() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "SELL", 20_000L, 3, "client-003"));
+            triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -130,6 +157,7 @@ class PlaceOrderServiceTest {
         @DisplayName("반환된 orderId는 생성된 Order의 orderId와 같다")
         void placeOrder_returnedOrderIdMatchesCommandOrderId() {
             OrderId returnedId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-004"));
+            triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -152,6 +180,7 @@ class PlaceOrderServiceTest {
         @DisplayName("저장한 Order와 엔진에 제출한 Order는 동일 객체다")
         void placeOrder_savedOrderIsSameAsSubmittedOrder() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-006"));
+            triggerAfterCommit();
 
             ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
             ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
@@ -167,6 +196,7 @@ class PlaceOrderServiceTest {
         @DisplayName("멱등성 검사 → 계좌 검증 → hold 예약 → 주문 저장 → 엔진 제출 순서로 실행한다")
         void placeOrder_savesOrderBeforeSubmittingCommand() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
+            triggerAfterCommit();
 
             InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, holdReservationPort, orderRepository, engineManager);
             inOrder.verify(idempotencyKeyRepository).save(any(), any(), any());
@@ -185,6 +215,7 @@ class PlaceOrderServiceTest {
         @DisplayName("LIMIT 주문에서 tif=null이면 GTC가 기본값이다")
         void placeOrder_limitWithNullTif_defaultsToGtc() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-008"));
+            triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
             verify(engineManager).submit(any(Symbol.class), captor.capture());
@@ -207,6 +238,7 @@ class PlaceOrderServiceTest {
                         new Quantity(5),
                         "client-tif-" + tif.name()
                 ));
+                triggerAfterCommit();
 
                 ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
                 verify(engineManager, atLeastOnce()).submit(any(Symbol.class), captor.capture());
@@ -229,6 +261,7 @@ class PlaceOrderServiceTest {
                     null,
                     "client-market-001"
             ));
+            triggerAfterCommit();
 
             verify(engineManager).submit(any(Symbol.class), any(EngineCommand.class));
         }
@@ -249,6 +282,7 @@ class PlaceOrderServiceTest {
                     .thenReturn(firstId);
 
             OrderId secondId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "idempotent-key-001"));
+            triggerAfterCommit();
 
             assertThat(firstId).isEqualTo(secondId);
             verify(engineManager, times(1)).submit(any(), any());
@@ -275,6 +309,7 @@ class PlaceOrderServiceTest {
         void placeOrder_sameClientOrderIdDifferentAccounts_createsDifferentOrders() {
             OrderId firstId = sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
             OrderId secondId = sut.placeOrder(limitCommand(OTHER_ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "shared-key"));
+            triggerAfterCommit();
 
             assertThat(firstId).isNotEqualTo(secondId);
             verify(engineManager, times(2)).submit(any(), any());

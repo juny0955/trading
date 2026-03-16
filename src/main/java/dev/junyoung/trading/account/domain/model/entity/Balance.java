@@ -100,7 +100,7 @@ public class Balance {
 
         return new Balance(
             asset,
-            available - amount,
+            Math.subtractExact(available, amount),
             Math.addExact(held, amount),
             createdAt,
             Instant.now()
@@ -119,7 +119,7 @@ public class Balance {
         return new Balance(
             asset,
             Math.addExact(available, amount),
-            held - amount,
+            Math.subtractExact(held, amount),
             createdAt,
             Instant.now()
         );

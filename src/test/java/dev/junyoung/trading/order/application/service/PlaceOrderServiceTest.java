@@ -24,9 +24,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import io.micrometer.core.instrument.Counter;
-
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
@@ -78,7 +77,7 @@ class PlaceOrderServiceTest {
     private OrderCompensationService orderCompensationService;
 
     @Mock
-    private Counter queueFullRollbackCount;
+    private OrderMetrics orderMetrics;
 
     @InjectMocks
     private PlaceOrderService sut;
@@ -346,6 +345,26 @@ class PlaceOrderServiceTest {
             verify(idempotencyKeyRepository).save(eq(ACCOUNT_ID), orderIdCaptor.capture(), eq("check-key"));
             assertThat(orderIdCaptor.getValue()).isNotNull();
         }
+
+        @Test
+        @DisplayName("DuplicateKeyException 발생 시 idempotencyConflict 카운터가 증가한다")
+        void placeOrder_duplicateKey_incrementsIdempotencyConflictCount() {
+            doThrow(new DuplicateKeyException("duplicate"))
+                    .when(idempotencyKeyRepository).save(any(), any(), any());
+            when(idempotencyKeyRepository.findOrderId(any(), any())).thenReturn(OrderId.newId());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "conflict-key"));
+
+            verify(orderMetrics, times(1)).incrementIdempotencyConflict();
+        }
+
+        @Test
+        @DisplayName("정상 요청에서는 idempotencyConflict 카운터를 증가시키지 않는다")
+        void placeOrder_normal_doesNotIncrementIdempotencyConflictCount() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "normal-key"));
+
+            verify(orderMetrics, never()).incrementIdempotencyConflict();
+        }
     }
 
     @Nested
@@ -532,7 +551,7 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("engineManager.submit() 실패 후 compensation 성공 시 queueFullRollbackCount가 증가한다")
+        @DisplayName("engineManager.submit() 실패 후 compensation 성공 시 queueFullRollback 카운터가 증가한다")
         void engineSubmit_failure_compensateSucceeds_incrementsCounter() {
             doThrow(new RuntimeException("engine error"))
                     .when(engineManager).submit(any(), any());
@@ -541,11 +560,11 @@ class PlaceOrderServiceTest {
             assertThatThrownBy(() -> triggerAfterCommit())
                     .isInstanceOf(RuntimeException.class);
 
-            verify(queueFullRollbackCount, times(1)).increment();
+            verify(orderMetrics, times(1)).incrementQueueFullRollback();
         }
 
         @Test
-        @DisplayName("compensation도 실패하면 queueFullRollbackCount를 증가시키지 않는다")
+        @DisplayName("compensation도 실패하면 queueFullRollback 카운터를 증가시키지 않는다")
         void engineSubmit_failure_compensateFails_doesNotIncrementCounter() {
             doThrow(new RuntimeException("engine error"))
                     .when(engineManager).submit(any(), any());
@@ -556,16 +575,16 @@ class PlaceOrderServiceTest {
             assertThatThrownBy(() -> triggerAfterCommit())
                     .isInstanceOf(RuntimeException.class);
 
-            verify(queueFullRollbackCount, never()).increment();
+            verify(orderMetrics, never()).incrementQueueFullRollback();
         }
 
         @Test
-        @DisplayName("engineManager.submit() 성공 시 queueFullRollbackCount를 증가시키지 않는다")
+        @DisplayName("engineManager.submit() 성공 시 queueFullRollback 카운터를 증가시키지 않는다")
         void engineSubmit_success_doesNotIncrementCounter() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-003"));
             triggerAfterCommit();
 
-            verify(queueFullRollbackCount, never()).increment();
+            verify(orderMetrics, never()).incrementQueueFullRollback();
         }
     }
 }

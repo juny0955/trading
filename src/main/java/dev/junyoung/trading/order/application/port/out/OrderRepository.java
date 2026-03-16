@@ -10,4 +10,6 @@ public interface OrderRepository {
     Optional<Order> findById(OrderId id);
 
     Optional<Long> findMaxAcceptedSeq();
+
+    void deleteById(OrderId orderId);
 }

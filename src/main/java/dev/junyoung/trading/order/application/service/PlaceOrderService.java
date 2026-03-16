@@ -11,6 +11,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PlaceOrderService implements PlaceOrderUseCase {
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
@@ -28,6 +30,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private final HoldReservationPort holdReservationPort;
     private final OrderRepository orderRepository;
     private final EngineManager engineManager;
+    private final OrderCompensationService orderCompensationService;
 
     @Override
     public OrderId placeOrder(PlaceOrderCommand command) {
@@ -61,7 +64,16 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+                try {
+                    engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+                } catch (Exception e) {
+                    try {
+                        orderCompensationService.compensate(order);
+                    } catch (Exception ex) {
+                        log.error("Order Compensation Error: {}", order.getOrderId(), ex);
+                    }
+                    throw e;
+                }
             }
         });
     }

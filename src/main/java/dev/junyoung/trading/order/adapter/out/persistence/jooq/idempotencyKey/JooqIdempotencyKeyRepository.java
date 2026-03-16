@@ -39,4 +39,12 @@ public class JooqIdempotencyKeyRepository implements IdempotencyKeyRepository {
 			.and(Tables.IDEMPOTENCY_KEYS.CLIENT_ORDER_ID.eq(clientOrderId))
 			.fetchSingle(r -> new OrderId(r.get(Tables.IDEMPOTENCY_KEYS.ORDER_ID)));
 	}
+
+	@Override
+	public void delete(AccountId accountId, String clientOrderId) {
+		dslContext.deleteFrom(Tables.IDEMPOTENCY_KEYS)
+			.where(Tables.IDEMPOTENCY_KEYS.ACCOUNT_ID.eq(accountId.value()))
+			.and(Tables.IDEMPOTENCY_KEYS.CLIENT_ORDER_ID.eq(clientOrderId))
+			.execute();
+	}
 }

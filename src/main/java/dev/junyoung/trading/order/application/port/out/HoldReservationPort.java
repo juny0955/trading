@@ -5,4 +5,5 @@ import dev.junyoung.trading.account.domain.model.value.Asset;
 
 public interface HoldReservationPort {
 	void reserve(AccountId accountId, Asset asset, long amount);
+	void release(AccountId accountId, Asset asset, long amount);
 }

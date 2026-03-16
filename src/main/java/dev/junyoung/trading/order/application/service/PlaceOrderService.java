@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.port.out.*;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
+import io.micrometer.core.instrument.Counter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -31,6 +32,8 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private final OrderRepository orderRepository;
     private final EngineManager engineManager;
     private final OrderCompensationService orderCompensationService;
+
+    private final Counter queueFullRollbackCount;
 
     @Override
     public OrderId placeOrder(PlaceOrderCommand command) {
@@ -69,8 +72,14 @@ public class PlaceOrderService implements PlaceOrderUseCase {
                 } catch (Exception e) {
                     try {
                         orderCompensationService.compensate(order);
+                        queueFullRollbackCount.increment();
                     } catch (Exception ex) {
-                        log.error("Order Compensation Error: {}", order.getOrderId(), ex);
+                        log.error("Order Compensation Error orderId={}, accountId={}, clientOrderId={}",
+                            order.getOrderId(),
+                            order.getAccountId(),
+                            order.getClientOrderId(),
+                            ex
+                        );
                     }
                     throw e;
                 }

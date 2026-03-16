@@ -72,6 +72,9 @@ class PlaceOrderServiceTest {
     @Mock
     private HoldReservationPort holdReservationPort;
 
+    @Mock
+    private OrderCompensationService orderCompensationService;
+
     @InjectMocks
     private PlaceOrderService sut;
 
@@ -474,6 +477,53 @@ class PlaceOrderServiceTest {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "hold-005"));
 
             verify(holdReservationPort, never()).reserve(any(), any(), anyLong());
+        }
+    }
+
+    @Nested
+    @DisplayName("engine submit failure")
+    class EngineSubmitFailure {
+
+        @Test
+        @DisplayName("engineManager.submit() 예외 시 orderCompensationService.compensate(order)가 호출된다")
+        void engineSubmit_failure_callsCompensate() {
+            doThrow(new RuntimeException("engine error"))
+                    .when(engineManager).submit(any(), any());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-001"));
+            assertThatThrownBy(() -> triggerAfterCommit())
+                    .isInstanceOf(RuntimeException.class);
+
+            verify(orderCompensationService).compensate(any(Order.class));
+        }
+
+        @Test
+        @DisplayName("engineManager.submit() 성공 시 orderCompensationService.compensate()를 호출하지 않는다")
+        void engineSubmit_success_doesNotCallCompensate() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-002"));
+            triggerAfterCommit();
+
+            verify(orderCompensationService, never()).compensate(any());
+        }
+
+        @Test
+        @DisplayName("compensate()에 전달된 Order는 submit 대상 Order와 동일하다")
+        void engineSubmit_failure_compensateReceivesSameOrder() {
+            doThrow(new RuntimeException("engine error"))
+                    .when(engineManager).submit(any(), any());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-003"));
+            assertThatThrownBy(() -> triggerAfterCommit())
+                    .isInstanceOf(RuntimeException.class);
+
+            ArgumentCaptor<EngineCommand> engineCaptor = ArgumentCaptor.forClass(EngineCommand.class);
+            verify(engineManager).submit(any(Symbol.class), engineCaptor.capture());
+
+            ArgumentCaptor<Order> compensateCaptor = ArgumentCaptor.forClass(Order.class);
+            verify(orderCompensationService).compensate(compensateCaptor.capture());
+
+            Order submittedOrder = ((EngineCommand.PlaceOrder) engineCaptor.getValue()).order();
+            assertThat(compensateCaptor.getValue()).isSameAs(submittedOrder);
         }
     }
 }

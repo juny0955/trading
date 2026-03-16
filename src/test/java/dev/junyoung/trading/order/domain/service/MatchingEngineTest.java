@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.domain.service;
 
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import dev.junyoung.trading.common.exception.ConflictException;
 

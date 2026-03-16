@@ -16,7 +16,7 @@ import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
-import dev.junyoung.trading.order.domain.service.PlaceResult;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

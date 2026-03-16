@@ -6,7 +6,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.domain.service.PlaceResult;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 

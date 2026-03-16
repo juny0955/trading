@@ -26,7 +26,7 @@ import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.domain.service.PlaceResult;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 
 @DisplayName("MatchingEngine 시뮬레이션 — 랜덤 10만 건 불변식 검증")
 class MatchingEngineSimulationTest {

@@ -8,6 +8,7 @@ import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;

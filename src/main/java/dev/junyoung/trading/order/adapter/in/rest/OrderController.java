@@ -16,6 +16,7 @@ import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -33,11 +34,11 @@ public class OrderController {
         @PathVariable String accountId,
         @RequestBody @Valid PlaceOrderRequest request
     ) {
-        String orderId = placeOrderUseCase.placeOrder(request.toCommand(accountId));
+        OrderId orderId = placeOrderUseCase.placeOrder(request.toCommand(accountId));
 
         return ResponseEntity
                 .accepted()
-                .body(new PlaceOrderResponse(orderId));
+                .body(new PlaceOrderResponse(orderId.value()));
     }
 
     @DeleteMapping("/{orderId}")

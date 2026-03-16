@@ -1,4 +1,4 @@
-package dev.junyoung.trading.account.domain.service;
+package dev.junyoung.trading.order.domain.service;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -6,7 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import dev.junyoung.trading.account.domain.model.value.Asset;
-import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
@@ -24,7 +24,7 @@ class BalanceHoldPolicyTest {
     @Test
     @DisplayName("LIMIT BUY는 정산 자산을 price * quantity만큼 hold한다")
     void holdLimitBuyInSettlementAsset() {
-        Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(3));
+        var order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(3));
 
         BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
 
@@ -35,7 +35,7 @@ class BalanceHoldPolicyTest {
     @Test
     @DisplayName("LIMIT SELL은 주문 심볼 자산을 quantity만큼 hold한다")
     void holdLimitSellInSymbolAsset() {
-        Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(3));
+        var order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(3));
 
         BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
 
@@ -46,7 +46,7 @@ class BalanceHoldPolicyTest {
     @Test
     @DisplayName("MARKET BUY quoteQty는 정산 자산을 quoteQty만큼 hold한다")
     void holdMarketBuyQuoteQtyInSettlementAsset() {
-        Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000));
+        var order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(50_000));
 
         BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
 
@@ -57,7 +57,7 @@ class BalanceHoldPolicyTest {
     @Test
     @DisplayName("MARKET SELL은 주문 심볼 자산을 quantity만큼 hold한다")
     void holdMarketSellInSymbolAsset() {
-        Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(2));
+        var order = OrderFixture.createMarketSell(SYMBOL, new Quantity(2));
 
         BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
 
@@ -65,4 +65,13 @@ class BalanceHoldPolicyTest {
         assertThat(holdSpec.amount()).isEqualTo(2L);
     }
 
+    @Test
+    @DisplayName("holdAmount가 0 이하면 HoldSpec 생성 시 BusinessRuleException 발생")
+    void holdSpecRejectsZeroOrNegativeAmount() {
+        assertThatThrownBy(() -> new BalanceHoldPolicy.HoldSpec(SETTLEMENT_ASSET, 0L))
+                .isInstanceOf(BusinessRuleException.class);
+
+        assertThatThrownBy(() -> new BalanceHoldPolicy.HoldSpec(SETTLEMENT_ASSET, -1L))
+                .isInstanceOf(BusinessRuleException.class);
+    }
 }

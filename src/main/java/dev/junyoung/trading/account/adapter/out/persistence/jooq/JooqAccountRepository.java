@@ -1,23 +1,25 @@
 package dev.junyoung.trading.account.adapter.out.persistence.jooq;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.jooq.DSLContext;
+import org.jooq.Result;
+import org.jooq.impl.DSL;
+import org.springframework.stereotype.Repository;
+
 import dev.junyoung.trading.account.application.port.out.AccountRepository;
 import dev.junyoung.trading.account.domain.model.entity.Account;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.records.AccountsRecord;
 import dev.junyoung.trading.jooq.tables.records.BalancesRecord;
+import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
 import lombok.RequiredArgsConstructor;
-import org.jooq.DSLContext;
-import org.jooq.Result;
-import org.jooq.impl.DSL;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-public class JooqAccountRepository implements AccountRepository {
+public class JooqAccountRepository implements AccountRepository, AccountQueryPort {
 
     private final DSLContext dslContext;
 
@@ -32,7 +34,7 @@ public class JooqAccountRepository implements AccountRepository {
         List<BalancesRecord> balancesRecords = account.getBalances().values().stream()
             .map(b -> JooqBalanceMapper.toRecord(
                 dslContext,
-                account.getAccountId().value(),
+                account.getAccountId(),
                 b
             ))
             .toList();
@@ -62,5 +64,13 @@ public class JooqAccountRepository implements AccountRepository {
                 .fetch();
 
         return Optional.of(JooqAccountMapper.toDomain(accountsRecord, balancesRecords));
+    }
+
+    @Override
+    public boolean existsById(AccountId accountId) {
+        return dslContext.fetchExists(
+            Tables.ACCOUNTS,
+            Tables.ACCOUNTS.ACCOUNT_ID.eq(accountId.value())
+        );
     }
 }

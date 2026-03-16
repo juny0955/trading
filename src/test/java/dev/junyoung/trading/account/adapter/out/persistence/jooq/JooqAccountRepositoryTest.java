@@ -158,4 +158,25 @@ class JooqAccountRepositoryTest {
             assertThat(result).isEmpty();
         }
     }
+
+    @Nested
+    @DisplayName("existsById()")
+    class ExistsById {
+
+        @Test
+        @DisplayName("저장된 Account는 true를 반환한다")
+        void returnsTrueWhenAccountExists() {
+            repository.save(new Account(ACCOUNT_ID, null, Instant.now()));
+
+            assertThat(repository.existsById(ACCOUNT_ID)).isTrue();
+        }
+
+        @Test
+        @DisplayName("저장되지 않은 AccountId는 false를 반환한다")
+        void returnsFalseWhenAccountNotFound() {
+            AccountId unknownId = new AccountId(UUID.randomUUID());
+
+            assertThat(repository.existsById(unknownId)).isFalse();
+        }
+    }
 }

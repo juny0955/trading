@@ -7,6 +7,7 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -39,5 +40,12 @@ public class JooqOrderRepository implements OrderRepository {
         return dslContext.selectFrom(Tables.ORDERS)
             .where(Tables.ORDERS.ORDER_ID.eq(id.value()))
             .fetchOptional(JooqOrderMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Long> findMaxAcceptedSeq() {
+        return dslContext.select(DSL.max(Tables.ORDERS.ACCEPTED_SEQ))
+            .from(Tables.ORDERS)
+            .fetchOptionalInto(Long.class);
     }
 }

@@ -1,4 +1,4 @@
-package dev.junyoung.trading.account.domain.service;
+package dev.junyoung.trading.order.domain.service;
 
 import dev.junyoung.trading.account.domain.model.entity.Balance;
 import dev.junyoung.trading.account.domain.model.value.Asset;

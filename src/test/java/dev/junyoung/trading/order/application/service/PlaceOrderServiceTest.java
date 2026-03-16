@@ -24,6 +24,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import io.micrometer.core.instrument.Counter;
+
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.account.domain.model.value.Asset;
@@ -74,6 +76,9 @@ class PlaceOrderServiceTest {
 
     @Mock
     private OrderCompensationService orderCompensationService;
+
+    @Mock
+    private Counter queueFullRollbackCount;
 
     @InjectMocks
     private PlaceOrderService sut;
@@ -524,6 +529,43 @@ class PlaceOrderServiceTest {
 
             Order submittedOrder = ((EngineCommand.PlaceOrder) engineCaptor.getValue()).order();
             assertThat(compensateCaptor.getValue()).isSameAs(submittedOrder);
+        }
+
+        @Test
+        @DisplayName("engineManager.submit() 실패 후 compensation 성공 시 queueFullRollbackCount가 증가한다")
+        void engineSubmit_failure_compensateSucceeds_incrementsCounter() {
+            doThrow(new RuntimeException("engine error"))
+                    .when(engineManager).submit(any(), any());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-001"));
+            assertThatThrownBy(() -> triggerAfterCommit())
+                    .isInstanceOf(RuntimeException.class);
+
+            verify(queueFullRollbackCount, times(1)).increment();
+        }
+
+        @Test
+        @DisplayName("compensation도 실패하면 queueFullRollbackCount를 증가시키지 않는다")
+        void engineSubmit_failure_compensateFails_doesNotIncrementCounter() {
+            doThrow(new RuntimeException("engine error"))
+                    .when(engineManager).submit(any(), any());
+            doThrow(new RuntimeException("compensation error"))
+                    .when(orderCompensationService).compensate(any());
+
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-002"));
+            assertThatThrownBy(() -> triggerAfterCommit())
+                    .isInstanceOf(RuntimeException.class);
+
+            verify(queueFullRollbackCount, never()).increment();
+        }
+
+        @Test
+        @DisplayName("engineManager.submit() 성공 시 queueFullRollbackCount를 증가시키지 않는다")
+        void engineSubmit_success_doesNotIncrementCounter() {
+            sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-003"));
+            triggerAfterCommit();
+
+            verify(queueFullRollbackCount, never()).increment();
         }
     }
 }

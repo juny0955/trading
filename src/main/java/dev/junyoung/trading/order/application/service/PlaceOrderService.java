@@ -4,13 +4,13 @@ import dev.junyoung.trading.account.application.exception.account.AccountNotFoun
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.*;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
-import io.micrometer.core.instrument.Counter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,8 +32,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private final OrderRepository orderRepository;
     private final EngineManager engineManager;
     private final OrderCompensationService orderCompensationService;
-
-    private final Counter queueFullRollbackCount;
+    private final OrderMetrics orderMetrics;
 
     @Override
     public OrderId placeOrder(PlaceOrderCommand command) {
@@ -41,6 +40,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         try {
             idempotencyKeyRepository.save(command.accountId(), orderId, command.clientOrderId());
         } catch (DuplicateKeyException e) {
+            orderMetrics.incrementIdempotencyConflict();
             return idempotencyKeyRepository.findOrderId(command.accountId(), command.clientOrderId());
         }
 
@@ -72,7 +72,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
                 } catch (Exception e) {
                     try {
                         orderCompensationService.compensate(order);
-                        queueFullRollbackCount.increment();
+                        orderMetrics.incrementQueueFullRollback();
                     } catch (Exception ex) {
                         log.error("Order Compensation Error orderId={}, accountId={}, clientOrderId={}",
                             order.getOrderId(),

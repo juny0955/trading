@@ -80,6 +80,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
                             order.getClientOrderId(),
                             ex
                         );
+                        e.addSuppressed(ex);
                     }
                     throw e;
                 }

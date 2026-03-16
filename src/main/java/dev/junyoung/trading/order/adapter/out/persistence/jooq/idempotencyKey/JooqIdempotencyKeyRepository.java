@@ -37,6 +37,6 @@ public class JooqIdempotencyKeyRepository implements IdempotencyKeyRepository {
 			.from(Tables.IDEMPOTENCY_KEYS)
 			.where(Tables.IDEMPOTENCY_KEYS.ACCOUNT_ID.eq(accountId.value()))
 			.and(Tables.IDEMPOTENCY_KEYS.CLIENT_ORDER_ID.eq(clientOrderId))
-			.fetchOne(r -> new OrderId(r.get(Tables.IDEMPOTENCY_KEYS.ORDER_ID)));
+			.fetchSingle(r -> new OrderId(r.get(Tables.IDEMPOTENCY_KEYS.ORDER_ID)));
 	}
 }

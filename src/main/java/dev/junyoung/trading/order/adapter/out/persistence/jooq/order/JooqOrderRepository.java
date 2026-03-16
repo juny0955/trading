@@ -48,4 +48,11 @@ public class JooqOrderRepository implements OrderRepository {
             .from(Tables.ORDERS)
             .fetchOptionalInto(Long.class);
     }
+
+    @Override
+    public void deleteById(OrderId orderId) {
+        dslContext.deleteFrom(Tables.ORDERS)
+            .where(Tables.ORDERS.ORDER_ID.eq(orderId.value()))
+            .execute();
+    }
 }

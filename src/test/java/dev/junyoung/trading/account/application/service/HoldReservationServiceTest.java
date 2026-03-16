@@ -117,4 +117,85 @@ class HoldReservationServiceTest {
             assertThat(accountIdCaptor.getValue()).isEqualTo(ACCOUNT_ID);
         }
     }
+
+    @Nested
+    @DisplayName("release()")
+    class Release {
+
+        @Test
+        @DisplayName("잔고가 존재하면 findByAccountIdAndAssetForUpdate()로 조회 후 release()된 잔고를 save한다")
+        void release_existingBalance_savesReleasedBalance() {
+            Balance existing = Balance.of(KRW, 50_000L, 30_000L);
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.of(existing));
+
+            sut.release(ACCOUNT_ID, KRW, 10_000L);
+
+            verify(balanceRepository).save(eq(ACCOUNT_ID), any(Balance.class));
+        }
+
+        @Test
+        @DisplayName("잔고가 없으면 BalanceNotFountException이 전파된다")
+        void release_noBalance_throwsBalanceNotFoundException() {
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> sut.release(ACCOUNT_ID, KRW, 10_000L))
+                    .isInstanceOf(dev.junyoung.trading.account.application.exception.balance.BalanceNotFountException.class);
+        }
+
+        @Test
+        @DisplayName("release() 결과가 save에 전달된다 — available 증가, held 감소")
+        void release_savedBalanceReflectsRelease() {
+            Balance existing = Balance.of(KRW, 50_000L, 30_000L);
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.of(existing));
+
+            sut.release(ACCOUNT_ID, KRW, 20_000L);
+
+            ArgumentCaptor<Balance> captor = ArgumentCaptor.forClass(Balance.class);
+            verify(balanceRepository).save(eq(ACCOUNT_ID), captor.capture());
+            Balance saved = captor.getValue();
+            assertThat(saved.getAvailable()).isEqualTo(70_000L);
+            assertThat(saved.getHeld()).isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("held 잔고 부족 시 BusinessRuleException이 전파된다")
+        void release_insufficientHeld_throwsException() {
+            Balance existing = Balance.of(KRW, 50_000L, 5_000L);
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.of(existing));
+
+            assertThatThrownBy(() -> sut.release(ACCOUNT_ID, KRW, 10_000L))
+                    .isInstanceOf(BusinessRuleException.class);
+        }
+
+        @Test
+        @DisplayName("findByAccountIdAndAsset()이 아닌 findByAccountIdAndAssetForUpdate()를 사용한다 (pessimistic lock 확인)")
+        void release_usesFindForUpdate_notRegularFind() {
+            Balance existing = Balance.of(KRW, 50_000L, 30_000L);
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.of(existing));
+
+            sut.release(ACCOUNT_ID, KRW, 10_000L);
+
+            verify(balanceRepository).findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW);
+            verify(balanceRepository, never()).findByAccountIdAndAsset(any(), any());
+        }
+
+        @Test
+        @DisplayName("save에는 올바른 accountId가 전달된다")
+        void release_saveCalledWithCorrectAccountId() {
+            Balance existing = Balance.of(KRW, 50_000L, 30_000L);
+            when(balanceRepository.findByAccountIdAndAssetForUpdate(ACCOUNT_ID, KRW))
+                    .thenReturn(Optional.of(existing));
+
+            sut.release(ACCOUNT_ID, KRW, 10_000L);
+
+            ArgumentCaptor<AccountId> accountIdCaptor = ArgumentCaptor.forClass(AccountId.class);
+            verify(balanceRepository).save(accountIdCaptor.capture(), any(Balance.class));
+            assertThat(accountIdCaptor.getValue()).isEqualTo(ACCOUNT_ID);
+        }
+    }
 }

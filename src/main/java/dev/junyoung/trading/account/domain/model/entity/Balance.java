@@ -95,7 +95,7 @@ public class Balance {
      * @throws BusinessRuleException hold 예약 수량이 0 이하이거나 사용 가능 잔고가 부족한 경우
      */
     public Balance reserve(long amount) {
-        validateReserveAmount(amount);
+        validateAmount(amount);
         requireSufficientAvailable(amount);
 
         return new Balance(
@@ -107,17 +107,40 @@ public class Balance {
         );
     }
 
+    /**
+     * 지정한 수량만큼 held를 줄이고 available을 증가시킨다.
+     *
+     * @throws BusinessRuleException hold 해제 수량이 0 이하이거나 held 잔고가 부족한 경우
+     */
+    public Balance release(long amount) {
+        validateAmount(amount);
+        requireSufficientHeld(amount);
+
+        return new Balance(
+            asset,
+            Math.addExact(available, amount),
+            Math.subtractExact(held, amount),
+            createdAt,
+            Instant.now()
+        );
+    }
+
     // -------------------------------------------------------------------------
     // 내부 헬퍼
     // -------------------------------------------------------------------------
 
-    private void validateReserveAmount(long amount) {
+    private void validateAmount(long amount) {
         if (amount <= 0)
-            throw new BusinessRuleException("BALANCE_RESERVE_INVALID", "reserve amount must be positive");
+            throw new BusinessRuleException("BALANCE_AMOUNT_INVALID", "amount must be positive");
     }
 
     private void requireSufficientAvailable(long amount) {
         if (available < amount)
             throw new BusinessRuleException("BALANCE_INSUFFICIENT", "insufficient available balance");
+    }
+
+    private void requireSufficientHeld(long amount) {
+        if (held < amount)
+            throw new BusinessRuleException("BALANCE_INSUFFICIENT", "insufficient held balance");
     }
 }

@@ -1,24 +1,21 @@
 package dev.junyoung.trading.order.application.service;
 
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
 import dev.junyoung.trading.order.application.engine.EngineManager;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
-import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
-import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
-import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
-import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.application.port.out.*;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +46,8 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(order);
         holdReservationPort.reserve(order.getAccountId(), holdSpec.asset(), holdSpec.amount());
         orderRepository.save(order);
-        engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+
+        submitEngine(order);
 
         return order.getOrderId();
     }
@@ -57,6 +55,15 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private void validateAccount(AccountId accountId) {
         if (!accountQueryPort.existsById(accountId))
             throw new AccountNotFoundException(accountId.toString());
+    }
+
+    private void submitEngine(Order order) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+            }
+        });
     }
 
     private Order createOrder(OrderId orderId, long acceptedSeq, PlaceOrderCommand command) {

@@ -46,6 +46,6 @@ public class JooqOrderRepository implements OrderRepository {
     public Optional<Long> findMaxAcceptedSeq() {
         return dslContext.select(DSL.max(Tables.ORDERS.ACCEPTED_SEQ))
             .from(Tables.ORDERS)
-            .fetchOptional(DSL.max(Tables.ORDERS.ACCEPTED_SEQ));
+            .fetchOptionalInto(Long.class);
     }
 }

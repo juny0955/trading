@@ -684,6 +684,15 @@ public class MatchingEngineTest {
 		}
 
 		@Test
+		@DisplayName("FOK SELL — 반대 호가 없음 → 즉시 CANCELLED")
+		void fokSell_noOppositeOrder_immediatelyCancelled() {
+			Order taker = fokSellOrder(10_000, 5);
+			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			assertThat(result.trades()).isEmpty();
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		}
+
+		@Test
 		@DisplayName("PlaceResult의 updatedOrders에 FOK taker가 항상 포함된다")
 		void placeLimitOrderFOK_updatedOrdersAlwaysContainsTaker() {
 			Order taker = fokBuyOrder(10_000, 5);

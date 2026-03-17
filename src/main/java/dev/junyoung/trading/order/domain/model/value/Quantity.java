@@ -20,4 +20,8 @@ public record Quantity(
     public Quantity add(long executeQty) {
         return new Quantity(Math.addExact(value, executeQty));
     }
+
+    public boolean isPositive() {
+        return value > 0;
+    }
 }

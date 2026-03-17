@@ -8,13 +8,18 @@ import dev.junyoung.trading.account.domain.model.value.Asset;
 public record SettlementResult(
     List<BalanceDelta> balanceDeltas
 ) {
-
-    public SettlementResult {
-        balanceDeltas = List.copyOf(balanceDeltas);
-    }
-
-    public static SettlementResult of(List<BalanceDelta> balanceDeltas) {
-        return new SettlementResult(balanceDeltas);
+    public static SettlementResult ofDeltaBook(DeltaBook deltaBook) {
+        return new SettlementResult(
+            deltaBook.getDeltas().entrySet().stream()
+                .filter(entry -> !entry.getValue().isZero())
+                .map(entry -> new BalanceDelta(
+                    entry.getKey().accountId(),
+                    entry.getKey().asset(),
+                    entry.getValue().getAvailableDelta(),
+                    entry.getValue().getHeldDelta()
+                ))
+                .toList()
+        );
     }
 
     public record BalanceDelta(
@@ -22,6 +27,5 @@ public record SettlementResult(
         Asset asset,
         long availableDelta,
         long heldDelta
-    ) {
-    }
+    ) { }
 }

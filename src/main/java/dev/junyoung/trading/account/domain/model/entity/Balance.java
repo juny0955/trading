@@ -125,6 +125,16 @@ public class Balance {
         );
     }
 
+    public Balance applyDelta(long availableDelta, long heldDelta) {
+        return new Balance(
+            asset,
+            Math.addExact(available, availableDelta),
+            Math.addExact(held, heldDelta),
+            createdAt,
+            Instant.now()
+        );
+    }
+
     // -------------------------------------------------------------------------
     // 내부 헬퍼
     // -------------------------------------------------------------------------

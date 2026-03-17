@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.domain.service;
 
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import dev.junyoung.trading.common.exception.ConflictException;
 
@@ -683,6 +684,15 @@ public class MatchingEngineTest {
 		}
 
 		@Test
+		@DisplayName("FOK SELL — 반대 호가 없음 → 즉시 CANCELLED")
+		void fokSell_noOppositeOrder_immediatelyCancelled() {
+			Order taker = fokSellOrder(10_000, 5);
+			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			assertThat(result.trades()).isEmpty();
+			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		}
+
+		@Test
 		@DisplayName("PlaceResult의 updatedOrders에 FOK taker가 항상 포함된다")
 		void placeLimitOrderFOK_updatedOrdersAlwaysContainsTaker() {
 			Order taker = fokBuyOrder(10_000, 5);
@@ -885,6 +895,49 @@ public class MatchingEngineTest {
 
 			assertThrows(ConflictException.class, () -> engine.cancelOrder(order.getOrderId()));
 			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		}
+	}
+
+	@Nested
+	@DisplayName("누적 체결값")
+	class CumulativeFields {
+
+		@Test
+		@DisplayName("LIMIT taker 체결 시 cumQuoteQty/cumBaseQty가 갱신된다")
+		void limitTaker_accumulates_cumQuoteQtyAndCumBaseQty() {
+			Order maker = activatedSellOrder(10_000, 10);
+			orderBook.add(maker);
+
+			Order taker = buyOrder(10_000, 3);
+			engine.placeLimitOrder(taker);
+
+			assertThat(taker.getCumQuoteQty().value()).isEqualTo(30_000L);
+			assertThat(taker.getCumBaseQty().value()).isEqualTo(3L);
+		}
+
+		@Test
+		@DisplayName("maker 체결 시에도 cumQuoteQty/cumBaseQty가 갱신된다")
+		void maker_accumulates_cumQuoteQtyAndCumBaseQty() {
+			Order maker = activatedSellOrder(10_000, 10);
+			orderBook.add(maker);
+
+			Order taker = buyOrder(10_000, 3);
+			engine.placeLimitOrder(taker);
+
+			assertThat(maker.getCumQuoteQty().value()).isEqualTo(30_000L);
+			assertThat(maker.getCumBaseQty().value()).isEqualTo(3L);
+		}
+
+		@Test
+		@DisplayName("SELL MARKET 체결 시 cumQuoteQty/cumBaseQty가 갱신된다")
+		void sellMarket_accumulates_cumQuoteQtyAndCumBaseQty() {
+			orderBook.add(activatedBuyOrder(10_000, 3));
+			Order taker = marketSellOrder(10);
+
+			engine.placeMarketSellOrder(taker);
+
+			assertThat(taker.getCumQuoteQty().value()).isEqualTo(30_000L);
+			assertThat(taker.getCumBaseQty().value()).isEqualTo(3L);
 		}
 	}
 }

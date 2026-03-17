@@ -14,4 +14,8 @@ public record Asset(
 
 		value = value.trim().toUpperCase();
 	}
+
+	public static Asset of(String asset) {
+		return new Asset(asset);
+	}
 }

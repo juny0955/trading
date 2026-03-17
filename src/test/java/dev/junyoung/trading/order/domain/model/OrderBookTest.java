@@ -31,6 +31,7 @@ class OrderBookTest {
 	// ── 헬퍼 ──────────────────────────────────────────────────────────────
 
 	private static final Symbol SYMBOL = new Symbol("BTC");
+	private static final Price DEFAULT_PRICE = new Price(10_000);
 
 	/** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
 	private Order newBuyOrder(long price, long qty) {
@@ -539,7 +540,7 @@ class OrderBookTest {
 		@DisplayName("부분 체결된 BUY 주문의 remaining 잔량이 반영된다")
 		void bidsSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
 			Order order = newBuyOrder(10_000, 10);
-			order.fill(new Quantity(3)); // remaining = 7
+			order.fill(new Quantity(3), DEFAULT_PRICE); // remaining = 7
 			orderBook.add(order);
 
 			assertThat(orderBook.bidsSnapshot())
@@ -614,7 +615,7 @@ class OrderBookTest {
 		@DisplayName("부분 체결된 SELL 주문의 remaining 잔량이 반영된다")
 		void asksSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
 			Order order = newSellOrder(10_000, 10);
-			order.fill(new Quantity(4)); // remaining = 6
+			order.fill(new Quantity(4), DEFAULT_PRICE); // remaining = 6
 			orderBook.add(order);
 
 			assertThat(orderBook.asksSnapshot())

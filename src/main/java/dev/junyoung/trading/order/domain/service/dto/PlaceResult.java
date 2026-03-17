@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.domain.service;
+package dev.junyoung.trading.order.domain.service.dto;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;

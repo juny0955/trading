@@ -7,7 +7,9 @@ import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
@@ -21,7 +23,7 @@ import java.util.stream.Stream;
  * <p>{@link OrderBook} 상태 변경은 이 클래스 내부에서만 이루어지며, 체결 결과는 {@link PlaceResult}로 반환한다.</p>
  */
 @RequiredArgsConstructor
-public class MatchingEngine {
+public final class MatchingEngine {
 
 	// -------------------------------------------------------------------------
 	// 생성자
@@ -128,17 +130,16 @@ public class MatchingEngine {
 			if (best.isEmpty()) break;
 
 			Order maker = best.get();
-			long makerPrice = maker.getLimitPriceOrThrow().value();
-			long maxExecQty = remainingQuote / makerPrice;
+			Price executedPrice = maker.getLimitPriceOrThrow();
+			long maxExecQty = remainingQuote / executedPrice.value();
 			if (maxExecQty == 0) break;
 
-			long execQtyValue = Math.min(maxExecQty, maker.getRemaining().value());
-			Quantity execQty = new Quantity(execQtyValue);
-			trades.add(Trade.of(taker, maker, execQty));
-			long tradedQuote = Math.multiplyExact(makerPrice, execQtyValue);
+			Quantity executedQty = new Quantity(Math.min(maxExecQty, maker.getRemaining().value()));
+			trades.add(Trade.of(taker, maker, executedQty));
+			long tradedQuote = Math.multiplyExact(executedPrice.value(), executedQty.value());
 
-			maker.fill(execQty);
-			taker.accumulate(tradedQuote, execQtyValue);
+			maker.fill(executedQty, executedPrice);
+			taker.fillQuoteMode(executedQty, executedPrice);
 			remainingQuote = Math.subtractExact(remainingQuote, tradedQuote);
 			executedTradeCount++;
 
@@ -220,11 +221,12 @@ public class MatchingEngine {
 			Order maker = best.get();
 			if (!isPriceMatch(taker, maker)) break;
 
-			Quantity qty = new Quantity(Math.min(taker.getRemaining().value(), maker.getRemaining().value()));
-			trades.add(Trade.of(taker, maker, qty));
+			Quantity executedQty = new Quantity(Math.min(taker.getRemaining().value(), maker.getRemaining().value()));
+			Price executedPrice = maker.getLimitPriceOrThrow();
+			trades.add(Trade.of(taker, maker, executedQty));
 
-			maker.fill(qty);
-			taker.fill(qty);
+			maker.fill(executedQty, executedPrice);
+			taker.fill(executedQty, executedPrice);
 			if (maker.getRemaining().value() == 0)
 				orderBook.poll(side);
 

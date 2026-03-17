@@ -277,16 +277,6 @@ public class Order {
     }
 
     // -------------------------------------------------------------------------
-    // 누적
-    // -------------------------------------------------------------------------
-
-    /** quoteQty 모드에서 체결된 quote/base 금액을 누적한다. */
-    public void accumulate(long quoteAmt, long baseQty) {
-        this.cumQuoteQty = this.cumQuoteQty.add(quoteAmt);
-        this.cumBaseQty = this.cumBaseQty.add(baseQty);
-    }
-
-    // -------------------------------------------------------------------------
     // 조회
     // -------------------------------------------------------------------------
 
@@ -298,6 +288,8 @@ public class Order {
     public boolean isQuoteQtyMode() {
         return quoteQty != null && side.isBuy() && isMarket();
     }
+
+    public boolean isFinal() { return status.isFinal(); }
 
     public Optional<Long> getQuantityValue() {
         return Optional.ofNullable(quantity).map(Quantity::value);
@@ -336,18 +328,53 @@ public class Order {
     }
 
     /**
-     * 체결 수량을 적용하고 상태를 전이한다.
+     * 체결 수량과 체결가를 적용하고 상태를 전이한다.
+     *
+     * <p>체결가는 항상 maker의 지정가를 사용한다.
+     * BUY 주문의 경우 지정가보다 낮은 maker 가격에 체결되면 가격 개선이 발생하며,
+     * 이 때 {@code cumQuoteQty < limitPrice × quantity}가 되어 정산 시 차액이 hold에서 반환된다.
+     *
      * <ul>
      *   <li>remaining > 0 → PARTIALLY_FILLED</li>
      *   <li>remaining = 0 → FILLED</li>
      * </ul>
      *
+     * @param executedQty   체결 수량
+     * @param executedPrice 체결가 (maker의 지정가)
      * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
-    public void fill(Quantity executeQty) {
+    public void fill(Quantity executedQty, Price executedPrice) {
         requireActive();
-        this.remaining = remaining.sub(executeQty);
-        this.status = remaining.value() > 0 ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED;
+
+        long executedBase = executedQty.value();
+        long executedQuote = Math.multiplyExact(executedPrice.value(), executedBase);
+
+        this.cumBaseQty = this.cumBaseQty.add(executedBase);
+        this.cumQuoteQty = this.cumQuoteQty.add(executedQuote);
+        this.remaining = remaining.sub(executedQty);
+        this.status = remaining.isPositive() ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED;
+    }
+
+    /**
+     * quoteQty 예산 기반 MARKET BUY 주문의 체결 누적을 처리한다.
+     *
+     * <p>{@link #fill(Quantity, Price)}와 달리 {@code remaining}을 갱신하지 않는다.
+     * MARKET BUY는 수량 목표가 아닌 예산({@code quoteQty}) 기반으로 동작하므로
+     * remaining은 의미 없는 값(초기값 0)으로 고정되며, 종료 상태 전이는
+     * {@link #markFilledByMarketBuy()} 또는 {@link #cancel()}이 담당한다.
+     *
+     * @param executedQty   체결 수량 (base asset)
+     * @param executedPrice 체결가 (maker의 지정가)
+     * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
+     */
+    public void fillQuoteMode(Quantity executedQty, Price executedPrice) {
+        requireActive();
+
+        long executedBase = executedQty.value();
+        long executedQuote = Math.multiplyExact(executedPrice.value(), executedBase);
+
+        this.cumBaseQty = this.cumBaseQty.add(executedBase);
+        this.cumQuoteQty = this.cumQuoteQty.add(executedQuote);
     }
 
     /**

@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
@@ -32,6 +33,7 @@ public class EngineManager {
     private final TradingProperties tradingProperties;
     private final OrderRepository orderRepository;
     private final OrderBookCache orderBookCache;
+    private final SettlementService settlementService;
 
     private final Map<Symbol, EngineContext> contexts = new HashMap<>();
 
@@ -44,7 +46,7 @@ public class EngineManager {
     public void start() {
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
-            EngineContext ctx = new EngineContext(symbol, orderRepository, orderBookCache);
+            EngineContext ctx = new EngineContext(symbol, orderRepository, orderBookCache, settlementService);
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());

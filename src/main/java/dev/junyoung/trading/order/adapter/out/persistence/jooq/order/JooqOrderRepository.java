@@ -38,13 +38,15 @@ public class JooqOrderRepository implements OrderRepository {
 
     @Override
     public void updateAll(List<Order> orders) {
+        Instant now = Instant.now();
+
         var records = orders.stream()
             .map(order -> dslContext.update(Tables.ORDERS)
                 .set(Tables.ORDERS.STATUS, order.getStatus().name())
                 .set(Tables.ORDERS.REMAINING_QTY, order.getRemaining().value())
                 .set(Tables.ORDERS.CUM_BASE_QTY, order.getCumBaseQty().value())
                 .set(Tables.ORDERS.CUM_QUOTE_QTY, order.getCumQuoteQty().value())
-                .set(Tables.ORDERS.UPDATED_AT, Instant.now())
+                .set(Tables.ORDERS.UPDATED_AT, now)
                 .where(Tables.ORDERS.ORDER_ID.eq(order.getOrderId().value()))
             )
             .toList();

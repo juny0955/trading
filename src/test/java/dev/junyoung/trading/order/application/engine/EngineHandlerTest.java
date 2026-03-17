@@ -4,6 +4,7 @@ import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
@@ -57,13 +58,16 @@ class EngineHandlerTest {
 	@Mock
 	private OrderRepository orderRepository;
 
+	@Mock
+	private SettlementService settlementService;
+
 	private EngineHandler handler;
 
 	private static final Symbol SYMBOL = new Symbol("BTC");
 
 	@BeforeEach
 	void setUp() {
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, orderRepository);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, orderRepository, settlementService);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -188,17 +192,17 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("MARKET SELL 주문 처리 후 updatedOrders를 모두 orderRepository에 저장한다")
-		void handle_placeOrder_marketSell_savesUpdatedOrders() {
+		@DisplayName("MARKET SELL 주문 처리 후 PlaceResult를 settlementService.settlement()에 전달한다")
+		void handle_placeOrder_marketSell_delegatesToSettlementService() {
 			Order order = marketSellOrder(5);
 			Order filledMaker = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
 			filledMaker.activate();
-			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(filledMaker, order), List.of()));
+			PlaceResult result = PlaceResult.of(List.of(filledMaker, order), List.of());
+			when(engine.placeMarketSellOrder(order)).thenReturn(result);
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(orderRepository).save(filledMaker);
-			verify(orderRepository).save(order);
+			verify(settlementService).settlement(result);
 		}
 
 		@Test

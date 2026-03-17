@@ -4,12 +4,12 @@ import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.account.domain.model.value.Asset;
 import lombok.Getter;
 
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 
 @Getter
 public final class DeltaBook {
-    private final Map<BalanceKey, Delta> deltas = new LinkedHashMap<>();
+    private final Map<BalanceKey, Delta> deltas = new HashMap<>();
 
     public void subHeld(AccountId accountId, Asset asset, long execute) {
         BalanceKey balanceKey = new BalanceKey(accountId, asset);

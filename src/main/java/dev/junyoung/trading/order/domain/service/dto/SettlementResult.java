@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.domain.service.dto;
 
+import java.util.Comparator;
 import java.util.List;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
@@ -18,6 +19,7 @@ public record SettlementResult(
                     entry.getValue().getAvailableDelta(),
                     entry.getValue().getHeldDelta()
                 ))
+                .sorted(Comparator.comparing(d -> d.asset().value()))
                 .toList()
         );
     }

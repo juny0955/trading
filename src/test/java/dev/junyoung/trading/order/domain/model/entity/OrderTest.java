@@ -27,6 +27,7 @@ class OrderTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private static final Symbol SYMBOL = new Symbol("BTC");
+    private static final Price DEFAULT_PRICE = new Price(10_000);
 
     private Order buyOrder(long price, long qty) {
         return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
@@ -339,7 +340,7 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
+            order.fill(new Quantity(2), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
@@ -347,7 +348,7 @@ class OrderTest {
         @DisplayName("FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
@@ -370,7 +371,7 @@ class OrderTest {
         @DisplayName("NEW 상태에서 부분 체결 → PARTIALLY_FILLED, remaining 감소")
         void partialFillFromNew() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
+            order.fill(new Quantity(2), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
@@ -380,7 +381,7 @@ class OrderTest {
         @DisplayName("NEW 상태에서 전량 체결 → FILLED, remaining = 0")
         void fullFillFromNew() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -390,8 +391,8 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 추가 부분 체결 → PARTIALLY_FILLED 유지, remaining 감소")
         void partialFillFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 10);
-            order.fill(new Quantity(3));  // remaining = 7
-            order.fill(new Quantity(4));  // remaining = 3
+            order.fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 7
+            order.fill(new Quantity(4), DEFAULT_PRICE);  // remaining = 3
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
@@ -401,8 +402,8 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 잔량 전량 체결 → FILLED")
         void fullFillFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));  // remaining = 3
-            order.fill(new Quantity(3));  // remaining = 0
+            order.fill(new Quantity(2), DEFAULT_PRICE);  // remaining = 3
+            order.fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 0
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -412,9 +413,9 @@ class OrderTest {
         @DisplayName("1개씩 여러 번 체결하여 전량 체결된다")
         void fillOneByOne() {
             Order order = newBuyOrder(10_000, 3);
-            order.fill(new Quantity(1));
-            order.fill(new Quantity(1));
-            order.fill(new Quantity(1));
+            order.fill(new Quantity(1), DEFAULT_PRICE);
+            order.fill(new Quantity(1), DEFAULT_PRICE);
+            order.fill(new Quantity(1), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -424,7 +425,7 @@ class OrderTest {
         @DisplayName("quantity = 1인 주문을 전량 체결한다")
         void fillMinQuantityOrder() {
             Order order = newBuyOrder(1, 1);
-            order.fill(new Quantity(1));
+            order.fill(new Quantity(1), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -434,7 +435,7 @@ class OrderTest {
         @DisplayName("원래 quantity는 체결 후에도 변경되지 않는다")
         void quantityUnchangedAfterFill() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(3));
+            order.fill(new Quantity(3), DEFAULT_PRICE);
 
             assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
         }
@@ -443,30 +444,30 @@ class OrderTest {
         @DisplayName("체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다 (remaining 음수 방지)")
         void fillExceedingRemainingThrows() {
             Order order = newBuyOrder(10_000, 3);
-            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(4)));
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(4), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("부분 체결 후 체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다")
         void fillExceedingRemainingAfterPartialFillThrows() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(3));  // remaining = 2
-            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(3)));
+            order.fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 2
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(3), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("ACCEPTED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromAccepted() {
             Order order = buyOrder(10_000, 5);
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("FILLED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
@@ -474,7 +475,7 @@ class OrderTest {
         void cannotFillFromCancelled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
     }
 
@@ -496,7 +497,7 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 취소 → CANCELLED")
         void cancelFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
+            order.fill(new Quantity(2), DEFAULT_PRICE);
             order.cancel();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         }
@@ -505,7 +506,7 @@ class OrderTest {
         @DisplayName("취소 후 remaining은 변경되지 않는다")
         void cancelDoesNotChangeRemaining() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));  // remaining = 3
+            order.fill(new Quantity(2), DEFAULT_PRICE);  // remaining = 3
             order.cancel();
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
         }
@@ -521,7 +522,7 @@ class OrderTest {
         @DisplayName("FILLED 상태에서 cancel() 호출하면 ConflictException이 발생한다")
         void cannotCancelFromFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::cancel);
         }
 
@@ -550,11 +551,11 @@ class OrderTest {
             order.activate();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
 
-            order.fill(new Quantity(4));
+            order.fill(new Quantity(4), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(6));
 
-            order.fill(new Quantity(6));
+            order.fill(new Quantity(6), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
         }
@@ -576,7 +577,7 @@ class OrderTest {
             Order order = buyOrder(10_000, 5);
 
             order.activate();
-            order.fill(new Quantity(2));
+            order.fill(new Quantity(2), DEFAULT_PRICE);
             order.cancel();
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
@@ -588,15 +589,15 @@ class OrderTest {
         void multiplePartialFillsThenFilled() {
             Order order = newBuyOrder(10_000, 9);
 
-            order.fill(new Quantity(3));
+            order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(6));
 
-            order.fill(new Quantity(3));
+            order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
 
-            order.fill(new Quantity(3));
+            order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
         }
@@ -611,7 +612,7 @@ class OrderTest {
             order.activate();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
 
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
         }
 
@@ -621,7 +622,7 @@ class OrderTest {
             Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
             order.activate();
-            order.fill(new Quantity(3));
+            order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 
             order.cancel();
@@ -640,15 +641,15 @@ class OrderTest {
         @DisplayName("FILLED 이후 fill()은 불가하다")
         void filledOrder_cannotBeFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("FILLED 이후 cancel()은 불가하다")
         void filledOrder_cannotBeCancelled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::cancel);
         }
 
@@ -656,7 +657,7 @@ class OrderTest {
         @DisplayName("FILLED 이후 activate()는 불가하다")
         void filledOrder_cannotBeActivated() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
@@ -665,7 +666,7 @@ class OrderTest {
         void cancelledOrder_cannotBeFilled() {
             Order order = newBuyOrder(10_000, 5);
             order.cancel();
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test

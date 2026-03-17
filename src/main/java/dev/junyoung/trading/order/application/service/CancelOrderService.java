@@ -32,7 +32,7 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isMarket())
             throw new OrderNotCancellableException(orderId);
 
-        if (order.getStatus().isFinal())
+        if (order.isFinal())
             throw new OrderAlreadyFinalizedException(orderId);
 
         engineManager.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId)));

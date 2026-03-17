@@ -92,7 +92,7 @@ class JooqOrderRepositoryTest {
 
             order.activate();
             Quantity fillQty = new Quantity(3L);
-            order.fill(fillQty);
+            order.fill(fillQty, PRICE);
             repository.save(order);
 
             Order updated = repository.findById(order.getOrderId()).orElseThrow();

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import java.util.Optional;
 import java.util.UUID;
 
+import dev.junyoung.trading.account.application.exception.balance.BalanceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -141,7 +142,7 @@ class HoldReservationServiceTest {
                     .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> sut.release(ACCOUNT_ID, KRW, 10_000L))
-                    .isInstanceOf(dev.junyoung.trading.account.application.exception.balance.BalanceNotFountException.class);
+                    .isInstanceOf(BalanceNotFoundException.class);
         }
 
         @Test

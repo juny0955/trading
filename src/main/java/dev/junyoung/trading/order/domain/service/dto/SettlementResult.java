@@ -19,7 +19,10 @@ public record SettlementResult(
                     entry.getValue().getAvailableDelta(),
                     entry.getValue().getHeldDelta()
                 ))
-                .sorted(Comparator.comparing(d -> d.asset().value()))
+                .sorted(Comparator
+                    .comparing((BalanceDelta d) -> d.accountId.value())
+                    .thenComparing(d -> d.asset.value())
+                )
                 .toList()
         );
     }

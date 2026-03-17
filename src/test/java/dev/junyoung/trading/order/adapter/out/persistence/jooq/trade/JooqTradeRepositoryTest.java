@@ -73,7 +73,7 @@ class JooqTradeRepositoryTest {
     }
 
     @Nested
-    @DisplayName("saveAll()")
+    @DisplayName("updateAll()")
     class SaveAll {
 
         @Test

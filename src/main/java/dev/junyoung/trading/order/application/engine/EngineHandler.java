@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -33,6 +34,7 @@ public class EngineHandler {
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
 	private final OrderRepository orderRepository;
+	private final SettlementService settlementService;
 
 	// -------------------------------------------------------------------------
 	// 진입점
@@ -52,8 +54,8 @@ public class EngineHandler {
 			case EngineCommand.PlaceOrder c -> {
 				Order order = c.order();
 				PlaceResult result = processPlaceOrder(order);
-				result.updatedOrders().forEach(orderRepository::save);
-				if (!result.trades().isEmpty()) log.info("Trades executed: {}", result.trades());
+
+				settlementService.settlement(result);
 				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.CancelOrder c -> {

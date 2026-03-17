@@ -1,6 +1,6 @@
 package dev.junyoung.trading.account.application.service;
 
-import dev.junyoung.trading.account.application.exception.balance.BalanceNotFountException;
+import dev.junyoung.trading.account.application.exception.balance.BalanceNotFoundException;
 import org.springframework.stereotype.Service;
 
 import dev.junyoung.trading.account.application.port.out.BalanceRepository;
@@ -30,7 +30,7 @@ public class HoldReservationService implements HoldReservationPort {
 	@Override
 	public void release(AccountId accountId, Asset asset, long amount) {
 		Balance balance = balanceRepository.findByAccountIdAndAssetForUpdate(accountId, asset)
-			.orElseThrow(() -> new BalanceNotFountException(accountId.toString(), asset.value()));
+			.orElseThrow(() -> new BalanceNotFoundException(accountId.toString(), asset.value()));
 
 		Balance release = balance.release(amount);
 		balanceRepository.save(accountId, release);

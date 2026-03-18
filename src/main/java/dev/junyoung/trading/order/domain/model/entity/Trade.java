@@ -8,8 +8,9 @@ import dev.junyoung.trading.order.domain.model.value.*;
 
 /**
  * 매칭된 단일 체결 결과.
- *
+ * <p>
  * 외부 진입점은 {@link #of(Order, Order, Quantity)}이다.
+ * </p>
  */
 public record Trade(
 	TradeId tradeId,
@@ -40,6 +41,26 @@ public record Trade(
 			maker.getLimitPriceOrThrow(),
 			qty,
 			Instant.now()
+		);
+	}
+
+	public static Trade restore(
+		TradeId tradeId,
+		Symbol symbol,
+		OrderId buyOrderId,
+		OrderId sellOrderId,
+		Price price,
+		Quantity quantity,
+		Instant createdAt
+	) {
+		return new Trade(
+			tradeId,
+			symbol,
+			buyOrderId,
+			sellOrderId,
+			price,
+			quantity,
+			createdAt
 		);
 	}
 }

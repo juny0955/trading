@@ -212,8 +212,11 @@ class OrderControllerTest {
             assertThat(response.getBody()).hasSize(1);
             TradeResponse body = response.getBody().getFirst();
             assertThat(body.tradeId()).isEqualTo(TRADE_RESULT.tradeId());
+            assertThat(body.symbol()).isEqualTo(TRADE_RESULT.symbol());
+            assertThat(body.orderId()).isEqualTo(TRADE_RESULT.orderId());
             assertThat(body.side()).isEqualTo(TRADE_RESULT.side());
             assertThat(body.price()).isEqualTo(TRADE_RESULT.price());
+            assertThat(body.quantity()).isEqualTo(TRADE_RESULT.quantity());
         }
     }
 }

@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -27,12 +28,12 @@ public class EngineContext {
     private final EngineLoop engineLoop;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
-    protected EngineContext(Symbol symbol, OrderBookCache orderBookCache, SettlementService settlementService) {
+    protected EngineContext(Symbol symbol, OrderBookCachePort orderBookCachePort, SettlementService settlementService) {
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine(orderBook);
-        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookCache, settlementService);
+        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookCachePort, settlementService);
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread);
     }
 

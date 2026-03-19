@@ -1,28 +1,23 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.order.fixture.OrderFixture;
-
 import dev.junyoung.trading.common.exception.ConflictException;
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.model.value.*;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
 import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-
+import dev.junyoung.trading.order.fixture.OrderFixture;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.BeforeEach;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,7 +46,7 @@ class EngineHandlerTest {
 	private OrderBook orderBook;
 
 	@Mock
-	private OrderBookCache orderBookCache;
+	private OrderBookCachePort orderBookCachePort;
 
 	@Mock
 	private SettlementService settlementService;
@@ -62,7 +57,7 @@ class EngineHandlerTest {
 
 	@BeforeEach
 	void setUp() {
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, settlementService);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCachePort, settlementService);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -129,27 +124,27 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("placeLimitOrder 완료 후 orderBookCache.update가 orderBook을 인자로 호출된다")
+		@DisplayName("placeLimitOrder 완료 후 orderBookCachePort.update가 orderBook을 인자로 호출된다")
 		void handle_placeOrder_updatesCache() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(orderBookCache).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("orderBookCache.update는 placeLimitOrder 이후에 호출된다")
+		@DisplayName("orderBookCachePort.update는 placeLimitOrder 이후에 호출된다")
 		void handle_placeOrder_updatesCacheAfterEngine() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			InOrder inOrder = inOrder(engine, orderBookCache);
+			InOrder inOrder = inOrder(engine, orderBookCachePort);
 			inOrder.verify(engine).placeLimitOrder(order);
-			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -176,14 +171,14 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("MARKET SELL 주문 처리 완료 후 orderBookCache.update가 호출된다")
+		@DisplayName("MARKET SELL 주문 처리 완료 후 orderBookCachePort.update가 호출된다")
 		void handle_placeOrder_marketSell_updatesCache() {
 			Order order = marketSellOrder(5);
 			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(orderBookCache).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -240,36 +235,36 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("cancelOrder 완료 후 orderBookCache.update가 orderBook을 인자로 호출된다")
+		@DisplayName("cancelOrder 완료 후 orderBookCachePort.update가 orderBook을 인자로 호출된다")
 		void handle_cancelOrder_updatesCache() {
 			OrderId orderId = OrderId.newId();
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			verify(orderBookCache).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("orderBookCache.update는 cancelOrder 이후에 호출된다")
+		@DisplayName("orderBookCachePort.update는 cancelOrder 이후에 호출된다")
 		void handle_cancelOrder_updatesCacheAfterEngine() {
 			OrderId orderId = OrderId.newId();
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			InOrder inOrder = inOrder(engine, orderBookCache);
+			InOrder inOrder = inOrder(engine, orderBookCachePort);
 			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("엔진이 예외를 던져도 orderBookCache.update는 호출된다")
+		@DisplayName("엔진이 예외를 던져도 orderBookCachePort.update는 호출된다")
 		void handle_cancelOrder_engineThrows_cacheStillUpdated() {
 			OrderId orderId = OrderId.newId();
 			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(orderBookCache).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -285,7 +280,7 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("호출 순서: engine.cancelOrder → settlementService.cancelSettlement → orderBookCache.update")
+		@DisplayName("호출 순서: engine.cancelOrder → settlementService.cancelSettlement → orderBookCachePort.update")
 		void handle_cancelOrder_callOrderIsEngineSettlementCache() {
 			OrderId orderId = OrderId.newId();
 			Order cancelled = buyOrder(10_000, 5);
@@ -293,10 +288,10 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			InOrder inOrder = inOrder(engine, settlementService, orderBookCache);
+			InOrder inOrder = inOrder(engine, settlementService, orderBookCachePort);
 			inOrder.verify(engine).cancelOrder(orderId);
 			inOrder.verify(settlementService).cancelSettlement(cancelled);
-			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
@@ -328,7 +323,7 @@ class EngineHandlerTest {
 		void handle_shutdown_noInteractions() {
 			handler.handle(new EngineCommand.Shutdown());
 
-			verifyNoInteractions(engine, settlementService, orderBookCache);
+			verifyNoInteractions(engine, settlementService, orderBookCachePort);
 		}
 	}
 }

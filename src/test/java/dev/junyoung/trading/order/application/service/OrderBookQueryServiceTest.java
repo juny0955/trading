@@ -1,13 +1,13 @@
 package dev.junyoung.trading.order.application.service;
 
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import dev.junyoung.trading.order.application.engine.OrderBookCache;
-import dev.junyoung.trading.order.application.engine.OrderBookSnapshot;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -29,7 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OrderBookQueryServiceTest {
 
     @Mock
-    private OrderBookCache orderBookCache;
+    private OrderBookCachePort orderBookCachePort;
 
     @InjectMocks
     private OrderBookQueryService sut;
@@ -64,7 +64,7 @@ class OrderBookQueryServiceTest {
             book.add(activatedBuy(9_000, 3));
             book.add(activatedSell(11_000, 2));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
-            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
+            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
@@ -75,7 +75,7 @@ class OrderBookQueryServiceTest {
         @Test
         @DisplayName("캐시가 비어 있으면 bids/asks가 빈 맵으로 반환된다")
         void getOrderBookCache_emptyCache_returnsEmptyMaps() {
-            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(OrderBookSnapshot.EMPTY);
+            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(OrderBookSnapshot.EMPTY);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
@@ -93,7 +93,7 @@ class OrderBookQueryServiceTest {
             book.add(activatedSell(12_000, 1));
             book.add(activatedSell(11_000, 2));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
-            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
+            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 

@@ -261,4 +261,76 @@ class SettlementServiceTest {
             verify(balanceSettlementPort).balanceSettlement(ACCOUNT_B, KRW, 0L, -20_000L);
         }
     }
+
+    @Nested
+    @DisplayName("cancelSettlement() - 취소 정산")
+    class CancelSettlement {
+
+        @Test
+        @DisplayName("취소된 주문을 orderRepository.save()에 위임한다")
+        void delegatesToOrderRepositorySave() {
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
+            cancelled.activate();
+            cancelled.cancel();
+
+            sut.cancelSettlement(cancelled);
+
+            verify(orderRepository).save(cancelled);
+        }
+
+        @Test
+        @DisplayName("tradeRepository는 호출하지 않는다")
+        void doesNotCallTradeRepository() {
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
+            cancelled.activate();
+            cancelled.cancel();
+
+            sut.cancelSettlement(cancelled);
+
+            verifyNoInteractions(tradeRepository);
+        }
+
+        @Test
+        @DisplayName("LIMIT BUY NEW → CANCELLED: KRW hold 전액 해제")
+        void limitBuyNew_cancelled_fullKrwRefund() {
+            // price=10000, qty=3 → hold=30000, refund=30000
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
+            cancelled.activate();
+            cancelled.cancel();
+
+            sut.cancelSettlement(cancelled);
+
+            verify(balanceSettlementPort).balanceSettlement(ACCOUNT_A, KRW, 30_000L, -30_000L);
+        }
+
+        @Test
+        @DisplayName("LIMIT BUY PARTIALLY_FILLED → CANCELLED: 잔여 KRW hold만 해제")
+        void limitBuyPartiallyFilled_cancelled_partialKrwRefund() {
+            // price=10000, qty=5, filled=2 → originalHold=50000, consumed=20000, refund=30000
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2));
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5));
+            cancelled.activate();
+            sell.activate();
+            cancelled.fill(new Quantity(2), P_10000); // → PARTIALLY_FILLED, cumQuoteQty=20000
+            sell.fill(new Quantity(2), P_10000);
+            cancelled.cancel(); // → CANCELLED
+
+            sut.cancelSettlement(cancelled);
+
+            verify(balanceSettlementPort).balanceSettlement(ACCOUNT_A, KRW, 30_000L, -30_000L);
+        }
+
+        @Test
+        @DisplayName("LIMIT SELL NEW → CANCELLED: BTC hold 전액 해제")
+        void limitSellNew_cancelled_fullBaseRefund() {
+            // qty=5(BTC) → hold=5, refund=5
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5));
+            cancelled.activate();
+            cancelled.cancel();
+
+            sut.cancelSettlement(cancelled);
+
+            verify(balanceSettlementPort).balanceSettlement(ACCOUNT_A, BTC, 5L, -5L);
+        }
+    }
 }

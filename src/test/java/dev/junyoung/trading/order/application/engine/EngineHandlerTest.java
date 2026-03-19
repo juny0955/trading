@@ -3,7 +3,6 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import dev.junyoung.trading.common.exception.ConflictException;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -32,7 +31,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -56,9 +54,6 @@ class EngineHandlerTest {
 	private OrderBookCache orderBookCache;
 
 	@Mock
-	private OrderRepository orderRepository;
-
-	@Mock
 	private SettlementService settlementService;
 
 	private EngineHandler handler;
@@ -67,7 +62,7 @@ class EngineHandlerTest {
 
 	@BeforeEach
 	void setUp() {
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, orderRepository, settlementService);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCache, settlementService);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -236,12 +231,12 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("엔진이 ConflictException을 던지면 그대로 전파된다")
-		void handle_cancelOrder_propagatesConflictException() {
+		@DisplayName("엔진이 ConflictException을 던져도 외부로 전파되지 않는다")
+		void handle_cancelOrder_engineThrows_doesNotPropagateException() {
 			OrderId orderId = OrderId.newId();
 			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 		}
 
 		@Test
@@ -267,52 +262,52 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("엔진이 예외를 던지면 orderBookCache.update는 호출되지 않는다")
-		void handle_cancelOrder_engineThrows_doesNotUpdateCache() {
+		@DisplayName("엔진이 예외를 던져도 orderBookCache.update는 호출된다")
+		void handle_cancelOrder_engineThrows_cacheStillUpdated() {
 			OrderId orderId = OrderId.newId();
 			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(orderBookCache, never()).update(any(), any());
+			verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("engine.cancelOrder()가 반환한 Order를 orderRepository.save()에 전달한다")
-		void handle_cancelOrder_savesReturnedOrderToRepository() {
+		@DisplayName("engine.cancelOrder()가 반환한 Order를 settlementService.cancelSettlement()에 위임한다")
+		void handle_cancelOrder_delegatesToCancelSettlement() {
 			OrderId orderId = OrderId.newId();
 			Order cancelled = buyOrder(10_000, 5);
 			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			verify(orderRepository).save(cancelled);
+			verify(settlementService).cancelSettlement(cancelled);
 		}
 
 		@Test
-		@DisplayName("호출 순서: engine.cancelOrder → orderRepository.save → orderBookCache.update")
-		void handle_cancelOrder_callOrderIsEngineRepositoryCache() {
+		@DisplayName("호출 순서: engine.cancelOrder → settlementService.cancelSettlement → orderBookCache.update")
+		void handle_cancelOrder_callOrderIsEngineSettlementCache() {
 			OrderId orderId = OrderId.newId();
 			Order cancelled = buyOrder(10_000, 5);
 			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
 
 			handler.handle(new EngineCommand.CancelOrder(orderId));
 
-			InOrder inOrder = inOrder(engine, orderRepository, orderBookCache);
+			InOrder inOrder = inOrder(engine, settlementService, orderBookCache);
 			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(orderRepository).save(cancelled);
+			inOrder.verify(settlementService).cancelSettlement(cancelled);
 			inOrder.verify(orderBookCache).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("엔진이 예외를 던지면 orderRepository.save는 호출되지 않는다")
-		void handle_cancelOrder_engineThrows_doesNotSaveToRepository() {
+		@DisplayName("엔진이 예외를 던지면 settlementService.cancelSettlement는 호출되지 않는다")
+		void handle_cancelOrder_engineThrows_doesNotDelegateToSettlementService() {
 			OrderId orderId = OrderId.newId();
 			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
 
-			assertThrows(ConflictException.class, () -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(orderRepository, never()).save(any());
+			verify(settlementService, never()).cancelSettlement(any());
 		}
 	}
 
@@ -329,11 +324,11 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("Shutdown 커맨드를 수신하면 engine, repository, cache를 호출하지 않는다")
+		@DisplayName("Shutdown 커맨드를 수신하면 engine, settlementService, cache를 호출하지 않는다")
 		void handle_shutdown_noInteractions() {
 			handler.handle(new EngineCommand.Shutdown());
 
-			verifyNoInteractions(engine, orderRepository, orderBookCache);
+			verifyNoInteractions(engine, settlementService, orderBookCache);
 		}
 	}
 }

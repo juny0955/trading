@@ -11,6 +11,7 @@ import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetTradeUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.in.result.TradeResult;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -110,8 +111,7 @@ class OrderControllerTest {
 
         sut.placeOrder(ACCOUNT_ID, request);
 
-        ArgumentCaptor<dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand> captor =
-                forClass(dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand.class);
+        ArgumentCaptor<PlaceOrderCommand> captor = forClass(PlaceOrderCommand.class);
         verify(placeOrderUseCase).placeOrder(captor.capture());
         assertThat(captor.getValue().accountId().value().toString()).isEqualTo(ACCOUNT_ID);
         assertThat(captor.getValue().clientOrderId()).isEqualTo("client-001");

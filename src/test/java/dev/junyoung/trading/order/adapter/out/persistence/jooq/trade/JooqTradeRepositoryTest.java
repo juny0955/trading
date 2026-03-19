@@ -4,13 +4,17 @@ import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.records.TradesRecord;
 import dev.junyoung.trading.order.adapter.out.persistence.jooq.order.JooqOrderRepository;
+import dev.junyoung.trading.order.application.port.out.result.AccountTradeResult;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.model.value.TradeId;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -121,6 +125,146 @@ class JooqTradeRepositoryTest {
 
             List<TradesRecord> rows = dslContext.selectFrom(Tables.TRADES).fetchInto(TradesRecord.class);
             assertThat(rows).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByOrderId()")
+    class FindByOrderId {
+
+        @Test
+        @DisplayName("buyOrderId가 일치하면 trade를 반환하고 주요 필드가 일치한다")
+        void buyOrderMatches_returnsTrade() {
+            buyOrder.activate();
+            sellOrder.activate();
+            Trade trade = Trade.of(buyOrder, sellOrder, QTY);
+            tradeRepository.saveAll(List.of(trade));
+
+            List<Trade> result = tradeRepository.findByOrderId(buyOrder.getOrderId());
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().tradeId()).isEqualTo(trade.tradeId());
+            assertThat(result.getFirst().symbol()).isEqualTo(SYMBOL);
+            assertThat(result.getFirst().price()).isEqualTo(PRICE);
+            assertThat(result.getFirst().quantity()).isEqualTo(QTY);
+        }
+
+        @Test
+        @DisplayName("sellOrderId가 일치하면 trade를 반환한다")
+        void sellOrderMatches_returnsTrade() {
+            buyOrder.activate();
+            sellOrder.activate();
+            Trade trade = Trade.of(buyOrder, sellOrder, QTY);
+            tradeRepository.saveAll(List.of(trade));
+
+            List<Trade> result = tradeRepository.findByOrderId(sellOrder.getOrderId());
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().tradeId()).isEqualTo(trade.tradeId());
+        }
+
+        @Test
+        @DisplayName("관련 trade가 없으면 빈 리스트를 반환한다")
+        void noRelatedTrades_returnsEmptyList() {
+            List<Trade> result = tradeRepository.findByOrderId(buyOrder.getOrderId());
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("여러 trade가 있으면 created_at 오름차순으로 정렬된다")
+        void multipleTrades_sortedByCreatedAtAsc() {
+            Instant earlier = Instant.parse("2026-03-01T00:00:00Z");
+            Instant later = Instant.parse("2026-03-02T00:00:00Z");
+            Trade trade1 = Trade.restore(
+                    TradeId.newId(), SYMBOL,
+                    buyOrder.getOrderId(), sellOrder.getOrderId(),
+                    PRICE, new Quantity(5L), earlier
+            );
+            Trade trade2 = Trade.restore(
+                    TradeId.newId(), SYMBOL,
+                    buyOrder.getOrderId(), sellOrder.getOrderId(),
+                    PRICE, new Quantity(3L), later
+            );
+
+            tradeRepository.saveAll(List.of(trade2, trade1));
+
+            List<Trade> result = tradeRepository.findByOrderId(buyOrder.getOrderId());
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).createdAt()).isEqualTo(earlier);
+            assertThat(result.get(1).createdAt()).isEqualTo(later);
+        }
+    }
+
+    @Nested
+    @DisplayName("findByAccountIdWithSide()")
+    class FindByAccountIdWithSide {
+
+        @Test
+        @DisplayName("BUY account로 조회하면 side = BUY, buyOrderId를 반환한다")
+        void buyAccount_returnsTradeWithBuySide() {
+            buyOrder.activate();
+            sellOrder.activate();
+            Trade trade = Trade.of(buyOrder, sellOrder, QTY);
+            tradeRepository.saveAll(List.of(trade));
+
+            List<AccountTradeResult> result = tradeRepository.findByAccountIdWithSide(BUY_ACCOUNT_ID);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().side()).isEqualTo(Side.BUY);
+            assertThat(result.getFirst().orderId()).isEqualTo(buyOrder.getOrderId());
+        }
+
+        @Test
+        @DisplayName("SELL account로 조회하면 side = SELL, sellOrderId를 반환한다")
+        void sellAccount_returnsTradeWithSellSide() {
+            buyOrder.activate();
+            sellOrder.activate();
+            Trade trade = Trade.of(buyOrder, sellOrder, QTY);
+            tradeRepository.saveAll(List.of(trade));
+
+            List<AccountTradeResult> result = tradeRepository.findByAccountIdWithSide(SELL_ACCOUNT_ID);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().side()).isEqualTo(Side.SELL);
+            assertThat(result.getFirst().orderId()).isEqualTo(sellOrder.getOrderId());
+        }
+
+        @Test
+        @DisplayName("해당 account의 trade가 없으면 빈 리스트를 반환한다")
+        void noTrades_returnsEmptyList() {
+            AccountId unknownAccountId = new AccountId(UUID.fromString("33333333-3333-3333-3333-333333333333"));
+
+            List<AccountTradeResult> result = tradeRepository.findByAccountIdWithSide(unknownAccountId);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("BUY account로 조회 시 buy와 sell 양쪽 참여 거래를 모두 반환한다")
+        void bothSidesParticipation_returnsAllTrades() {
+            // BUY_ACCOUNT is buyer in trade1
+            buyOrder.activate();
+            sellOrder.activate();
+            Trade trade1 = Trade.of(buyOrder, sellOrder, QTY);
+
+            // BUY_ACCOUNT is seller in trade2 (use unique clientOrderIds to avoid duplicate key)
+            Order anotherBuyOrder = Order.create(OrderId.newId(), SELL_ACCOUNT_ID, "client-buy-2", 1L,
+                    SYMBOL, Side.BUY, OrderType.LIMIT, TimeInForce.GTC, PRICE, null, new Quantity(5L));
+            Order anotherSellOrder = Order.create(OrderId.newId(), BUY_ACCOUNT_ID, "client-sell-2", 1L,
+                    SYMBOL, Side.SELL, OrderType.LIMIT, TimeInForce.GTC, PRICE, null, new Quantity(5L));
+            orderRepository.save(anotherBuyOrder);
+            orderRepository.save(anotherSellOrder);
+            anotherBuyOrder.activate();
+            anotherSellOrder.activate();
+            Trade trade2 = Trade.of(anotherBuyOrder, anotherSellOrder, new Quantity(5L));
+
+            tradeRepository.saveAll(List.of(trade1, trade2));
+
+            List<AccountTradeResult> result = tradeRepository.findByAccountIdWithSide(BUY_ACCOUNT_ID);
+
+            assertThat(result).hasSize(2);
         }
     }
 }

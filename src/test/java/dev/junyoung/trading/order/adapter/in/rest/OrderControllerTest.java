@@ -1,16 +1,21 @@
 package dev.junyoung.trading.order.adapter.in.rest;
 
 import java.time.Instant;
+import java.util.List;
 
 import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.response.OrderResponse;
 import dev.junyoung.trading.order.adapter.in.rest.response.PlaceOrderResponse;
+import dev.junyoung.trading.order.adapter.in.rest.response.TradeResponse;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
+import dev.junyoung.trading.order.application.port.in.GetTradeUseCase;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
+import dev.junyoung.trading.order.application.port.in.result.TradeResult;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -45,8 +50,21 @@ class OrderControllerTest {
     @Mock
     private GetOrderUseCase getOrderUseCase;
 
+    @Mock
+    private GetTradeUseCase getTradeUseCase;
+
     @InjectMocks
     private OrderController sut;
+
+    private static final TradeResult TRADE_RESULT = new TradeResult(
+            "trade-1",
+            "BTC",
+            ORDER_ID,
+            "BUY",
+            50_000L,
+            10L,
+            Instant.parse("2026-03-10T00:00:00Z")
+    );
 
     @Test
     @DisplayName("잘못된 side 값이면 IllegalArgumentException이 발생한다")
@@ -134,5 +152,68 @@ class OrderControllerTest {
         assertThat(response.getBody().orderId()).isEqualTo(ORDER_ID);
         assertThat(response.getBody().side()).isEqualTo("BUY");
         verify(getOrderUseCase).getOrder(ACCOUNT_ID, ORDER_ID);
+    }
+
+    @Nested
+    @DisplayName("getTradesByOrder()")
+    class GetTradesByOrder {
+
+        @Test
+        @DisplayName("useCase에 accountId와 orderId를 전달하고 200을 반환한다")
+        void delegatesToUseCaseAndReturnsOk() {
+            when(getTradeUseCase.getTradesByOrder(ACCOUNT_ID, ORDER_ID)).thenReturn(List.of());
+
+            ResponseEntity<List<TradeResponse>> response = sut.getTradesByOrder(ACCOUNT_ID, ORDER_ID);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            verify(getTradeUseCase).getTradesByOrder(ACCOUNT_ID, ORDER_ID);
+        }
+
+        @Test
+        @DisplayName("TradeResult가 TradeResponse로 변환되어 응답 body에 포함된다")
+        void tradeResultMappedToResponseBody() {
+            when(getTradeUseCase.getTradesByOrder(ACCOUNT_ID, ORDER_ID)).thenReturn(List.of(TRADE_RESULT));
+
+            ResponseEntity<List<TradeResponse>> response = sut.getTradesByOrder(ACCOUNT_ID, ORDER_ID);
+
+            assertThat(response.getBody()).hasSize(1);
+            TradeResponse body = response.getBody().getFirst();
+            assertThat(body.tradeId()).isEqualTo(TRADE_RESULT.tradeId());
+            assertThat(body.symbol()).isEqualTo(TRADE_RESULT.symbol());
+            assertThat(body.orderId()).isEqualTo(TRADE_RESULT.orderId());
+            assertThat(body.side()).isEqualTo(TRADE_RESULT.side());
+            assertThat(body.price()).isEqualTo(TRADE_RESULT.price());
+            assertThat(body.quantity()).isEqualTo(TRADE_RESULT.quantity());
+        }
+    }
+
+    @Nested
+    @DisplayName("getTradesByAccount()")
+    class GetTradesByAccount {
+
+        @Test
+        @DisplayName("useCase에 accountId를 전달하고 200을 반환한다")
+        void delegatesToUseCaseAndReturnsOk() {
+            when(getTradeUseCase.getTradesByAccount(ACCOUNT_ID)).thenReturn(List.of());
+
+            ResponseEntity<List<TradeResponse>> response = sut.getTradesByAccount(ACCOUNT_ID);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+            verify(getTradeUseCase).getTradesByAccount(ACCOUNT_ID);
+        }
+
+        @Test
+        @DisplayName("TradeResult가 TradeResponse로 변환되어 응답 body에 포함된다")
+        void tradeResultMappedToResponseBody() {
+            when(getTradeUseCase.getTradesByAccount(ACCOUNT_ID)).thenReturn(List.of(TRADE_RESULT));
+
+            ResponseEntity<List<TradeResponse>> response = sut.getTradesByAccount(ACCOUNT_ID);
+
+            assertThat(response.getBody()).hasSize(1);
+            TradeResponse body = response.getBody().getFirst();
+            assertThat(body.tradeId()).isEqualTo(TRADE_RESULT.tradeId());
+            assertThat(body.side()).isEqualTo(TRADE_RESULT.side());
+            assertThat(body.price()).isEqualTo(TRADE_RESULT.price());
+        }
     }
 }

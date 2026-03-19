@@ -1,6 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -33,7 +33,6 @@ public class EngineHandler {
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCache orderBookCache;
-	private final OrderRepository orderRepository;
 	private final SettlementService settlementService;
 
 	// -------------------------------------------------------------------------
@@ -59,8 +58,12 @@ public class EngineHandler {
 				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.CancelOrder c -> {
-				Order cancelled = engine.cancelOrder(c.orderId());
-				orderRepository.save(cancelled);
+				try {
+					Order cancelled = engine.cancelOrder(c.orderId());
+					settlementService.cancelSettlement(cancelled);
+				} catch (ConflictException e) {
+					log.warn("Cancel skipped - order not in orderBook: orderId={}", c.orderId(), e);
+				}
 				orderBookCache.update(symbol, orderBook);
 			}
 			case EngineCommand.Shutdown _ ->

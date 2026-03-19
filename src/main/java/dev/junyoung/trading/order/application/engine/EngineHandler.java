@@ -1,10 +1,13 @@
 package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.common.exception.ConflictException;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
@@ -32,7 +35,7 @@ public class EngineHandler {
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
-	private final OrderBookCache orderBookCache;
+	private final OrderBookCachePort orderBookCachePort;
 	private final SettlementService settlementService;
 
 	// -------------------------------------------------------------------------
@@ -50,22 +53,8 @@ public class EngineHandler {
 	 */
 	protected void handle(EngineCommand command) {
 		switch (command) {
-			case EngineCommand.PlaceOrder c -> {
-				Order order = c.order();
-				PlaceResult result = processPlaceOrder(order);
-
-				settlementService.settlement(result);
-				orderBookCache.update(symbol, orderBook);
-			}
-			case EngineCommand.CancelOrder c -> {
-				try {
-					Order cancelled = engine.cancelOrder(c.orderId());
-					settlementService.cancelSettlement(cancelled);
-				} catch (ConflictException e) {
-					log.warn("Cancel skipped - order not in orderBook: orderId={}", c.orderId(), e);
-				}
-				orderBookCache.update(symbol, orderBook);
-			}
+			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
+			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId());
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");
@@ -75,6 +64,27 @@ public class EngineHandler {
 	// -------------------------------------------------------------------------
 	// 내부 헬퍼
 	// -------------------------------------------------------------------------
+
+	private void handlePlaceOrder(Order order) {
+		PlaceResult result = processPlaceOrder(order);
+		settlementService.settlement(result);
+		orderBookCachePort.update(symbol, orderBook);
+	}
+
+	private void handleCancelOrder(OrderId orderId) {
+		Order cancelled = null;
+		try {
+			cancelled = engine.cancelOrder(orderId);
+		} catch (ConflictException e) {
+			log.warn("Cancel skipped - order not in orderBook: orderId={}", orderId, e);
+		}
+
+		try {
+			if (cancelled != null) settlementService.cancelSettlement(cancelled);
+		} finally {
+			orderBookCachePort.update(symbol, orderBook);
+		}
+	}
 
 	/**
 	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.

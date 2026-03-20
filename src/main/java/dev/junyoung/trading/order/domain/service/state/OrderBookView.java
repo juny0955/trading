@@ -23,8 +23,7 @@ import java.util.NavigableMap;
  *   <li>반대로 {@code index}에 객체가 존재하는데 상태(가격·방향)가 큐 위치와 불일치하면 invariant 위반이다.</li>
  * </ul>
  *
- * <p>생성은 {@code OrderBookViewFactory}(application 계층)가 담당한다.
- * Spring 비의존 POJO로 유지한다.</p>
+ * <p>생성은 {@code OrderBookViewFactory}(application 계층)가 담당한다.</p>
  */
 public class OrderBookView {
     private final NavigableMap<Price, Deque<OrderId>> bids;

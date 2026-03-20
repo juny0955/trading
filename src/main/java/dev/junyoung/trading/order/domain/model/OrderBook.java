@@ -82,12 +82,12 @@ public class OrderBook {
 	}
 
 	/** 매수 호가창 스냅샷. 가격 → 잔량 합계 (내림차순) */
-	public NavigableMap<Price, Long> bidsSnapshot() {
+	public NavigableMap<Price, Quantity> bidsSnapshot() {
 		return aggregateDepth(bids);
 	}
 
 	/** 매도 호가창 스냅샷. 가격 → 잔량 합계 (오름차순) */
-	public NavigableMap<Price, Long> asksSnapshot() {
+	public NavigableMap<Price, Quantity> asksSnapshot() {
 		return aggregateDepth(asks);
 	}
 
@@ -182,10 +182,12 @@ public class OrderBook {
 	 * 호가창을 순회해 가격 레벨별 잔량 합계 스냅샷을 생성한다.
 	 * 원본 comparator를 그대로 사용하므로 bids는 내림차순, asks는 오름차순으로 반환된다.
 	 */
-	private NavigableMap<Price, Long> aggregateDepth(NavigableMap<Price, Deque<Order>> book) {
-		NavigableMap<Price, Long> snapshot = new TreeMap<>(book.comparator());
+	private NavigableMap<Price, Quantity> aggregateDepth(NavigableMap<Price, Deque<Order>> book) {
+		NavigableMap<Price, Quantity> snapshot = new TreeMap<>(book.comparator());
 		book.forEach((price, queue) -> {
-			long qty = queue.stream().mapToLong(o -> o.getRemaining().value()).sum();
+			Quantity qty = new Quantity(queue.stream()
+				.mapToLong(o -> o.getRemaining().value())
+				.sum());
 			snapshot.put(price, qty);
 		});
 		return snapshot;

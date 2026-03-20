@@ -1,6 +1,8 @@
 package dev.junyoung.trading.order.adapter.out.cache;
 
 import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 import java.util.Collections;
@@ -28,14 +30,14 @@ public final class OrderBookSnapshot {
 
     /** 앱 기동 직후 또는 미등록 심볼 조회 시 반환되는 빈 스냅샷. NPE 방지용. */
     public static final OrderBookSnapshot EMPTY = new OrderBookSnapshot(
-        Collections.unmodifiableNavigableMap(new TreeMap<Long, Long>(Comparator.reverseOrder())),
-        Collections.unmodifiableNavigableMap(new TreeMap<Long, Long>())
+        Collections.unmodifiableNavigableMap(new TreeMap<>(Comparator.comparing(Price::value).reversed())),
+        Collections.unmodifiableNavigableMap(new TreeMap<>(Comparator.comparing(Price::value)))
     );
 
-    private final NavigableMap<Long, Long> bids;
-    private final NavigableMap<Long, Long> asks;
+    private final NavigableMap<Price, Quantity> bids;
+    private final NavigableMap<Price, Quantity> asks;
 
-    private OrderBookSnapshot(NavigableMap<Long, Long> bids, NavigableMap<Long, Long> asks) {
+    private OrderBookSnapshot(NavigableMap<Price, Quantity> bids, NavigableMap<Price, Quantity> asks) {
         this.bids = bids;
         this.asks = asks;
     }
@@ -45,11 +47,11 @@ public final class OrderBookSnapshot {
      * engine-thread에서만 호출해야 한다.
      */
     public static OrderBookSnapshot from(OrderBook orderBook) {
-        NavigableMap<Long, Long> bids = new TreeMap<>(Comparator.reverseOrder());
-        orderBook.bidsSnapshot().forEach((p, q) -> bids.put(p.value(), q));
+        NavigableMap<Price, Quantity> bids = new TreeMap<>(Comparator.comparing(Price::value).reversed());
+        bids.putAll(orderBook.bidsSnapshot());
 
-        NavigableMap<Long, Long> asks = new TreeMap<>();
-        orderBook.asksSnapshot().forEach((p, q) -> asks.put(p.value(), q));
+        NavigableMap<Price, Quantity> asks = new TreeMap<>(Comparator.comparing(Price::value));
+        asks.putAll(orderBook.asksSnapshot());
 
         return new OrderBookSnapshot(
             Collections.unmodifiableNavigableMap(bids),
@@ -62,8 +64,8 @@ public final class OrderBookSnapshot {
     // -------------------------------------------------------------------------
 
     /** 매수 호가 맵 (가격 내림차순). 불변. */
-    public NavigableMap<Long, Long> bids() { return bids; }
+    public NavigableMap<Price, Quantity> bids() { return bids; }
 
     /** 매도 호가 맵 (가격 오름차순). 불변. */
-    public NavigableMap<Long, Long> asks() { return asks; }
+    public NavigableMap<Price, Quantity> asks() { return asks; }
 }

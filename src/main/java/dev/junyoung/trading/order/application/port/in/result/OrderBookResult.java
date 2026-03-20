@@ -1,9 +1,12 @@
 package dev.junyoung.trading.order.application.port.in.result;
 
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+
 import java.util.NavigableMap;
 
 public record OrderBookResult(
-    NavigableMap<Long, Long> bids,
-    NavigableMap<Long, Long> asks
+    NavigableMap<Price, Quantity> bids,
+    NavigableMap<Price, Quantity> asks
 ) {
 }

@@ -13,10 +13,10 @@ public record OrderBookResponse(
     public static OrderBookResponse from(OrderBookResult result) {
         return new OrderBookResponse(
             result.bids().entrySet().stream()
-                .map(e -> new PriceLevel(e.getKey(), e.getValue()))
+                .map(e -> new PriceLevel(e.getKey().value(), e.getValue().value()))
                 .toList(),
             result.asks().entrySet().stream()
-                .map(e -> new PriceLevel(e.getKey(), e.getValue()))
+                .map(e -> new PriceLevel(e.getKey().value(), e.getValue().value()))
                 .toList()
         );
     }

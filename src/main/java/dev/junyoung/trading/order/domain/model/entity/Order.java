@@ -291,6 +291,8 @@ public class Order {
 
     public boolean isFinal() { return status.isFinal(); }
 
+    public boolean isActive() { return status.isActive(); }
+
     public Optional<Long> getQuantityValue() {
         return Optional.ofNullable(quantity).map(Quantity::value);
     }

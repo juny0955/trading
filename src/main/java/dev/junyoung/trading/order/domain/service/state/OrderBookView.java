@@ -1,17 +1,17 @@
 package dev.junyoung.trading.order.domain.service.state;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.Optional;
+
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
-
-import java.util.ArrayDeque;
-import java.util.Collection;
-import java.util.Deque;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.Optional;
 
 /**
  * MatchingEngine 계산 전용 호가창 working copy.
@@ -104,18 +104,15 @@ public class OrderBookView {
      * </ul>
      */
     public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
-        NavigableMap<Price, Deque<OrderId>> matchingBook = makerSide.isBuy()
-            ? bids.headMap(limitPrice, true)
-            : asks.headMap(limitPrice, true);
-
-        long total = matchingBook.values().stream()
-            .flatMap(Collection::stream)
-            .mapToLong(id -> {
-                Order o = index.get(id);
-                return o != null ? o.getRemaining().value() : 0L;
-            })
-            .sum();
-        return new Quantity(total);
+        NavigableMap<Price, Deque<OrderId>> book = bookOf(makerSide);
+        return new Quantity(
+            book.headMap(limitPrice, true).values().stream()
+                .flatMap(Deque::stream)
+                .map(index::get)
+                .filter(Objects::nonNull)
+                .mapToLong(order -> order.getRemaining().value())
+                .sum()
+        );
     }
 
     // -------------------------------------------------------------------------

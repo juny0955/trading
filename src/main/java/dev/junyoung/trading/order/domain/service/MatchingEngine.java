@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
@@ -47,7 +47,7 @@ public final class MatchingEngine {
 	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
 	 */
 	public PlaceResult placeLimitOrder(Order taker) {
-		return placeOrder(taker, orderBook::add);
+		return placeOrder(taker, t -> { orderBook.add(t); return t; });
 	}
 
 	/**
@@ -82,8 +82,8 @@ public final class MatchingEngine {
 		Quantity availableQty = orderBook.totalAvailableQty(makerSide, taker.getLimitPriceOrThrow());
 
 		if (availableQty.value() < taker.getQuantity().value()) {
-			taker.activate();
-			taker.cancel();
+			taker = taker.activate();
+			taker = taker.cancel();
 			return PlaceResult.of(List.of(taker), List.of());
 		}
 
@@ -118,7 +118,7 @@ public final class MatchingEngine {
 	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
 	 */
 	public PlaceResult placeMarketBuyOrderWithQuoteQty(Order taker) {
-		taker.activate();
+		taker = taker.activate();
 
 		long remainingQuote = taker.getQuoteQty().value();
 		int executedTradeCount = 0;
@@ -138,8 +138,8 @@ public final class MatchingEngine {
 			trades.add(Trade.of(taker, maker, executedQty));
 			long tradedQuote = Math.multiplyExact(executedPrice.value(), executedQty.value());
 
-			maker.fill(executedQty, executedPrice);
-			taker.fillQuoteMode(executedQty, executedPrice);
+			maker = maker.fill(executedQty, executedPrice);
+			taker = taker.fillQuoteMode(executedQty, executedPrice);
 			remainingQuote = Math.subtractExact(remainingQuote, tradedQuote);
 			executedTradeCount++;
 
@@ -149,9 +149,9 @@ public final class MatchingEngine {
 		}
 
 		if (executedTradeCount > 0)
-			taker.markFilledByMarketBuy();
+			taker = taker.markFilledByMarketBuy();
 		else
-			taker.cancel();
+			taker = taker.cancel();
 
 		List<Order> updatedOrders = Stream.concat(updatedMakers.stream(), Stream.of(taker)).toList();
 		return PlaceResult.of(updatedOrders, trades);
@@ -172,7 +172,7 @@ public final class MatchingEngine {
 		Order order = orderBook.remove(orderId)
 			.orElseThrow(() -> new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed or Cancelled Order"));
 
-		order.cancel();
+		order = order.cancel();
 		return order;
 	}
 
@@ -195,11 +195,12 @@ public final class MatchingEngine {
 	 *                    ({@code orderBook::add}: 호가창 등록 / {@code Order::cancel}: 즉시 취소)
 	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
 	 */
-	private PlaceResult placeOrder(Order taker, Consumer<Order> onRemaining) {
-		taker.activate();
+	private PlaceResult placeOrder(Order taker, UnaryOperator<Order> onRemaining) {
+		taker = taker.activate();
 		MatchLoopResult loop = runMatchingLoop(taker);
+		taker = loop.updatedTaker();
 		if (taker.getRemaining().value() > 0)
-			onRemaining.accept(taker);
+			taker = onRemaining.apply(taker);
 
 		List<Order> updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
 		return PlaceResult.of(updatedOrders, loop.trades());
@@ -225,14 +226,14 @@ public final class MatchingEngine {
 			Price executedPrice = maker.getLimitPriceOrThrow();
 			trades.add(Trade.of(taker, maker, executedQty));
 
-			maker.fill(executedQty, executedPrice);
-			taker.fill(executedQty, executedPrice);
+			maker = maker.fill(executedQty, executedPrice);
+			taker = taker.fill(executedQty, executedPrice);
 			if (maker.getRemaining().value() == 0)
 				orderBook.poll(side);
 
 			updatedMakers.add(maker);
 		}
-		return new MatchLoopResult(trades, updatedMakers);
+		return new MatchLoopResult(trades, updatedMakers, taker);
 	}
 
 	/**
@@ -254,5 +255,5 @@ public final class MatchingEngine {
 	// 내부 레코드
 	// -------------------------------------------------------------------------
 
-	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers) {}
+	private record MatchLoopResult(List<Trade> trades, List<Order> updatedMakers, Order updatedTaker) {}
 }

@@ -1,12 +1,17 @@
 package dev.junyoung.trading.order.domain.service.state;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
 
+import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Optional;
 
 /**
  * MatchingEngine 계산 전용 호가창 working copy.
@@ -38,5 +43,93 @@ public class OrderBookView {
         this.bids = bids;
         this.asks = asks;
         this.index = index;
+    }
+
+    public void add(Order order) {
+        bookOf(order.getSide())
+            .computeIfAbsent(order.getLimitPriceOrThrow(), _ -> new ArrayDeque<>())
+            .addLast(order.getOrderId());
+        index.put(order.getOrderId(), order);
+    }
+
+    /**
+     * 해당 방향의 최우선 주문을 조회한다 (큐에서 제거하지 않음).
+     * stale ID는 탐색 과정에서 자동으로 정리된다.
+     */
+    public Optional<Order> peek(Side side) {
+        NavigableMap<Price, Deque<OrderId>> book = bookOf(side);
+        while (!book.isEmpty()) {
+            Deque<OrderId> queue = book.firstEntry().getValue();
+            while (!queue.isEmpty()) {
+                OrderId id = queue.peekFirst();
+                Order order = index.get(id);
+                if (order != null) return Optional.of(order);
+                queue.pollFirst(); // lazy-skip: index에 없는 stale id 제거
+            }
+            book.pollFirstEntry(); // 빈 가격 레벨 제거
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 해당 방향의 최우선 주문을 소비(큐 + index에서 제거)한다.
+     * stale ID는 탐색 과정에서 자동으로 정리된다.
+     */
+    public void poll(Side side) {
+        NavigableMap<Price, Deque<OrderId>> book = bookOf(side);
+        while (!book.isEmpty()) {
+            Deque<OrderId> queue = book.firstEntry().getValue();
+            while (!queue.isEmpty()) {
+                OrderId id = queue.pollFirst();
+                Order order = index.remove(id);
+                if (order != null) {
+                    removeFirstLevelIfEmpty(book);
+                    return; // 실제 주문 소비 완료
+                }
+                // stale id였으면 계속 탐색
+            }
+            book.pollFirstEntry(); // 빈 가격 레벨 제거
+        }
+    }
+
+    public void replaceInIndex(Order order) {
+        index.put(order.getOrderId(), order);
+    }
+
+    /**
+     * FOK 사전 충족성 검사용. makerSide 방향에서 limitPrice 조건을 만족하는 총 잔량을 집계한다.
+     * <ul>
+     *   <li>SELL maker: asks 오름차순에서 price ≤ limitPrice 인 레벨 합산</li>
+     *   <li>BUY  maker: bids 내림차순에서 price ≥ limitPrice 인 레벨 합산</li>
+     * </ul>
+     */
+    public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
+        NavigableMap<Price, Deque<OrderId>> matchingBook = makerSide.isBuy()
+            ? bids.headMap(limitPrice, true)
+            : asks.headMap(limitPrice, true);
+
+        long total = matchingBook.values().stream()
+            .flatMap(Collection::stream)
+            .mapToLong(id -> {
+                Order o = index.get(id);
+                return o != null ? o.getRemaining().value() : 0L;
+            })
+            .sum();
+        return new Quantity(total);
+    }
+
+    // -------------------------------------------------------------------------
+    // 내부 헬퍼
+    // -------------------------------------------------------------------------
+
+    private NavigableMap<Price, Deque<OrderId>> bookOf(Side side) {
+        return side.isBuy() ? bids : asks;
+    }
+
+    /** 최우선 가격 레벨의 큐가 비었으면 해당 레벨을 제거한다. */
+    private void removeFirstLevelIfEmpty(NavigableMap<Price, Deque<OrderId>> book) {
+        if (!book.isEmpty() && book.firstEntry().getValue().isEmpty()) {
+            book.pollFirstEntry();
+        }
     }
 }

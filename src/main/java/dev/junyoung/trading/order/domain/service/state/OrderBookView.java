@@ -96,6 +96,11 @@ public class OrderBookView {
         index.put(order.getOrderId(), order);
     }
 
+
+    public void removeInIndex(OrderId orderId) {
+        index.remove(orderId);
+    }
+
     /**
      * FOK 사전 충족성 검사용. makerSide 방향에서 limitPrice 조건을 만족하는 총 잔량을 집계한다.
      * <ul>

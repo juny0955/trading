@@ -15,7 +15,11 @@ public sealed interface PlaceCalculationResult
 			List<Order> updatedOrders,
 			List<Trade> trades,
 			List<BookOperation> bookOps
-		) implements PlaceCalculationResult {}
+		) implements PlaceCalculationResult {
+			public Accepted(Symbol symbol, long acceptedSeq, List<Order> updatedOrders) {
+				this(symbol, acceptedSeq, updatedOrders, List.of(), List.of());
+			}
+		}
 
 		record Rejected(
 			Symbol symbol,

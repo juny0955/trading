@@ -13,11 +13,11 @@ import java.util.concurrent.BlockingQueue;
  * 단일 심볼의 매칭 엔진을 구성하는 모든 컴포넌트를 담는 컨테이너.
  *
  * <p>Spring 빈이 아니며 {@link EngineManager}가 직접 생성·소유한다.
- * 생성자에서 {@link java.util.concurrent.BlockingQueue}, {@link OrderBook},
+ * 생성자에서 {@link BlockingQueue}, {@link OrderBook},
  * {@link EngineThread}, {@link MatchingEngine}, {@link EngineHandler}, {@link EngineLoop}를 조립하므로
  * 각 컴포넌트는 심볼 단위로 완전히 격리된다.</p>
  */
-public class EngineContext {
+public class EngineRuntime {
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -28,11 +28,11 @@ public class EngineContext {
     private final EngineLoop engineLoop;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
-    protected EngineContext(Symbol symbol, OrderBookCachePort orderBookCachePort, SettlementService settlementService) {
+    protected EngineRuntime(Symbol symbol, OrderBookCachePort orderBookCachePort, SettlementService settlementService) {
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
-        MatchingEngine matchingEngine = new MatchingEngine(orderBook);
+        MatchingEngine matchingEngine = new MatchingEngine();
         EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookCachePort, settlementService);
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread);
     }

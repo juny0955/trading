@@ -15,6 +15,8 @@ import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 
 /**
@@ -28,7 +30,10 @@ public final class MatchingEngine {
 	// 진입점 (public API)
 	// -------------------------------------------------------------------------
 
-	public PlaceCalculationResult calculatePlace(OrderBookView view, Order taker) {
+	public PlaceCalculationResult calculatePlace(PlaceCalculationInput input) {
+		Order taker = input.taker();
+		OrderBookView view = input.view();
+
 		if (taker.isMarket()) {
 			if (taker.isBuy()) {
 				if (!taker.isQuoteQtyMode())
@@ -45,7 +50,10 @@ public final class MatchingEngine {
 		};
 	}
 
-	public CancelCalculationResult calculateCancel(OrderBookView view, Order target) {
+	public CancelCalculationResult calculateCancel(CancelCalculationInput input) {
+		Order target = input.target();
+		OrderBookView view = input.view();
+
 		if (target.isFinal())
 			return new CancelCalculationResult.Skipped(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.ORDER_ALREADY_FINAL);
 

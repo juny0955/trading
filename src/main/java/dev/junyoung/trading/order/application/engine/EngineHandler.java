@@ -11,6 +11,8 @@ import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 
 import java.util.List;
@@ -85,7 +87,7 @@ public class EngineHandler {
 		}
 
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		CancelCalculationResult result = engine.calculateCancel(view, order);
+		CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(view, order));
 
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
@@ -106,7 +108,7 @@ public class EngineHandler {
 	 */
 	private PlaceResult processPlaceOrder(Order order) {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		PlaceCalculationResult result = engine.calculatePlace(view, order);
+		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
 
 		return switch (result) {
 			case PlaceCalculationResult.Rejected r -> {

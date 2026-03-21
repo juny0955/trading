@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -28,6 +29,7 @@ import java.util.Optional;
  * {@link #create(OrderId, AccountId, String, long, Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
  */
 @Getter
+@Builder(toBuilder = true)
 public class Order {
 
     private final OrderId orderId;
@@ -46,10 +48,10 @@ public class Order {
     private final QuoteQty quoteQty;
     private final Quantity quantity;
 
-    private Quantity remaining;
-    private OrderStatus status;
-    private QuoteQty cumQuoteQty;
-    private Quantity cumBaseQty;
+    private final Quantity remaining;
+    private final OrderStatus status;
+    private final QuoteQty cumQuoteQty;
+    private final Quantity cumBaseQty;
 
     private final Instant orderedAt;
     private final Instant createdAt;
@@ -201,51 +203,45 @@ public class Order {
     /** 지정가 주문을 생성한다. */
     private static Order createLimit(OrderId orderId, AccountId accountId, String clientOrderId, long acceptedSeq,
         Side side, Symbol symbol, TimeInForce tif, Price price, Quantity quantity) {
-        return new Order(
-            orderId,
-            accountId,
-            clientOrderId,
-            acceptedSeq,
-            side,
-            symbol,
-            OrderType.LIMIT,
-            tif,
-            price,
-            null,
-            quantity,
-            quantity,
-            OrderStatus.ACCEPTED,
-            new QuoteQty(0),
-            new Quantity(0),
-            Instant.now(),
-            null,
-            null
-        );
+        return Order.builder()
+            .orderId(orderId)
+            .accountId(accountId)
+            .clientOrderId(clientOrderId)
+            .acceptedSeq(acceptedSeq)
+            .side(side)
+            .symbol(symbol)
+            .orderType(OrderType.LIMIT)
+            .tif(tif)
+            .price(price)
+            .quantity(quantity)
+            .remaining(quantity)
+            .status(OrderStatus.ACCEPTED)
+            .cumBaseQty(Quantity.zero())
+            .cumQuoteQty(QuoteQty.zero())
+            .orderedAt(Instant.now())
+            .build();
     }
 
     /** MARKET SELL 주문을 생성한다. TIF는 IOC로 고정된다. */
     private static Order createMarketSell(OrderId orderId, AccountId accountId, String clientOrderId, long acceptedSeq,
         Side side, Symbol symbol, Quantity quantity) {
-        return new Order(
-            orderId,
-            accountId,
-            clientOrderId,
-            acceptedSeq,
-            side,
-            symbol,
-            OrderType.MARKET,
-            TimeInForce.IOC,
-            null,
-            null,
-            quantity,
-            quantity,
-            OrderStatus.ACCEPTED,
-            new QuoteQty(0),
-            new Quantity(0),
-            Instant.now(),
-            null,
-            null
-        );
+
+        return Order.builder()
+            .orderId(orderId)
+            .accountId(accountId)
+            .clientOrderId(clientOrderId)
+            .acceptedSeq(acceptedSeq)
+            .side(side)
+            .symbol(symbol)
+            .orderType(OrderType.MARKET)
+            .tif(TimeInForce.IOC)
+            .quantity(quantity)
+            .remaining(quantity)
+            .status(OrderStatus.ACCEPTED)
+            .cumBaseQty(Quantity.zero())
+            .cumQuoteQty(QuoteQty.zero())
+            .orderedAt(Instant.now())
+            .build();
     }
 
     /**
@@ -254,26 +250,23 @@ public class Order {
      */
     private static Order createMarketBuyWithQuoteQty(OrderId orderId, AccountId accountId, String clientOrderId, long acceptedSeq,
         Side side, Symbol symbol, QuoteQty quoteQty) {
-        return new Order(
-            orderId,
-            accountId,
-            clientOrderId,
-            acceptedSeq,
-            side,
-            symbol,
-            OrderType.MARKET,
-            TimeInForce.IOC,
-            null,
-            quoteQty,
-            null,
-            new Quantity(0),
-            OrderStatus.ACCEPTED,
-            new QuoteQty(0),
-            new Quantity(0),
-            Instant.now(),
-            null,
-            null
-        );
+
+        return Order.builder()
+            .orderId(orderId)
+            .accountId(accountId)
+            .clientOrderId(clientOrderId)
+            .acceptedSeq(acceptedSeq)
+            .side(side)
+            .symbol(symbol)
+            .orderType(OrderType.MARKET)
+            .tif(TimeInForce.IOC)
+            .quoteQty(quoteQty)
+            .remaining(new Quantity(0))
+            .status(OrderStatus.ACCEPTED)
+            .cumBaseQty(Quantity.zero())
+            .cumQuoteQty(QuoteQty.zero())
+            .orderedAt(Instant.now())
+            .build();
     }
 
     // -------------------------------------------------------------------------
@@ -290,6 +283,8 @@ public class Order {
     }
 
     public boolean isFinal() { return status.isFinal(); }
+
+    public boolean isActive() { return status.isActive(); }
 
     public Optional<Long> getQuantityValue() {
         return Optional.ofNullable(quantity).map(Quantity::value);
@@ -320,11 +315,13 @@ public class Order {
      *
      * @throws ConflictException 현재 상태가 ACCEPTED가 아닌 경우
      */
-    public void activate() {
+    public Order activate() {
         if (status != OrderStatus.ACCEPTED)
             throw new ConflictException("ORDER_INVALID_STATE", "Order is not in accepted state: " + status);
 
-        this.status = OrderStatus.NEW;
+        return this.toBuilder()
+            .status(OrderStatus.NEW)
+            .build();
     }
 
     /**
@@ -343,16 +340,19 @@ public class Order {
      * @param executedPrice 체결가 (maker의 지정가)
      * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
-    public void fill(Quantity executedQty, Price executedPrice) {
+    public Order fill(Quantity executedQty, Price executedPrice) {
         requireActive();
 
         long executedBase = executedQty.value();
         long executedQuote = Math.multiplyExact(executedPrice.value(), executedBase);
 
-        this.cumBaseQty = this.cumBaseQty.add(executedBase);
-        this.cumQuoteQty = this.cumQuoteQty.add(executedQuote);
-        this.remaining = remaining.sub(executedQty);
-        this.status = remaining.isPositive() ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED;
+        Quantity afterRemaining = remaining.sub(executedQty);
+        return this.toBuilder()
+            .cumBaseQty(cumBaseQty.add(executedBase))
+            .cumQuoteQty(cumQuoteQty.add(executedQuote))
+            .remaining(afterRemaining)
+            .status(afterRemaining.isPositive() ? OrderStatus.PARTIALLY_FILLED : OrderStatus.FILLED)
+            .build();
     }
 
     /**
@@ -367,14 +367,16 @@ public class Order {
      * @param executedPrice 체결가 (maker의 지정가)
      * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
-    public void fillQuoteMode(Quantity executedQty, Price executedPrice) {
+    public Order fillQuoteMode(Quantity executedQty, Price executedPrice) {
         requireActive();
 
         long executedBase = executedQty.value();
         long executedQuote = Math.multiplyExact(executedPrice.value(), executedBase);
 
-        this.cumBaseQty = this.cumBaseQty.add(executedBase);
-        this.cumQuoteQty = this.cumQuoteQty.add(executedQuote);
+        return this.toBuilder()
+            .cumBaseQty(cumBaseQty.add(executedBase))
+            .cumQuoteQty(cumQuoteQty.add(executedQuote))
+            .build();
     }
 
     /**
@@ -382,9 +384,12 @@ public class Order {
      *
      * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
-    public void markFilledByMarketBuy() {
+    public Order markFilledByMarketBuy() {
         requireActive();
-        this.status = OrderStatus.FILLED;
+
+        return this.toBuilder()
+            .status(OrderStatus.FILLED)
+            .build();
     }
 
     /**
@@ -392,9 +397,12 @@ public class Order {
      *
      * @throws ConflictException 현재 상태가 활성 상태가 아닌 경우
      */
-    public void cancel() {
+    public Order cancel() {
         requireActive();
-        this.status = OrderStatus.CANCELLED;
+
+        return this.toBuilder()
+            .status(OrderStatus.CANCELLED)
+            .build();
     }
 
     // -------------------------------------------------------------------------

@@ -13,4 +13,9 @@ public enum OrderStatus {
     public boolean isFinal() {
         return this == CANCELLED || this == FILLED;
     }
+
+    /** 활설 상태({@link #NEW} 또는 {@link #PARTIALLY_FILLED}) 여부를 반환한다. */
+    public boolean isActive() {
+        return this == NEW || this == PARTIALLY_FILLED;
+    }
 }

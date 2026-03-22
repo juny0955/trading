@@ -7,6 +7,7 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
 
+import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -63,7 +64,10 @@ public class OrderBookView {
             while (!queue.isEmpty()) {
                 OrderId id = queue.peekFirst();
                 Order order = index.get(id);
-                if (order != null) return Optional.of(order);
+                if (order != null) {
+                    validateQueueOrderInvariant(order, side, book.firstEntry().getKey());
+                    return Optional.of(order);
+                }
                 queue.pollFirst(); // lazy-skip: index에 없는 stale id 제거
             }
             book.pollFirstEntry(); // 빈 가격 레벨 제거
@@ -83,6 +87,7 @@ public class OrderBookView {
                 OrderId id = queue.pollFirst();
                 Order order = index.remove(id);
                 if (order != null) {
+                    validateQueueOrderInvariant(order, side, book.firstEntry().getKey());
                     removeFirstLevelIfEmpty(book);
                     return; // 실제 주문 소비 완료
                 }
@@ -93,11 +98,13 @@ public class OrderBookView {
     }
 
     public void replaceInIndex(Order order) {
+        // queue의 FIFO 위치는 유지하고, 최신 상태 소스인 index만 교체한다.
         index.put(order.getOrderId(), order);
     }
 
 
     public void removeInIndex(OrderId orderId) {
+        // lazy removal: queue의 stale id는 이후 peek/poll 시점에 정리된다.
         index.remove(orderId);
     }
 
@@ -111,11 +118,12 @@ public class OrderBookView {
     public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
         NavigableMap<Price, Deque<OrderId>> book = bookOf(makerSide);
         return new Quantity(
-            book.headMap(limitPrice, true).values().stream()
-                .flatMap(Deque::stream)
-                .map(index::get)
-                .filter(Objects::nonNull)
-                .mapToLong(order -> order.getRemaining().value())
+            book.headMap(limitPrice, true).entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                    .map(id -> Map.entry(entry.getKey(), index.get(id))))
+                .filter(entry -> Objects.nonNull(entry.getValue()))
+                .peek(entry -> validateQueueOrderInvariant(entry.getValue(), makerSide, entry.getKey()))
+                .mapToLong(entry -> entry.getValue().getRemaining().value())
                 .sum()
         );
     }
@@ -133,5 +141,17 @@ public class OrderBookView {
         if (!book.isEmpty() && book.firstEntry().getValue().isEmpty()) {
             book.pollFirstEntry();
         }
+    }
+
+    private void validateQueueOrderInvariant(Order order, Side side, Price price) {
+        // stale id(index miss)는 정상 상태지만, 살아있는 주문의 위치 불일치는 데이터 오염이다.
+        if (order.isMarket())
+            throw new OrderBookInvariantViolationException("order is market: " + order.getOrderId());
+        if (order.isFinal())
+            throw new OrderBookInvariantViolationException("order is final: " + order.getOrderId());
+        if (!order.getSide().equals(side))
+            throw new OrderBookInvariantViolationException("side mismatch: " + order.getOrderId());
+        if (!order.getLimitPriceOrThrow().equals(price))
+            throw new OrderBookInvariantViolationException("price mismatch: " + order.getOrderId());
     }
 }

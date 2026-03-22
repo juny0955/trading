@@ -4,7 +4,9 @@ import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.records.OrdersRecord;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -66,6 +68,15 @@ public class JooqOrderRepository implements OrderRepository {
         return dslContext.select(DSL.max(Tables.ORDERS.ACCEPTED_SEQ))
             .from(Tables.ORDERS)
             .fetchOptionalInto(Long.class);
+    }
+
+    @Override
+    public List<Order> findOpenOrdersBySymbol(Symbol symbol) {
+        return dslContext.selectFrom(Tables.ORDERS)
+            .where(Tables.ORDERS.SYMBOL.eq(symbol.value()))
+            .and(Tables.ORDERS.STATUS.notIn(OrderStatus.FILLED.name(), OrderStatus.CANCELLED.name()))
+            .orderBy(Tables.ORDERS.ACCEPTED_SEQ.asc())
+            .fetch(JooqOrderMapper::toDomain);
     }
 
     @Override

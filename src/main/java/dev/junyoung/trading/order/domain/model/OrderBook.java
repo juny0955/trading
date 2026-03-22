@@ -181,6 +181,13 @@ public class OrderBook {
 		return Optional.ofNullable(index.remove(orderId));
 	}
 
+	public void rebuild(List<Order> orders) {
+		bids.clear();
+		asks.clear();
+		index.clear();
+		orders.forEach(this::add);
+	}
+
 	// -------------------------------------------------------------------------
 	// 내부 헬퍼
 	// -------------------------------------------------------------------------

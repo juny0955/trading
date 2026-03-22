@@ -29,7 +29,7 @@ import java.util.Optional;
  * {@link #create(OrderId, AccountId, String, long, Symbol, Side, OrderType, TimeInForce, Price, QuoteQty, Quantity)}이다.
  */
 @Getter
-@Builder(toBuilder = true)
+@Builder(toBuilder = true, access = AccessLevel.PRIVATE)
 public class Order {
 
     private final OrderId orderId;

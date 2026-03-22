@@ -3,10 +3,12 @@ package dev.junyoung.trading.order.application.engine;
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -30,22 +32,28 @@ public class EngineRuntime implements EngineRuntimeOwner{
     private static final int QUEUE_CAPACITY = 10_000;
 
     private final Symbol symbol;
+    private final OrderBook orderBook;
     private final EngineLoop engineLoop;
+    private final OrderBookCachePort orderBookCachePort;
+    private final OrderBookRebuilder orderBookRebuilder;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
     protected EngineRuntime(
         Symbol symbol,
         OrderBookCachePort orderBookCachePort,
         OrderBookProjectionApplier orderBookProjectionApplier,
-        EngineResultPersistenceService engineResultPersistenceService
+        EngineResultPersistenceService engineResultPersistenceService,
+        OrderBookRebuilder orderBookRebuilder
     ) {
         this.symbol = symbol;
+        this.orderBook = new OrderBook();
+        this.orderBookCachePort = orderBookCachePort;
+        this.orderBookRebuilder = orderBookRebuilder;
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-        OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();
         EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, this);
-        this.engineLoop = new EngineLoop(queue, engineHandler, engineThread);
+        this.engineLoop = new EngineLoop(queue, engineHandler, engineThread, this);
     }
 
     // -------------------------------------------------------------------------
@@ -71,6 +79,12 @@ public class EngineRuntime implements EngineRuntimeOwner{
     }
 
     @Override
+    public void transitionToActive() {
+        state = EngineSymbolState.ACTIVE;
+        log.info("[{}] Engine transitioning to ACTIVE", symbol.value());
+    }
+
+    @Override
     public void transitionToRebuilding() {
         state = EngineSymbolState.REBUILDING;
         log.warn("[{}] Engine transitioning to REBUILDING — rebuild required", symbol.value());
@@ -83,8 +97,15 @@ public class EngineRuntime implements EngineRuntimeOwner{
     }
 
     @Override
-    public void transitionToHalted() {
-        state = EngineSymbolState.HALTED;
-        log.error("[{}] Engine HALTED — critical invariant violation or split-brain", symbol.value());
+    public void attemptRebuild() {
+        try {
+            List<Order> openOrders = orderBookRebuilder.loadOpenOrders(symbol);
+            orderBook.rebuild(openOrders);
+            orderBookCachePort.update(symbol, orderBook);
+            transitionToActive();
+        } catch (Exception e) {
+            transitionToDirty();
+            log.error("[{}] Rebuild failed — engine DIRTY, manual intervention required", symbol.value(), e);
+        }
     }
 }

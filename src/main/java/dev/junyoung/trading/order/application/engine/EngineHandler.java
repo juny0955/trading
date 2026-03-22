@@ -2,10 +2,13 @@ package dev.junyoung.trading.order.application.engine;
 
 import java.util.List;
 
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
+import dev.junyoung.trading.order.application.exception.engine.RetryablePersistenceException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -65,7 +68,7 @@ public class EngineHandler {
 
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
-			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId());
+			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId(), c.requesterAccountId());
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");
@@ -88,7 +91,7 @@ public class EngineHandler {
 
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
-				engineResultPersistenceService.persistPlaceResult(a);
+				persistPlace(a);
 				applyToOrderBook(orderBook, a.bookOps());
 				updateCache();
 			}
@@ -97,18 +100,13 @@ public class EngineHandler {
 		}
 	}
 
-	private void handleCancelOrder(OrderId orderId) {
+	private void handleCancelOrder(OrderId orderId, AccountId requesterAccountId) {
 		Order order = orderBook.getIndex().get(orderId);
-		if (order == null) {
-			log.warn("Cancel skipped - order not in book: orderId={}", orderId);
-			return;
-		}
-
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		CancelCalculationResult result;
 
 		try {
-			result = engine.calculateCancel(new CancelCalculationInput(view, order));
+			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, orderId, requesterAccountId, order));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -116,7 +114,7 @@ public class EngineHandler {
 
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
-				engineResultPersistenceService.persistCancelResult(c);
+				persistCancel(c);
 				applyToOrderBook(orderBook, c.bookOps());
 				updateCache();
 			}
@@ -127,10 +125,37 @@ public class EngineHandler {
 		}
 	}
 
+	private void persistPlace(PlaceCalculationResult.Accepted accepted) {
+		try {
+			engineResultPersistenceService.persistPlaceResult(accepted);
+		} catch (RetryablePersistenceException e) {
+			// retryable 실패는 live book을 건드리지 않은 채 상위로 전파한다.
+			throw e;
+		} catch (PersistenceInvariantViolationException e) {
+			// persistence 모델과 계산 결과가 어긋난 경우는 즉시 DIRTY로 격리한다.
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
+	}
+
+	private void persistCancel(CancelCalculationResult.Cancelled cancelled) {
+		try {
+			engineResultPersistenceService.persistCancelResult(cancelled);
+		} catch (RetryablePersistenceException e) {
+			// retryable 실패는 live book을 건드리지 않은 채 상위로 전파한다.
+			throw e;
+		} catch (PersistenceInvariantViolationException e) {
+			// persistence 모델과 계산 결과가 어긋난 경우는 즉시 DIRTY로 격리한다.
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
+	}
+
 	private void applyToOrderBook(OrderBook orderBook, List<BookOperation> ops) {
 		try {
 			orderBookProjectionApplier.apply(orderBook, ops);
 		} catch (Exception e) {
+			// DB 반영 이후 live projection이 실패하면 rebuild만이 일관성 복구 수단이다.
 			runtimeOwner.transitionToRebuilding();
 			throw e;
 		}

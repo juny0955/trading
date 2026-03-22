@@ -11,8 +11,5 @@ public enum EngineSymbolState {
     REBUILDING,
 
     /// live/DB 정합성 미보장. 자동 처리 금지
-    DIRTY,
-
-    /// split-brain 또는 치명적 invariant 위반. 운영 개입 필요
-    HALTED
+    DIRTY
 }

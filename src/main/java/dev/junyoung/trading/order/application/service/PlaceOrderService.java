@@ -3,7 +3,7 @@ package dev.junyoung.trading.order.application.service;
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
@@ -30,7 +30,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     private final AccountQueryPort accountQueryPort;
     private final HoldReservationPort holdReservationPort;
     private final OrderRepository orderRepository;
-    private final EngineManager engineManager;
+    private final OrderCommandGateway engineCommandGateway;
     private final OrderCompensationService orderCompensationService;
     private final OrderMetrics orderMetrics;
 
@@ -68,7 +68,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             @Override
             public void afterCommit() {
                 try {
-                    engineManager.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+                    engineCommandGateway.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
                 } catch (Exception e) {
                     try {
                         orderCompensationService.compensate(order);

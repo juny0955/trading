@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -24,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class EngineManager {
+public class EngineManager implements OrderCommandGateway {
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -75,6 +76,7 @@ public class EngineManager {
      *
      * @throws UnsupportedSymbolException 등록되지 않은 심볼인 경우
      */
+    @Override
     public void submit(Symbol symbol, EngineCommand command) {
         EngineRuntime ctx = contexts.get(symbol);
         if (ctx == null) throw new UnsupportedSymbolException(symbol.value());

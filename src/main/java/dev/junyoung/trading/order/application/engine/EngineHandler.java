@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
 import dev.junyoung.trading.order.application.exception.engine.RetryablePersistenceException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -42,7 +43,7 @@ public class EngineHandler {
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
-	private final OrderBookProjectionApplier orderBookProjectionApplier;
+	private final OrderBookStateApplier orderBookStateApplier;
 	private final OrderBookCachePort orderBookCachePort;
 	private final EngineResultPersistenceService engineResultPersistenceService;
 	private final EngineRuntimeOwner runtimeOwner;
@@ -92,7 +93,7 @@ public class EngineHandler {
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
 				persistPlace(a);
-				applyToOrderBook(orderBook, a.bookOps());
+				applyToOrderBook(a.bookOps());
 				updateCache();
 			}
 			case PlaceCalculationResult.Rejected r ->
@@ -115,7 +116,7 @@ public class EngineHandler {
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
 				persistCancel(c);
-				applyToOrderBook(orderBook, c.bookOps());
+				applyToOrderBook(c.bookOps());
 				updateCache();
 			}
 			case CancelCalculationResult.Skipped s ->
@@ -151,9 +152,9 @@ public class EngineHandler {
 		}
 	}
 
-	private void applyToOrderBook(OrderBook orderBook, List<BookOperation> ops) {
+	private void applyToOrderBook(List<BookOperation> ops) {
 		try {
-			orderBookProjectionApplier.apply(orderBook, ops);
+			orderBookStateApplier.apply(symbol, ops);
 		} catch (Exception e) {
 			// DB 반영 이후 live projection이 실패하면 rebuild만이 일관성 복구 수단이다.
 			runtimeOwner.transitionToRebuilding();

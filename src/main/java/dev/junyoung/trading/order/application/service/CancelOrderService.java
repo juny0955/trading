@@ -4,7 +4,7 @@ import dev.junyoung.trading.account.domain.model.value.AccountId;
 import org.springframework.stereotype.Service;
 
 import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.exception.order.OrderAlreadyFinalizedException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CancelOrderService implements CancelOrderUseCase {
 
-    private final EngineManager engineManager;
+    private final OrderCommandGateway engineCommandGateway;
     private final OrderRepository orderRepository;
 
     @Override
@@ -35,6 +35,6 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isFinal())
             throw new OrderAlreadyFinalizedException(orderId);
 
-        engineManager.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId), AccountId.from(accountId)));
+        engineCommandGateway.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId), AccountId.from(accountId)));
     }
 }

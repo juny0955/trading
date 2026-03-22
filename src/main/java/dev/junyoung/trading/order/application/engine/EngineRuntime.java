@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -52,7 +53,8 @@ public class EngineRuntime implements EngineRuntimeOwner{
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();
-        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, this);
+        OrderBookStateApplier orderBookStateApplier = new SymbolOrderBookStateApplier(orderBook, orderBookProjectionApplier);
+        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, this);
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread, this);
     }
 

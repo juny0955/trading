@@ -29,7 +29,7 @@ import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
@@ -56,7 +56,7 @@ class PlaceOrderServiceTest {
             new AccountId(UUID.fromString("22222222-2222-2222-2222-222222222222"));
 
     @Mock
-    private EngineManager engineManager;
+    private OrderCommandGateway engineCommandGateway;
 
     @Mock
     private AcceptedSeqGenerator acceptedSeqGenerator;
@@ -140,7 +140,7 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
             assertThat(captor.getValue()).isInstanceOf(EngineCommand.PlaceOrder.class);
         }
 
@@ -151,7 +151,7 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
             assertThat(cmd.order().getAccountId()).isEqualTo(ACCOUNT_ID);
@@ -167,7 +167,7 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.PlaceOrder cmd = (EngineCommand.PlaceOrder) captor.getValue();
             assertThat(returnedId).isEqualTo(cmd.order().getOrderId());
@@ -192,7 +192,7 @@ class PlaceOrderServiceTest {
             ArgumentCaptor<Order> repositoryCaptor = ArgumentCaptor.forClass(Order.class);
             ArgumentCaptor<EngineCommand> engineCaptor = forClass(EngineCommand.class);
             verify(orderRepository).save(repositoryCaptor.capture());
-            verify(engineManager).submit(any(Symbol.class), engineCaptor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), engineCaptor.capture());
 
             Order savedOrder = repositoryCaptor.getValue();
             Order submittedOrder = ((EngineCommand.PlaceOrder) engineCaptor.getValue()).order();
@@ -205,12 +205,12 @@ class PlaceOrderServiceTest {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "client-007"));
             triggerAfterCommit();
 
-            InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, holdReservationPort, orderRepository, engineManager);
+            InOrder inOrder = inOrder(idempotencyKeyRepository, accountQueryPort, holdReservationPort, orderRepository, engineCommandGateway);
             inOrder.verify(idempotencyKeyRepository).save(any(), any(), any());
             inOrder.verify(accountQueryPort).existsById(any());
             inOrder.verify(holdReservationPort).reserve(any(), any(), anyLong());
             inOrder.verify(orderRepository).save(any());
-            inOrder.verify(engineManager).submit(any(), any());
+            inOrder.verify(engineCommandGateway).submit(any(), any());
         }
     }
 
@@ -225,7 +225,7 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
             Order order = ((EngineCommand.PlaceOrder) captor.getValue()).order();
             assertThat(order.getTif()).isEqualTo(TimeInForce.GTC);
         }
@@ -248,7 +248,7 @@ class PlaceOrderServiceTest {
                 triggerAfterCommit();
 
                 ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-                verify(engineManager, atLeastOnce()).submit(any(Symbol.class), captor.capture());
+                verify(engineCommandGateway, atLeastOnce()).submit(any(Symbol.class), captor.capture());
                 Order order = ((EngineCommand.PlaceOrder) captor.getValue()).order();
                 assertThat(order.getTif()).isEqualTo(tif);
             }
@@ -270,7 +270,7 @@ class PlaceOrderServiceTest {
             ));
             triggerAfterCommit();
 
-            verify(engineManager).submit(any(Symbol.class), any(EngineCommand.class));
+            verify(engineCommandGateway).submit(any(Symbol.class), any(EngineCommand.class));
         }
     }
 
@@ -292,7 +292,7 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             assertThat(firstId).isEqualTo(secondId);
-            verify(engineManager, times(1)).submit(any(), any());
+            verify(engineCommandGateway, times(1)).submit(any(), any());
         }
 
         @Test
@@ -319,12 +319,12 @@ class PlaceOrderServiceTest {
             triggerAfterCommit();
 
             assertThat(firstId).isNotEqualTo(secondId);
-            verify(engineManager, times(2)).submit(any(), any());
+            verify(engineCommandGateway, times(2)).submit(any(), any());
             verify(orderRepository, times(2)).save(any());
         }
 
         @Test
-        @DisplayName("DuplicateKeyException 발생 시 orderRepository와 engineManager는 호출되지 않는다")
+        @DisplayName("DuplicateKeyException 발생 시 orderRepository와 engineCommandGateway는 호출되지 않는다")
         void placeOrder_duplicateKey_doesNotCallOrderRepositoryOrEngine() {
             doThrow(new DuplicateKeyException("duplicate"))
                     .when(idempotencyKeyRepository).save(any(), any(), any());
@@ -333,7 +333,7 @@ class PlaceOrderServiceTest {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "dup-key"));
 
             verify(orderRepository, never()).save(any());
-            verify(engineManager, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submit(any(), any());
         }
 
         @Test
@@ -418,7 +418,7 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("계좌가 없으면 orderRepository와 engineManager를 호출하지 않는다")
+        @DisplayName("계좌가 없으면 orderRepository와 engineCommandGateway를 호출하지 않는다")
         void placeOrder_accountNotFound_doesNotSaveOrSubmit() {
             when(accountQueryPort.existsById(ACCOUNT_ID)).thenReturn(false);
 
@@ -426,7 +426,7 @@ class PlaceOrderServiceTest {
                     .isInstanceOf(AccountNotFoundException.class);
 
             verify(orderRepository, never()).save(any());
-            verify(engineManager, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submit(any(), any());
         }
 
         @Test
@@ -509,10 +509,10 @@ class PlaceOrderServiceTest {
     class EngineSubmitFailure {
 
         @Test
-        @DisplayName("engineManager.submit() 예외 시 orderCompensationService.compensate(order)가 호출된다")
+        @DisplayName("engineCommandGateway.submit() 예외 시 orderCompensationService.compensate(order)가 호출된다")
         void engineSubmit_failure_callsCompensate() {
             doThrow(new RuntimeException("engine error"))
-                    .when(engineManager).submit(any(), any());
+                    .when(engineCommandGateway).submit(any(), any());
 
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-001"));
             assertThatThrownBy(() -> triggerAfterCommit())
@@ -522,7 +522,7 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("engineManager.submit() 성공 시 orderCompensationService.compensate()를 호출하지 않는다")
+        @DisplayName("engineCommandGateway.submit() 성공 시 orderCompensationService.compensate()를 호출하지 않는다")
         void engineSubmit_success_doesNotCallCompensate() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-002"));
             triggerAfterCommit();
@@ -534,14 +534,14 @@ class PlaceOrderServiceTest {
         @DisplayName("compensate()에 전달된 Order는 submit 대상 Order와 동일하다")
         void engineSubmit_failure_compensateReceivesSameOrder() {
             doThrow(new RuntimeException("engine error"))
-                    .when(engineManager).submit(any(), any());
+                    .when(engineCommandGateway).submit(any(), any());
 
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "comp-003"));
             assertThatThrownBy(() -> triggerAfterCommit())
                     .isInstanceOf(RuntimeException.class);
 
             ArgumentCaptor<EngineCommand> engineCaptor = ArgumentCaptor.forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), engineCaptor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), engineCaptor.capture());
 
             ArgumentCaptor<Order> compensateCaptor = ArgumentCaptor.forClass(Order.class);
             verify(orderCompensationService).compensate(compensateCaptor.capture());
@@ -551,10 +551,10 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("engineManager.submit() 실패 후 compensation 성공 시 queueFullRollback 카운터가 증가한다")
+        @DisplayName("engineCommandGateway.submit() 실패 후 compensation 성공 시 queueFullRollback 카운터가 증가한다")
         void engineSubmit_failure_compensateSucceeds_incrementsCounter() {
             doThrow(new RuntimeException("engine error"))
-                    .when(engineManager).submit(any(), any());
+                    .when(engineCommandGateway).submit(any(), any());
 
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-001"));
             assertThatThrownBy(() -> triggerAfterCommit())
@@ -567,7 +567,7 @@ class PlaceOrderServiceTest {
         @DisplayName("compensation도 실패하면 queueFullRollback 카운터를 증가시키지 않는다")
         void engineSubmit_failure_compensateFails_doesNotIncrementCounter() {
             doThrow(new RuntimeException("engine error"))
-                    .when(engineManager).submit(any(), any());
+                    .when(engineCommandGateway).submit(any(), any());
             doThrow(new RuntimeException("compensation error"))
                     .when(orderCompensationService).compensate(any());
 
@@ -579,7 +579,7 @@ class PlaceOrderServiceTest {
         }
 
         @Test
-        @DisplayName("engineManager.submit() 성공 시 queueFullRollback 카운터를 증가시키지 않는다")
+        @DisplayName("engineCommandGateway.submit() 성공 시 queueFullRollback 카운터를 증가시키지 않는다")
         void engineSubmit_success_doesNotIncrementCounter() {
             sut.placeOrder(limitCommand(ACCOUNT_ID, "BTC", "BUY", 10_000L, 5, "counter-003"));
             triggerAfterCommit();

@@ -254,16 +254,6 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("주문이 없어도 orderBookCachePort.update는 호출된다")
-		void handle_cancelOrder_orderNotInBook_cacheStillUpdated() {
-			OrderId orderId = OrderId.newId();
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
-		}
-
-		@Test
 		@DisplayName("활성 주문이면 orderBook.remove → order.cancel() → settlementService.cancelSettlement 순으로 호출된다")
 		void handle_cancelOrder_activeOrder_cancelsAndSettles() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();

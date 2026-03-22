@@ -35,6 +35,6 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isFinal())
             throw new OrderAlreadyFinalizedException(orderId);
 
-        engineManager.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId)));
+        engineManager.submit(order.getSymbol(), new EngineCommand.CancelOrder(OrderId.from(orderId), AccountId.from(accountId)));
     }
 }

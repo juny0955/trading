@@ -8,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -47,6 +49,7 @@ class EngineLoopTest {
 	private BlockingQueue<EngineCommand> queue;
 	private EngineHandler handler;
 	private EngineThread engineThread;
+	private EngineRuntimeOwner runtimeOwner;
 	private EngineLoop loop;
 
 	@BeforeEach
@@ -54,7 +57,9 @@ class EngineLoopTest {
 		queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
 		handler = mock(EngineHandler.class);
 		engineThread = new EngineThread("BTC");
-		loop = new EngineLoop(queue, handler, engineThread);
+		runtimeOwner = mock(EngineRuntimeOwner.class);
+		when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
+		loop = new EngineLoop(queue, handler, engineThread, runtimeOwner);
 	}
 
 	@AfterEach
@@ -156,6 +161,38 @@ class EngineLoopTest {
 			// 첫 번째 커맨드 예외 발생 후 두 번째 커맨드가 정상 처리됨
 			assertThat(firstLatch.await(2, TimeUnit.SECONDS)).isTrue();
 			assertThat(secondLatch.await(2, TimeUnit.SECONDS)).isTrue();
+		}
+
+		@Test
+		@DisplayName("핸들러 예외 발생 시 REBUILDING 상태이면 attemptRebuild()가 호출된다")
+		void run_handlerException_rebuilding_triggersAttemptRebuild() throws InterruptedException {
+			CountDownLatch rebuildCalled = new CountDownLatch(1);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolState.REBUILDING);
+			doAnswer(_ -> { rebuildCalled.countDown(); return null; }).when(runtimeOwner).attemptRebuild();
+			doThrow(new RuntimeException("apply failed")).when(handler).handle(any());
+
+			loop.start();
+			loop.submit(placeOrderCommand());
+
+			assertThat(rebuildCalled.await(2, TimeUnit.SECONDS)).isTrue();
+			verify(runtimeOwner).attemptRebuild();
+		}
+
+		@Test
+		@DisplayName("핸들러 예외 발생 시 ACTIVE 상태이면 attemptRebuild()가 호출되지 않는다")
+		void run_handlerException_active_doesNotTriggerRebuild() throws InterruptedException {
+			CountDownLatch secondProcessed = new CountDownLatch(1);
+			// setUp()에서 ACTIVE로 기본 설정됨
+			doThrow(new RuntimeException("calc failed"))
+				.doAnswer(_ -> { secondProcessed.countDown(); return null; })
+				.when(handler).handle(any());
+
+			loop.start();
+			loop.submit(placeOrderCommand());
+			loop.submit(placeOrderCommand());
+
+			assertThat(secondProcessed.await(2, TimeUnit.SECONDS)).isTrue();
+			verify(runtimeOwner, never()).attemptRebuild();
 		}
 	}
 

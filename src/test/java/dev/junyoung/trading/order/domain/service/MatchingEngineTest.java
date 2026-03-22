@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.domain.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -88,7 +89,13 @@ public class MatchingEngineTest {
 	}
 
 	private CancelCalculationResult cancel(Order target) {
-		return engine.calculateCancel(new CancelCalculationInput(view(), target));
+		return engine.calculateCancel(new CancelCalculationInput(
+			view(),
+			target.getSymbol(),
+			target.getOrderId(),
+			target.getAccountId(),
+			target
+		));
 	}
 
 	/** PlaceCalculationResult가 Accepted임을 단언하며 추출한다 */
@@ -906,6 +913,42 @@ public class MatchingEngineTest {
 
 			assertThat(result.symbol()).isEqualTo(maker.getSymbol());
 			assertThat(result.acceptedSeq()).isEqualTo(maker.getAcceptedSeq());
+		}
+
+		@Test
+		@DisplayName("다른 account가 취소 요청하면 Rejected(OWNER_MISMATCH)")
+		void ownerMismatch_rejected() {
+			Order maker = addMakerSell(10_000, 5);
+
+			CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(
+				view(),
+				maker.getSymbol(),
+				maker.getOrderId(),
+				AccountId.newId(),
+				maker
+			));
+
+			assertInstanceOf(CancelCalculationResult.Rejected.class, result);
+			assertThat(((CancelCalculationResult.Rejected) result).reasonCode())
+				.isEqualTo(CancelResultCode.OWNER_MISMATCH);
+		}
+
+		@Test
+		@DisplayName("다른 symbol로 라우팅되면 Rejected(SYMBOL_MISMATCH)")
+		void symbolMismatch_rejected() {
+			Order maker = addMakerSell(10_000, 5);
+
+			CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(
+				view(),
+				new Symbol("ETH"),
+				maker.getOrderId(),
+				maker.getAccountId(),
+				maker
+			));
+
+			assertInstanceOf(CancelCalculationResult.Rejected.class, result);
+			assertThat(((CancelCalculationResult.Rejected) result).reasonCode())
+				.isEqualTo(CancelResultCode.SYMBOL_MISMATCH);
 		}
 	}
 }

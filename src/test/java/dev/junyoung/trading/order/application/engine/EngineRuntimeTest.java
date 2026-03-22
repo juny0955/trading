@@ -2,15 +2,18 @@ package dev.junyoung.trading.order.application.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +40,9 @@ class EngineRuntimeTest {
     @Mock
     private EngineResultPersistenceService engineResultPersistenceService;
 
+    @Mock
+    private OrderBookRebuilder orderBookRebuilder;
+
     private EngineRuntime runtime;
 
     private static final Symbol SYMBOL = new Symbol("BTC");
@@ -61,7 +67,7 @@ class EngineRuntimeTest {
         @Test
         @DisplayName("ACTIVE 상태에서 submit()은 정상 동작한다")
         void submit_active_succeeds() {
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
             runtime.start();
 
             assertThat(runtime.state()).isEqualTo(EngineSymbolState.ACTIVE);
@@ -72,7 +78,7 @@ class EngineRuntimeTest {
         @Test
         @DisplayName("REBUILDING 상태에서 submit()은 EngineNotActiveException을 던진다")
         void submit_rebuilding_throwsEngineNotActiveException() {
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
             runtime.start();
             runtime.transitionToRebuilding();
 
@@ -82,21 +88,46 @@ class EngineRuntimeTest {
         @Test
         @DisplayName("DIRTY 상태에서 submit()은 EngineNotActiveException을 던진다")
         void submit_dirty_throwsEngineNotActiveException() {
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
             runtime.start();
             runtime.transitionToDirty();
 
             assertThrows(EngineNotActiveException.class, () -> runtime.submit(placeOrder()));
         }
 
-        @Test
-        @DisplayName("HALTED 상태에서 submit()은 EngineNotActiveException을 던진다")
-        void submit_halted_throwsEngineNotActiveException() {
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
-            runtime.start();
-            runtime.transitionToHalted();
+    }
 
-            assertThrows(EngineNotActiveException.class, () -> runtime.submit(placeOrder()));
+    // ── attemptRebuild() ─────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("attemptRebuild()")
+    class AttemptRebuild {
+
+        @Test
+        @DisplayName("rebuild 성공 시 ACTIVE 상태로 전환된다")
+        void attemptRebuild_success_transitionsToActive() {
+            when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime.start();
+            runtime.transitionToRebuilding();
+            assertThat(runtime.state()).isEqualTo(EngineSymbolState.REBUILDING);
+
+            runtime.attemptRebuild();
+
+            assertThat(runtime.state()).isEqualTo(EngineSymbolState.ACTIVE);
+        }
+
+        @Test
+        @DisplayName("loadOpenOrders 실패 시 DIRTY 상태로 전환된다")
+        void attemptRebuild_loadFails_transitionsToDirty() {
+            when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenThrow(new RuntimeException("DB error"));
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime.start();
+            runtime.transitionToRebuilding();
+
+            runtime.attemptRebuild();
+
+            assertThat(runtime.state()).isEqualTo(EngineSymbolState.DIRTY);
         }
     }
 }

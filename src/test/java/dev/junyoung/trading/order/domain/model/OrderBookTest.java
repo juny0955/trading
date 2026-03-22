@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 
+import java.util.List;
 import java.util.NavigableMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -770,7 +771,26 @@ class OrderBookTest {
 		void replaceSideMismatch_throwsException() {
 			Order order = newBuyOrder(10_000, 5);
 			orderBook.add(order);
-			Order sideMismatch = order.toBuilder().side(Side.SELL).build();
+			Order sideMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				Side.SELL,
+				order.getSymbol(),
+				order.getOrderType(),
+				order.getTif(),
+				order.getLimitPriceOrThrow(),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
 
 			assertThatThrownBy(() -> orderBook.replaceOrder(sideMismatch))
 				.isInstanceOf(OrderBookInvariantViolationException.class);
@@ -781,7 +801,26 @@ class OrderBookTest {
 		void replaceSymbolMismatch_throwsException() {
 			Order order = newBuyOrder(10_000, 5);
 			orderBook.add(order);
-			Order symbolMismatch = order.toBuilder().symbol(new Symbol("ETH")).build();
+			Order symbolMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				order.getSide(),
+				new Symbol("ETH"),
+				order.getOrderType(),
+				order.getTif(),
+				order.getLimitPriceOrThrow(),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
 
 			assertThatThrownBy(() -> orderBook.replaceOrder(symbolMismatch))
 				.isInstanceOf(OrderBookInvariantViolationException.class);
@@ -792,7 +831,26 @@ class OrderBookTest {
 		void replacePriceMismatch_throwsException() {
 			Order order = newBuyOrder(10_000, 5);
 			orderBook.add(order);
-			Order priceMismatch = order.toBuilder().price(new Price(9_000)).build();
+			Order priceMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				order.getSide(),
+				order.getSymbol(),
+				order.getOrderType(),
+				order.getTif(),
+				new Price(9_000),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
 
 			assertThatThrownBy(() -> orderBook.replaceOrder(priceMismatch))
 				.isInstanceOf(OrderBookInvariantViolationException.class);
@@ -859,6 +917,40 @@ class OrderBookTest {
 			orderBook.add(third);
 
 			assertThat(orderBook.peek(Side.SELL)).contains(first);
+		}
+	}
+
+	// ── rebuild() ─────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("rebuild()")
+	class Rebuild {
+
+		@Test
+		@DisplayName("rebuild()은 기존 주문을 모두 제거하고 새 주문 목록으로 재구성한다")
+		void rebuild_clearsAndRepopulates() {
+			Order existing = newBuyOrder(10_000, 5);
+			orderBook.add(existing);
+
+			Order newBuy = newBuyOrder(9_000, 3);
+			Order newSell = newSellOrder(11_000, 2);
+			orderBook.rebuild(List.of(newBuy, newSell));
+
+			assertThat(orderBook.getIndex()).containsOnlyKeys(newBuy.getOrderId(), newSell.getOrderId());
+			assertThat(orderBook.getIndex()).doesNotContainKey(existing.getOrderId());
+		}
+
+		@Test
+		@DisplayName("rebuild()은 빈 목록으로 호출하면 호가창이 비워진다")
+		void rebuild_emptyList_clearsAll() {
+			orderBook.add(newBuyOrder(10_000, 5));
+			orderBook.add(newSellOrder(11_000, 3));
+
+			orderBook.rebuild(List.of());
+
+			assertThat(orderBook.getIndex()).isEmpty();
+			assertThat(orderBook.bestBid()).isEmpty();
+			assertThat(orderBook.bestAsk()).isEmpty();
 		}
 	}
 }

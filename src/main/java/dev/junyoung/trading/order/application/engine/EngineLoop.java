@@ -30,13 +30,13 @@ public class EngineLoop implements Runnable {
 	private final BlockingQueue<EngineCommand> engineQueue;
 	private final EngineHandler engineHandler;
 	private final EngineThread engineThread;
+	private final EngineRuntimeOwner runtimeOwner;
 
 	/**
 	 * 루프 종료 플래그.
 	 * {@link #submitLock}을 보유한 상태에서만 읽고 쓰므로 {@code volatile} 불필요.
 	 */
 	private boolean running = true;
-
 	/**
 	 * {@link #submit}의 check-then-act(running 확인 → 큐 삽입)와
 	 * {@link #stop}의 running 변경을 원자적으로 묶어 TOCTOU를 방지한다.
@@ -114,6 +114,8 @@ public class EngineLoop implements Runnable {
 			} catch (Exception e) {
 				// 특정 커맨드 처리 실패가 전체 엔진을 멈추지 않도록 예외를 격리
 				log.error("Engine Command Failed", e);
+				if (runtimeOwner.state() == EngineSymbolState.REBUILDING)
+					runtimeOwner.attemptRebuild();
 			}
 		}
 	}

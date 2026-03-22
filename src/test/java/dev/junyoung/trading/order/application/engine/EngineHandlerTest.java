@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +27,8 @@ import dev.junyoung.trading.order.application.engine.dto.BookOperation;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
+import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
+import dev.junyoung.trading.order.application.exception.engine.RetryablePersistenceException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.OrderBook;
@@ -72,6 +75,7 @@ class EngineHandlerTest {
 	private EngineHandler handler;
 
 	private static final Symbol SYMBOL = new Symbol("BTC");
+	private static final AccountId ACCOUNT_ID = AccountId.newId();
 
 	@BeforeEach
 	void setUp() {
@@ -253,8 +257,10 @@ class EngineHandlerTest {
 		void handle_cancelOrder_orderNotInBook_skips() {
 			OrderId orderId = OrderId.newId();
 			// getIndex()는 @BeforeEach에서 빈 맵으로 설정
+			when(engine.calculateCancel(any()))
+				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, dev.junyoung.trading.order.application.engine.dto.CancelResultCode.ORDER_NOT_FOUND));
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID)));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 		}
@@ -268,7 +274,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			verify(orderBookProjectionApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
@@ -283,7 +289,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
@@ -297,7 +303,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookProjectionApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
@@ -384,6 +390,38 @@ class EngineHandlerTest {
 
 			verify(runtimeOwner).transitionToDirty();
 			verify(runtimeOwner, never()).transitionToRebuilding();
+		}
+
+		@Test
+		@DisplayName("persist retryable 실패 시 상태 전이 없이 예외가 전파되고 apply/cache는 생략된다")
+		void persistRetryableFails_noStateTransition() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+			doThrow(new RetryablePersistenceException("retry", new RuntimeException("db timeout")))
+				.when(engineResultPersistenceService).persistPlaceResult(any());
+
+			assertThrows(RetryablePersistenceException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner, never()).transitionToDirty();
+			verify(runtimeOwner, never()).transitionToRebuilding();
+			verify(orderBookProjectionApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
+		}
+
+		@Test
+		@DisplayName("persist 정합성 실패 시 DIRTY 전이 후 예외가 전파되고 apply/cache는 생략된다")
+		void persistInvariantFails_transitionsToDirty() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+			doThrow(new PersistenceInvariantViolationException("broken", new IllegalStateException("unique violation")))
+				.when(engineResultPersistenceService).persistPlaceResult(any());
+
+			assertThrows(PersistenceInvariantViolationException.class,
+				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner).transitionToDirty();
+			verify(orderBookProjectionApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
 		}
 
 		@Test

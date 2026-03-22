@@ -91,6 +91,21 @@ class CancelOrderServiceTest {
         }
 
         @Test
+        @DisplayName("취소 커맨드에 요청 accountId가 포함된다")
+        void cancelOrder_commandContainsRequesterAccountId() {
+            OrderId orderId = new OrderId(UUID.randomUUID());
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
+
+            sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineManager).submit(any(Symbol.class), captor.capture());
+
+            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
+            assertThat(cmd.requesterAccountId()).isEqualTo(ACCOUNT_ID);
+        }
+
+        @Test
         @DisplayName("주문이 없으면 OrderNotFoundException이 발생한다")
         void cancelOrder_orderNotFound_throwsOrderNotFoundException() {
             OrderId orderId = new OrderId(UUID.randomUUID());

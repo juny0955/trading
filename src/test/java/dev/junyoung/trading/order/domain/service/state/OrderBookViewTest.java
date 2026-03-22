@@ -2,8 +2,10 @@ package dev.junyoung.trading.order.domain.service.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.junyoung.trading.order.application.engine.OrderBookViewFactory;
+import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -285,6 +287,39 @@ class OrderBookViewTest {
 			long qty = view().totalAvailableQty(Side.SELL, new Price(10_000)).value();
 
 			assertThat(qty).isZero();
+		}
+
+		@Test
+		@DisplayName("queue price와 index price가 다르면 invariant 예외가 발생한다")
+		void mismatchedPrice_throwsInvariantViolation() {
+			Order order = newSellOrder(10_000, 5);
+			orderBook.add(order);
+			OrderBookView view = view();
+
+			Order updated = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				order.getSide(),
+				order.getSymbol(),
+				order.getOrderType(),
+				order.getTif(),
+				new Price(11_000),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
+			view.replaceInIndex(updated);
+
+			assertThatThrownBy(() -> view.peek(Side.SELL))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
 		}
 	}
 }

@@ -40,8 +40,9 @@ class EngineIndependenceTest {
 
         BlockingQueue<EngineCommand> btcQueue = new ArrayBlockingQueue<>(100);
         BlockingQueue<EngineCommand> ethQueue = new ArrayBlockingQueue<>(100);
-        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"));
-        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"));
+        EngineRuntimeOwner runtimeOwner = mock(EngineRuntimeOwner.class);
+        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"), runtimeOwner);
+        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"), runtimeOwner);
 
         btcLoop.start();
         ethLoop.start();

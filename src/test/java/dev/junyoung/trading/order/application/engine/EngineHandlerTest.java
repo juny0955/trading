@@ -30,6 +30,7 @@ import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
 import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
 import dev.junyoung.trading.order.application.exception.engine.RetryablePersistenceException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -61,7 +62,7 @@ class EngineHandlerTest {
 	private OrderBook orderBook;
 
 	@Mock
-	private OrderBookProjectionApplier orderBookProjectionApplier;
+	private OrderBookStateApplier orderBookStateApplier;
 
 	@Mock
 	private OrderBookCachePort orderBookCachePort;
@@ -85,7 +86,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
 		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -276,7 +277,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
 
-			verify(orderBookProjectionApplier).apply(any(), any());
+			verify(orderBookStateApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
 		}
 
@@ -295,7 +296,7 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("호출 순서: persistCancelResult → orderBookProjectionApplier.apply → orderBookCachePort.update")
+		@DisplayName("호출 순서: persistCancelResult → orderBookStateApplier.apply → orderBookCachePort.update")
 		void handle_cancelOrder_callOrderIsRemoveSettlementCache() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();
@@ -305,9 +306,9 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
 
-			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookProjectionApplier, orderBookCachePort);
+			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
-			inOrder.verify(orderBookProjectionApplier).apply(any(), any());
+			inOrder.verify(orderBookStateApplier).apply(any(), any());
 			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 	}
@@ -344,7 +345,7 @@ class EngineHandlerTest {
 		void applyFails_transitionsToRebuilding() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
-			doThrow(new RuntimeException("unexpected error")).when(orderBookProjectionApplier).apply(any(), any());
+			doThrow(new RuntimeException("unexpected error")).when(orderBookStateApplier).apply(any(), any());
 
 			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
 
@@ -358,7 +359,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 			doThrow(new OrderBookInvariantViolationException("invariant violated"))
-				.when(orderBookProjectionApplier).apply(any(), any());
+				.when(orderBookStateApplier).apply(any(), any());
 
 			assertThrows(OrderBookInvariantViolationException.class,
 				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
@@ -404,7 +405,7 @@ class EngineHandlerTest {
 
 			verify(runtimeOwner, never()).transitionToDirty();
 			verify(runtimeOwner, never()).transitionToRebuilding();
-			verify(orderBookProjectionApplier, never()).apply(any(), any());
+			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());
 		}
 
@@ -420,7 +421,7 @@ class EngineHandlerTest {
 				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
 
 			verify(runtimeOwner).transitionToDirty();
-			verify(orderBookProjectionApplier, never()).apply(any(), any());
+			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());
 		}
 

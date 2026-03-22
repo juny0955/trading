@@ -260,7 +260,7 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("활성 주문이면 orderBook.remove 후 persistCancelResult가 호출된다")
+		@DisplayName("활성 주문이면 cancel 결과가 persist되고 orderBook에 반영된다")
 		void handle_cancelOrder_activeOrder_cancelsAndSettles() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();
@@ -289,7 +289,7 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("호출 순서: persistCancelResult → orderBook.remove → orderBookCachePort.update")
+		@DisplayName("호출 순서: persistCancelResult → orderBookProjectionApplier.apply → orderBookCachePort.update")
 		void handle_cancelOrder_callOrderIsRemoveSettlementCache() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();

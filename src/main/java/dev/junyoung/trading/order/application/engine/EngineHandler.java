@@ -82,7 +82,6 @@ public class EngineHandler {
 		Order order = orderBook.getIndex().get(orderId);
 		if (order == null) {
 			log.warn("Cancel skipped - order not in book: orderId={}", orderId);
-			orderBookCachePort.update(symbol, orderBook);
 			return;
 		}
 

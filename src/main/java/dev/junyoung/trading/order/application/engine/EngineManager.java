@@ -33,6 +33,7 @@ public class EngineManager {
     private final TradingProperties tradingProperties;
     private final OrderBookCachePort orderBookCachePort;
     private final EngineResultPersistenceService engineResultPersistenceService;
+    private final OrderBookProjectionApplier orderBookProjectionApplier;
 
     private final Map<Symbol, EngineRuntime> contexts = new HashMap<>();
 
@@ -45,7 +46,7 @@ public class EngineManager {
     public void start() {
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
-            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, engineResultPersistenceService);
+            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());

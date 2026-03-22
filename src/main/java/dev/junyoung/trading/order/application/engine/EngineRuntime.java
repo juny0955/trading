@@ -4,6 +4,7 @@ import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -16,7 +17,10 @@ import java.util.concurrent.BlockingQueue;
  * {@link EngineThread}, {@link MatchingEngine}, {@link EngineHandler}, {@link EngineLoop}를 조립하므로
  * 각 컴포넌트는 심볼 단위로 완전히 격리된다.</p>
  */
-public class EngineRuntime {
+@Slf4j
+public class EngineRuntime implements EngineRuntimeOwner{
+
+    private volatile EngineSymbolState state = EngineSymbolState.ACTIVE;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -27,12 +31,17 @@ public class EngineRuntime {
     private final EngineLoop engineLoop;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
-    protected EngineRuntime(Symbol symbol, OrderBookCachePort orderBookCachePort, EngineResultPersistenceService engineResultPersistenceService) {
+    protected EngineRuntime(
+        Symbol symbol,
+        OrderBookCachePort orderBookCachePort,
+        OrderBookProjectionApplier orderBookProjectionApplier,
+        EngineResultPersistenceService engineResultPersistenceService
+    ) {
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();
-        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookCachePort, engineResultPersistenceService);
+        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, this);
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread);
     }
 
@@ -48,4 +57,27 @@ public class EngineRuntime {
 
     /** 커맨드를 엔진 큐에 제출한다. */
     protected void submit(EngineCommand engineCommand) { engineLoop.submit(engineCommand); }
+
+    @Override
+    public EngineSymbolState state() {
+        return state;
+    }
+
+    @Override
+    public void transitionToRebuilding() {
+        state = EngineSymbolState.REBUILDING;
+        log.warn("Engine transition to REBUILDING: symbol requires rebuilding.");
+    }
+
+    @Override
+    public void transitionToDirty() {
+        state = EngineSymbolState.DIRTY;
+        log.error("Engine transitioning to DIRTY: manual intervention required");
+    }
+
+    @Override
+    public void transitionToHalted() {
+        state = EngineSymbolState.HALTED;
+        log.error("Engine HALTED: critical invariant violation or split-brain detected");
+    }
 }

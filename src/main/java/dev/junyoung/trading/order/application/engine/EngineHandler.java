@@ -39,8 +39,10 @@ public class EngineHandler {
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
+	private final OrderBookProjectionApplier orderBookProjectionApplier;
 	private final OrderBookCachePort orderBookCachePort;
 	private final EngineResultPersistenceService engineResultPersistenceService;
+	private final EngineRuntimeOwner runtimeOwner;
 
 	// -------------------------------------------------------------------------
 	// 진입점
@@ -76,8 +78,8 @@ public class EngineHandler {
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
 				engineResultPersistenceService.persistPlaceResult(a);
-				applyBookOps(a.bookOps());
-				orderBookCachePort.update(symbol, orderBook);
+				applyToOrderBook(orderBook, a.bookOps());
+				updateCache();
 			}
 			case PlaceCalculationResult.Rejected r ->
 				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
@@ -97,8 +99,8 @@ public class EngineHandler {
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
 				engineResultPersistenceService.persistCancelResult(c);
-				applyBookOps(c.bookOps());
-				orderBookCachePort.update(symbol, orderBook);
+				applyToOrderBook(orderBook, c.bookOps());
+				updateCache();
 			}
 			case CancelCalculationResult.Skipped s ->
 				log.warn("Cancel skipped - order already final: symbol={}, seq={}", s.symbol(), s.acceptedSeq());
@@ -107,13 +109,20 @@ public class EngineHandler {
 		}
 	}
 
-	private void applyBookOps(List<BookOperation> ops) {
-		for (BookOperation op : ops) {
-			switch (op) {
-				case BookOperation.Add a -> orderBook.add(a.order());
-				case BookOperation.Replace r -> orderBook.replaceOrder(r.updatedOrder());
-				case BookOperation.Remove r -> orderBook.remove(r.orderId());
-			}
+	private void applyToOrderBook(OrderBook orderBook, List<BookOperation> ops) {
+		try {
+			orderBookProjectionApplier.apply(orderBook, ops);
+		} catch (Exception e) {
+			runtimeOwner.transitionToRebuilding();
+			throw e;
+		}
+	}
+
+	private void updateCache() {
+		try {
+			orderBookCachePort.update(symbol, orderBook);
+		} catch (Exception e) {
+			log.error("Cache update failed after apply: symbol={}", symbol, e);
 		}
 	}
 }

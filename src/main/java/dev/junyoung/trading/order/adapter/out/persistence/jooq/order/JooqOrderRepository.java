@@ -74,7 +74,7 @@ public class JooqOrderRepository implements OrderRepository {
     public List<Order> findOpenOrdersBySymbol(Symbol symbol) {
         return dslContext.selectFrom(Tables.ORDERS)
             .where(Tables.ORDERS.SYMBOL.eq(symbol.value()))
-            .and(Tables.ORDERS.STATUS.notIn(OrderStatus.FILLED.name(), OrderStatus.CANCELLED.name()))
+            .and(Tables.ORDERS.STATUS.in(OrderStatus.NEW.name(), OrderStatus.PARTIALLY_FILLED.name()))
             .orderBy(Tables.ORDERS.ACCEPTED_SEQ.asc())
             .fetch(JooqOrderMapper::toDomain);
     }

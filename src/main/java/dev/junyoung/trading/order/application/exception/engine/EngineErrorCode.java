@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum EngineErrorCode implements ErrorCode {
     ENGINE_BACKPRESSURE(HttpStatus.SERVICE_UNAVAILABLE, "ENGINE_BACKPRESSURE", "engine is busy"),
+    ENGINE_NOT_ACTIVE(HttpStatus.SERVICE_UNAVAILABLE, "ENGINE_NOT_ACTIVE", "engine is not active"),
     ;
 
     private final HttpStatus status;

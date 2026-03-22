@@ -1,11 +1,12 @@
 package dev.junyoung.trading.order.application.engine;
 
+import java.util.List;
+
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
-import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -13,10 +14,6 @@ import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-
-import java.util.List;
-
 import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,8 +39,10 @@ public class EngineHandler {
 	private final Symbol symbol;
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
+	private final OrderBookProjectionApplier orderBookProjectionApplier;
 	private final OrderBookCachePort orderBookCachePort;
-	private final SettlementService settlementService;
+	private final EngineResultPersistenceService engineResultPersistenceService;
+	private final EngineRuntimeOwner runtimeOwner;
 
 	// -------------------------------------------------------------------------
 	// 진입점
@@ -59,6 +58,11 @@ public class EngineHandler {
 	 * </ul>
 	 */
 	protected void handle(EngineCommand command) {
+		if (runtimeOwner.state() != EngineSymbolState.ACTIVE) {
+			log.warn("Command dropped: engine not ACTIVE: state={}, symbol={}", runtimeOwner.state(), symbol);
+			return;
+		}
+
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
 			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId());
@@ -73,9 +77,24 @@ public class EngineHandler {
 	// -------------------------------------------------------------------------
 
 	private void handlePlaceOrder(Order order) {
-		PlaceResult result = processPlaceOrder(order);
-		settlementService.settlement(result);
-		orderBookCachePort.update(symbol, orderBook);
+		OrderBookView view = OrderBookViewFactory.create(orderBook);
+		PlaceCalculationResult result;
+		try {
+			result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+		} catch (Exception e) {
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
+
+		switch (result) {
+			case PlaceCalculationResult.Accepted a -> {
+				engineResultPersistenceService.persistPlaceResult(a);
+				applyToOrderBook(orderBook, a.bookOps());
+				updateCache();
+			}
+			case PlaceCalculationResult.Rejected r ->
+				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+		}
 	}
 
 	private void handleCancelOrder(OrderId orderId) {
@@ -86,13 +105,20 @@ public class EngineHandler {
 		}
 
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(view, order));
+		CancelCalculationResult result;
+
+		try {
+			result = engine.calculateCancel(new CancelCalculationInput(view, order));
+		} catch (Exception e) {
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
 
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
-				applyBookOps(c.bookOps());
-				settlementService.cancelSettlement(c.updatedOrders().getFirst());
-				orderBookCachePort.update(symbol, orderBook);
+				engineResultPersistenceService.persistCancelResult(c);
+				applyToOrderBook(orderBook, c.bookOps());
+				updateCache();
 			}
 			case CancelCalculationResult.Skipped s ->
 				log.warn("Cancel skipped - order already final: symbol={}, seq={}", s.symbol(), s.acceptedSeq());
@@ -101,33 +127,20 @@ public class EngineHandler {
 		}
 	}
 
-	/**
-	 * {@link MatchingEngine#calculatePlace}를 호출해 변경안을 계산하고,
-	 * bookOps를 live {@link OrderBook}에 반영한 뒤 {@link PlaceResult}로 변환한다.
-	 */
-	private PlaceResult processPlaceOrder(Order order) {
-		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
-
-		return switch (result) {
-			case PlaceCalculationResult.Rejected r -> {
-				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
-				yield PlaceResult.empty();
-			}
-			case PlaceCalculationResult.Accepted a -> {
-				applyBookOps(a.bookOps());
-				yield PlaceResult.of(a.updatedOrders(), a.trades());
-			}
-		};
+	private void applyToOrderBook(OrderBook orderBook, List<BookOperation> ops) {
+		try {
+			orderBookProjectionApplier.apply(orderBook, ops);
+		} catch (Exception e) {
+			runtimeOwner.transitionToRebuilding();
+			throw e;
+		}
 	}
 
-	private void applyBookOps(List<BookOperation> ops) {
-		for (BookOperation op : ops) {
-			switch (op) {
-				case BookOperation.Add a -> orderBook.add(a.order());
-				case BookOperation.Replace r -> orderBook.replaceOrder(r.updatedOrder());
-				case BookOperation.Remove r -> orderBook.remove(r.orderId());
-			}
+	private void updateCache() {
+		try {
+			orderBookCachePort.update(symbol, orderBook);
+		} catch (Exception e) {
+			log.error("Cache update failed after apply: symbol={}", symbol, e);
 		}
 	}
 }

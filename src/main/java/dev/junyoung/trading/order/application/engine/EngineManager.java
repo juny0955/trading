@@ -1,18 +1,18 @@
 package dev.junyoung.trading.order.application.engine;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 심볼별 {@link EngineRuntime}를 생성·관리하고 커맨드를 올바른 엔진으로 라우팅하는 오케스트레이터.
@@ -32,7 +32,8 @@ public class EngineManager {
 
     private final TradingProperties tradingProperties;
     private final OrderBookCachePort orderBookCachePort;
-    private final SettlementService settlementService;
+    private final EngineResultPersistenceService engineResultPersistenceService;
+    private final OrderBookProjectionApplier orderBookProjectionApplier;
 
     private final Map<Symbol, EngineRuntime> contexts = new HashMap<>();
 
@@ -45,7 +46,7 @@ public class EngineManager {
     public void start() {
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
-            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, settlementService);
+            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService);
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());

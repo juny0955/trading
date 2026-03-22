@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("SettlementCalculator")
-class SettlementCalculatorTest {
+public class SettlementCalculatorTest {
 
     private static final Symbol BTC = new Symbol("BTC");
     private static final Asset KRW = new Asset("KRW");

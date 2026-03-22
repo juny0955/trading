@@ -26,10 +26,8 @@ import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -39,7 +37,6 @@ import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 /**
@@ -62,7 +59,7 @@ class EngineHandlerTest {
 	private OrderBookCachePort orderBookCachePort;
 
 	@Mock
-	private SettlementService settlementService;
+	private EngineResultPersistenceService engineResultPersistenceService;
 
 	private EngineHandler handler;
 
@@ -75,7 +72,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.getBids()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCachePort, settlementService);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCachePort, engineResultPersistenceService);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -199,8 +196,8 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("MARKET SELL 주문 처리 후 PlaceResult를 settlementService.settlement()에 전달한다")
-		void handle_placeOrder_marketSell_delegatesToSettlementService() {
+		@DisplayName("Accepted 결과이면 engineResultPersistenceService.persistPlaceResult()가 호출된다")
+		void handle_placeOrder_accepted_delegatesToPersistenceService() {
 			Order order = marketSellOrder(5);
 			Order activated = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC,
 				new Price(10_000), new Quantity(5)).activate();
@@ -209,7 +206,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(settlementService).settlement(PlaceResult.of(accepted.updatedOrders(), accepted.trades()));
+			verify(engineResultPersistenceService).persistPlaceResult(accepted);
 		}
 
 		@Test
@@ -224,15 +221,15 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("Rejected 결과이면 빈 PlaceResult로 settlement가 호출된다")
-		void handle_placeOrder_rejected_delegatesEmptyResultToSettlementService() {
+		@DisplayName("Rejected 결과이면 persistPlaceResult가 호출되지 않는다")
+		void handle_placeOrder_rejected_doesNotCallPersistenceService() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any()))
 				.thenReturn(new PlaceCalculationResult.Rejected(SYMBOL, 1L, PlaceRejectCode.INVALID_TIF));
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(settlementService).settlement(PlaceResult.of(List.of(), List.of()));
+			verify(engineResultPersistenceService, never()).persistPlaceResult(any());
 		}
 	}
 
@@ -250,11 +247,11 @@ class EngineHandlerTest {
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
-			verify(settlementService, never()).cancelSettlement(any());
+			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 		}
 
 		@Test
-		@DisplayName("활성 주문이면 orderBook.remove → order.cancel() → settlementService.cancelSettlement 순으로 호출된다")
+		@DisplayName("활성 주문이면 orderBook.remove 후 persistCancelResult가 호출된다")
 		void handle_cancelOrder_activeOrder_cancelsAndSettles() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();
@@ -265,9 +262,7 @@ class EngineHandlerTest {
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
 
 			verify(orderBook).remove(activatedOrder.getOrderId());
-			verify(settlementService).cancelSettlement(argThat(o ->
-				o.getOrderId().equals(activatedOrder.getOrderId())
-					&& o.getStatus() == OrderStatus.CANCELLED));
+			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
 		}
 
 		@Test
@@ -285,7 +280,7 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("호출 순서: orderBook.remove → settlementService.cancelSettlement → orderBookCachePort.update")
+		@DisplayName("호출 순서: persistCancelResult → orderBook.remove → orderBookCachePort.update")
 		void handle_cancelOrder_callOrderIsRemoveSettlementCache() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();
@@ -295,9 +290,9 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
 
-			InOrder inOrder = inOrder(orderBook, settlementService, orderBookCachePort);
+			InOrder inOrder = inOrder(engineResultPersistenceService, orderBook, orderBookCachePort);
+			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
 			inOrder.verify(orderBook).remove(activatedOrder.getOrderId());
-			inOrder.verify(settlementService).cancelSettlement(any());
 			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 	}
@@ -315,11 +310,11 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("Shutdown 커맨드를 수신하면 engine, settlementService, cache를 호출하지 않는다")
+		@DisplayName("Shutdown 커맨드를 수신하면 engine, persistenceService, cache를 호출하지 않는다")
 		void handle_shutdown_noInteractions() {
 			handler.handle(new EngineCommand.Shutdown());
 
-			verifyNoInteractions(engine, settlementService, orderBookCachePort);
+			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
 		}
 	}
 }

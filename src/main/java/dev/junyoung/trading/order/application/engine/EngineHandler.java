@@ -1,16 +1,23 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.SettlementService;
+import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
+
+import java.util.List;
+
+import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -72,42 +79,55 @@ public class EngineHandler {
 	}
 
 	private void handleCancelOrder(OrderId orderId) {
-		Order cancelled = null;
-		try {
-			cancelled = engine.cancelOrder(orderId);
-		} catch (ConflictException e) {
-			log.warn("Cancel skipped - order not in orderBook: orderId={}", orderId, e);
+		Order order = orderBook.getIndex().get(orderId);
+		if (order == null) {
+			log.warn("Cancel skipped - order not in book: orderId={}", orderId);
+			return;
 		}
 
-		try {
-			if (cancelled != null) settlementService.cancelSettlement(cancelled);
-		} finally {
-			orderBookCachePort.update(symbol, orderBook);
+		OrderBookView view = OrderBookViewFactory.create(orderBook);
+		CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(view, order));
+
+		switch (result) {
+			case CancelCalculationResult.Cancelled c -> {
+				applyBookOps(c.bookOps());
+				settlementService.cancelSettlement(c.updatedOrders().getFirst());
+				orderBookCachePort.update(symbol, orderBook);
+			}
+			case CancelCalculationResult.Skipped s ->
+				log.warn("Cancel skipped - order already final: symbol={}, seq={}", s.symbol(), s.acceptedSeq());
+			case CancelCalculationResult.Rejected r ->
+				log.warn("Cancel rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
 		}
 	}
 
 	/**
-	 * 주문 유형(시장가/지정가)과 TIF에 따라 적절한 엔진 메서드로 디스패치한다.
-	 *
-	 * <ul>
-	 *   <li>시장가({@code isMarket()}): BUY는 quoteQty 예산 모드만 지원하고, SELL은 가격 조건 없이 즉시 체결 후 잔량이 취소된다.</li>
-	 *   <li>GTC: 잔량을 호가창에 등록해 이후 체결을 기다린다.</li>
-	 *   <li>IOC: 즉시 체결 가능한 수량만 체결하고 잔량은 취소한다.</li>
- *   <li>FOK: 전량 즉시 체결이 가능할 때만 체결하고, 그렇지 않으면 즉시 취소한다.</li>
-	 * </ul>
+	 * {@link MatchingEngine#calculatePlace}를 호출해 변경안을 계산하고,
+	 * bookOps를 live {@link OrderBook}에 반영한 뒤 {@link PlaceResult}로 변환한다.
 	 */
 	private PlaceResult processPlaceOrder(Order order) {
-		if (order.isMarket()) {
-			if (order.getSide() == Side.BUY && order.isQuoteQtyMode())
-				return engine.placeMarketBuyOrderWithQuoteQty(order);
+		OrderBookView view = OrderBookViewFactory.create(orderBook);
+		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
 
-			return engine.placeMarketSellOrder(order);
-		}
-
-		return switch (order.getTif()) {
-			case GTC -> engine.placeLimitOrder(order);
-			case IOC -> engine.placeLimitOrderIOC(order);
-			case FOK -> engine.placeLimitOrderFOK(order);
+		return switch (result) {
+			case PlaceCalculationResult.Rejected r -> {
+				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+				yield PlaceResult.empty();
+			}
+			case PlaceCalculationResult.Accepted a -> {
+				applyBookOps(a.bookOps());
+				yield PlaceResult.of(a.updatedOrders(), a.trades());
+			}
 		};
+	}
+
+	private void applyBookOps(List<BookOperation> ops) {
+		for (BookOperation op : ops) {
+			switch (op) {
+				case BookOperation.Add a -> orderBook.add(a.order());
+				case BookOperation.Replace r -> orderBook.replaceOrder(r.updatedOrder());
+				case BookOperation.Remove r -> orderBook.remove(r.orderId());
+			}
+		}
 	}
 }

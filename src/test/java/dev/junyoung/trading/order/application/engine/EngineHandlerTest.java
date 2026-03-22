@@ -1,18 +1,17 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.common.exception.ConflictException;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.SettlementService;
-import dev.junyoung.trading.order.domain.model.OrderBook;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.*;
-import dev.junyoung.trading.order.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-import dev.junyoung.trading.order.fixture.OrderFixture;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
+
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,12 +21,26 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.service.SettlementService;
+import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.model.value.QuoteQty;
+import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.service.MatchingEngineTest;
+import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
+import dev.junyoung.trading.order.fixture.OrderFixture;
 
 /**
  * {@link EngineHandler} 단위 테스트.
@@ -57,6 +70,11 @@ class EngineHandlerTest {
 
 	@BeforeEach
 	void setUp() {
+		// OrderBookViewFactory.create(orderBook) 에서 사용하는 필드 기본 설정
+		// Shutdown 같이 engine 미사용 테스트에서 불필요한 stub 경고가 발생하지 않도록 lenient() 사용
+		lenient().when(orderBook.getBids()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
+		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
+		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
 		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCachePort, settlementService);
 	}
 
@@ -72,6 +90,18 @@ class EngineHandlerTest {
 		return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQty));
 	}
 
+	private PlaceCalculationResult emptyAccepted() {
+		return new PlaceCalculationResult.Accepted(SYMBOL, 1L, List.of(), List.of(), List.of());
+	}
+
+	private CancelCalculationResult cancelledResult(Order order) {
+		Order cancelled = order.cancel();
+		return new CancelCalculationResult.Cancelled(
+			SYMBOL, order.getAcceptedSeq(),
+			List.of(cancelled),
+			List.of(new BookOperation.Remove(cancelled.getOrderId())));
+	}
+
 	// ── PlaceOrder ──────────────────────────────────────────────────────────
 
 	@Nested
@@ -79,21 +109,21 @@ class EngineHandlerTest {
 	class PlaceOrderCommand {
 
 		@Test
-		@DisplayName("Order를 MatchingEngine.placeLimitOrder()에 전달한다")
-		void handle_placeOrder_callsPlaceLimitOrder() {
+		@DisplayName("Order를 engine.calculatePlace()에 전달한다")
+		void handle_placeOrder_callsCalculatePlace() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(engine).placeLimitOrder(order);
+			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 		}
 
 		@Test
 		@DisplayName("체결 없이 처리되면 예외 없이 정상 종료한다")
 		void handle_placeOrder_noTrades_doesNotThrow() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
 		}
@@ -101,33 +131,32 @@ class EngineHandlerTest {
 		@Test
 		@DisplayName("Trade가 발생해도 예외 없이 정상 종료한다")
 		void handle_placeOrder_withTrades_doesNotThrow() {
-			Order taker = buyOrder(10_000, 5);
-			Order maker = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-			maker.activate();
-			Trade trade = Trade.of(taker, maker, new Quantity(5));
-			when(engine.placeLimitOrder(taker)).thenReturn(PlaceResult.of(List.of(), List.of(trade)));
+			Order order = buyOrder(10_000, 5);
+			Order activated = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC,
+				new Price(10_000), new Quantity(5)).activate();
+			var accepted = new PlaceCalculationResult.Accepted(SYMBOL, 1L, List.of(order, activated), List.of(), List.of());
+			when(engine.calculatePlace(any())).thenReturn(accepted);
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(taker)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
 		}
 
 		@Test
-		@DisplayName("PlaceOrder에 담긴 Order 참조가 그대로 placeLimitOrder에 전달된다")
+		@DisplayName("PlaceOrder에 담긴 Order 참조가 그대로 calculatePlace에 전달된다")
 		void handle_placeOrder_passesExactOrderReference() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			// same reference — orderId 포함 모든 필드가 동일한 객체가 전달됨을 보장
-			verify(engine).placeLimitOrder(order);
-			assertThat(order.getStatus().name()).isEqualTo("ACCEPTED"); // 핸들러는 상태를 바꾸지 않음
+			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+			assertThat(order.getStatus().name()).isEqualTo("ACCEPTED");
 		}
 
 		@Test
-		@DisplayName("placeLimitOrder 완료 후 orderBookCachePort.update가 orderBook을 인자로 호출된다")
+		@DisplayName("calculatePlace 완료 후 orderBookCachePort.update가 orderBook을 인자로 호출된다")
 		void handle_placeOrder_updatesCache() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -135,46 +164,34 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("orderBookCachePort.update는 placeLimitOrder 이후에 호출된다")
+		@DisplayName("orderBookCachePort.update는 calculatePlace 이후에 호출된다")
 		void handle_placeOrder_updatesCacheAfterEngine() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
 			InOrder inOrder = inOrder(engine, orderBookCachePort);
-			inOrder.verify(engine).placeLimitOrder(order);
+			inOrder.verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 
 		@Test
-		@DisplayName("MARKET SELL 주문이면 placeMarketSellOrder()에 전달하고 placeLimitOrder()는 호출하지 않는다")
-		void handle_placeOrder_marketSell_callsPlaceMarketSellOrder() {
+		@DisplayName("MARKET SELL 주문도 calculatePlace()로 전달된다")
+		void handle_placeOrder_marketSell_callsCalculatePlace() {
 			Order order = marketSellOrder(5);
-			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(engine).placeMarketSellOrder(order);
-			verify(engine, never()).placeLimitOrder(any());
-		}
-
-		@Test
-		@DisplayName("LIMIT 주문이면 placeMarketSellOrder()를 호출하지 않는다")
-		void handle_placeOrder_limit_neverCallsPlaceMarketSellOrder() {
-			Order order = buyOrder(10_000, 5);
-			when(engine.placeLimitOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
-
-			handler.handle(new EngineCommand.PlaceOrder(order));
-
-			verify(engine, never()).placeMarketSellOrder(any());
+			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 		}
 
 		@Test
 		@DisplayName("MARKET SELL 주문 처리 완료 후 orderBookCachePort.update가 호출된다")
 		void handle_placeOrder_marketSell_updatesCache() {
 			Order order = marketSellOrder(5);
-			when(engine.placeMarketSellOrder(order)).thenReturn(PlaceResult.of(List.of(), List.of()));
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
@@ -185,27 +202,37 @@ class EngineHandlerTest {
 		@DisplayName("MARKET SELL 주문 처리 후 PlaceResult를 settlementService.settlement()에 전달한다")
 		void handle_placeOrder_marketSell_delegatesToSettlementService() {
 			Order order = marketSellOrder(5);
-			Order filledMaker = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-			filledMaker.activate();
-			PlaceResult result = PlaceResult.of(List.of(filledMaker, order), List.of());
-			when(engine.placeMarketSellOrder(order)).thenReturn(result);
+			Order activated = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC,
+				new Price(10_000), new Quantity(5)).activate();
+			var accepted = new PlaceCalculationResult.Accepted(SYMBOL, 1L, List.of(activated, order), List.of(), List.of());
+			when(engine.calculatePlace(any())).thenReturn(accepted);
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(settlementService).settlement(result);
+			verify(settlementService).settlement(PlaceResult.of(accepted.updatedOrders(), accepted.trades()));
 		}
 
 		@Test
-		@DisplayName("BUY + quoteQty MARKET 주문이면 placeMarketBuyOrderWithQuoteQty()를 호출한다")
-		void handle_placeOrder_marketBuyQuoteQty_callsQuoteQtyPath() {
+		@DisplayName("BUY MARKET quoteQty 주문도 calculatePlace()로 전달된다")
+		void handle_placeOrder_marketBuyQuoteQty_callsCalculatePlace() {
 			Order order = marketBuyQuoteQtyOrder(50_000);
-			when(engine.placeMarketBuyOrderWithQuoteQty(order)).thenReturn(PlaceResult.of(List.of(order), List.of()));
+			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
-			verify(engine).placeMarketBuyOrderWithQuoteQty(order);
-			verify(engine, never()).placeMarketSellOrder(any());
-			verify(engine, never()).placeLimitOrder(any());
+			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+		}
+
+		@Test
+		@DisplayName("Rejected 결과이면 빈 PlaceResult로 settlement가 호출된다")
+		void handle_placeOrder_rejected_delegatesEmptyResultToSettlementService() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any()))
+				.thenReturn(new PlaceCalculationResult.Rejected(SYMBOL, 1L, PlaceRejectCode.INVALID_TIF));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(settlementService).settlement(PlaceResult.of(List.of(), List.of()));
 		}
 	}
 
@@ -216,93 +243,62 @@ class EngineHandlerTest {
 	class CancelOrderCommand {
 
 		@Test
-		@DisplayName("OrderId를 MatchingEngine.cancelOrder()에 전달한다")
-		void handle_cancelOrder_callsCancelOrder() {
+		@DisplayName("주문이 book에 없으면 예외 없이 정상 종료하고 settlement를 호출하지 않는다")
+		void handle_cancelOrder_orderNotInBook_skips() {
 			OrderId orderId = OrderId.newId();
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			verify(engine).cancelOrder(orderId);
-		}
-
-		@Test
-		@DisplayName("엔진이 ConflictException을 던져도 외부로 전파되지 않는다")
-		void handle_cancelOrder_engineThrows_doesNotPropagateException() {
-			OrderId orderId = OrderId.newId();
-			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
-
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
-		}
-
-		@Test
-		@DisplayName("cancelOrder 완료 후 orderBookCachePort.update가 orderBook을 인자로 호출된다")
-		void handle_cancelOrder_updatesCache() {
-			OrderId orderId = OrderId.newId();
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
-		}
-
-		@Test
-		@DisplayName("orderBookCachePort.update는 cancelOrder 이후에 호출된다")
-		void handle_cancelOrder_updatesCacheAfterEngine() {
-			OrderId orderId = OrderId.newId();
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			InOrder inOrder = inOrder(engine, orderBookCachePort);
-			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
-		}
-
-		@Test
-		@DisplayName("엔진이 예외를 던져도 orderBookCachePort.update는 호출된다")
-		void handle_cancelOrder_engineThrows_cacheStillUpdated() {
-			OrderId orderId = OrderId.newId();
-			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
-
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
-
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
-		}
-
-		@Test
-		@DisplayName("engine.cancelOrder()가 반환한 Order를 settlementService.cancelSettlement()에 위임한다")
-		void handle_cancelOrder_delegatesToCancelSettlement() {
-			OrderId orderId = OrderId.newId();
-			Order cancelled = buyOrder(10_000, 5);
-			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			verify(settlementService).cancelSettlement(cancelled);
-		}
-
-		@Test
-		@DisplayName("호출 순서: engine.cancelOrder → settlementService.cancelSettlement → orderBookCachePort.update")
-		void handle_cancelOrder_callOrderIsEngineSettlementCache() {
-			OrderId orderId = OrderId.newId();
-			Order cancelled = buyOrder(10_000, 5);
-			when(engine.cancelOrder(orderId)).thenReturn(cancelled);
-
-			handler.handle(new EngineCommand.CancelOrder(orderId));
-
-			InOrder inOrder = inOrder(engine, settlementService, orderBookCachePort);
-			inOrder.verify(engine).cancelOrder(orderId);
-			inOrder.verify(settlementService).cancelSettlement(cancelled);
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
-		}
-
-		@Test
-		@DisplayName("엔진이 예외를 던지면 settlementService.cancelSettlement는 호출되지 않는다")
-		void handle_cancelOrder_engineThrows_doesNotDelegateToSettlementService() {
-			OrderId orderId = OrderId.newId();
-			doThrow(new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed")).when(engine).cancelOrder(orderId);
+			// getIndex()는 @BeforeEach에서 빈 맵으로 설정
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId)));
 
 			verify(settlementService, never()).cancelSettlement(any());
+		}
+
+		@Test
+		@DisplayName("활성 주문이면 orderBook.remove → order.cancel() → settlementService.cancelSettlement 순으로 호출된다")
+		void handle_cancelOrder_activeOrder_cancelsAndSettles() {
+			Order activatedOrder = buyOrder(10_000, 5).activate();
+			Map<OrderId, Order> index = new HashMap<>();
+			index.put(activatedOrder.getOrderId(), activatedOrder);
+			when(orderBook.getIndex()).thenReturn(index);
+			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
+
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+
+			verify(orderBook).remove(activatedOrder.getOrderId());
+			verify(settlementService).cancelSettlement(argThat(o ->
+				o.getOrderId().equals(activatedOrder.getOrderId())
+					&& o.getStatus() == OrderStatus.CANCELLED));
+		}
+
+		@Test
+		@DisplayName("활성 주문 취소 후 orderBookCachePort.update가 호출된다")
+		void handle_cancelOrder_activeOrder_cacheUpdated() {
+			Order activatedOrder = buyOrder(10_000, 5).activate();
+			Map<OrderId, Order> index = new HashMap<>();
+			index.put(activatedOrder.getOrderId(), activatedOrder);
+			when(orderBook.getIndex()).thenReturn(index);
+			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
+
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+
+			verify(orderBookCachePort).update(SYMBOL, orderBook);
+		}
+
+		@Test
+		@DisplayName("호출 순서: orderBook.remove → settlementService.cancelSettlement → orderBookCachePort.update")
+		void handle_cancelOrder_callOrderIsRemoveSettlementCache() {
+			Order activatedOrder = buyOrder(10_000, 5).activate();
+			Map<OrderId, Order> index = new HashMap<>();
+			index.put(activatedOrder.getOrderId(), activatedOrder);
+			when(orderBook.getIndex()).thenReturn(index);
+			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
+
+			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
+
+			InOrder inOrder = inOrder(orderBook, settlementService, orderBookCachePort);
+			inOrder.verify(orderBook).remove(activatedOrder.getOrderId());
+			inOrder.verify(settlementService).cancelSettlement(any());
+			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 	}
 

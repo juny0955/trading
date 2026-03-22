@@ -17,6 +17,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 
 @DisplayName("OrderBook")
 class OrderBookTest {
@@ -35,16 +38,12 @@ class OrderBookTest {
 
 	/** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
 	private Order newBuyOrder(long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
+		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
 	}
 
 	/** ACCEPTED → activate() → NEW 상태인 SELL 주문 */
 	private Order newSellOrder(long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
+		return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
 	}
 
 	// ── add() ─────────────────────────────────────────────────────────────
@@ -99,6 +98,34 @@ class OrderBookTest {
 			orderBook.add(newSellOrder(10_000, 1));
 
 			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("동일 orderId 주문을 중복 추가하면 OrderBookInvariantViolationException이 발생한다")
+		void addDuplicateOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+
+			assertThatThrownBy(() -> orderBook.add(order))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("시장가(MARKET) 주문 추가 시 OrderBookInvariantViolationException이 발생한다")
+		void addMarketOrder_throwsException() {
+			Order market = OrderFixture.createMarketSell(SYMBOL, new Quantity(1)).activate();
+
+			assertThatThrownBy(() -> orderBook.add(market))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("비활성(ACCEPTED) 주문 추가 시 OrderBookInvariantViolationException이 발생한다")
+		void addInactiveOrder_throwsException() {
+			Order accepted = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+
+			assertThatThrownBy(() -> orderBook.add(accepted))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
 		}
 	}
 
@@ -502,7 +529,7 @@ class OrderBookTest {
 			orderBook.add(newBuyOrder(10_000, 5));
 
 			assertThat(orderBook.bidsSnapshot())
-				.containsEntry(new Price(10_000), 5L);
+				.containsEntry(new Price(10_000), new Quantity(5));
 		}
 
 		@Test
@@ -512,7 +539,7 @@ class OrderBookTest {
 			orderBook.add(newBuyOrder(10_000, 7));
 
 			assertThat(orderBook.bidsSnapshot())
-				.containsEntry(new Price(10_000), 10L);
+				.containsEntry(new Price(10_000), new Quantity(10));
 		}
 
 		@Test
@@ -522,7 +549,7 @@ class OrderBookTest {
 			orderBook.add(newBuyOrder(11_000, 1));
 			orderBook.add(newBuyOrder(10_000, 1));
 
-			NavigableMap<Price, Long> snapshot = orderBook.bidsSnapshot();
+			NavigableMap<Price, Quantity> snapshot = orderBook.bidsSnapshot();
 
 			assertThat(snapshot.firstKey()).isEqualTo(new Price(11_000));
 			assertThat(snapshot.lastKey()).isEqualTo(new Price(9_000));
@@ -539,19 +566,18 @@ class OrderBookTest {
 		@Test
 		@DisplayName("부분 체결된 BUY 주문의 remaining 잔량이 반영된다")
 		void bidsSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
-			Order order = newBuyOrder(10_000, 10);
-			order.fill(new Quantity(3), DEFAULT_PRICE); // remaining = 7
+			Order order = newBuyOrder(10_000, 10).fill(new Quantity(3), DEFAULT_PRICE); // remaining = 7
 			orderBook.add(order);
 
 			assertThat(orderBook.bidsSnapshot())
-				.containsEntry(new Price(10_000), 7L);
+				.containsEntry(new Price(10_000), new Quantity(7));
 		}
 
 		@Test
 		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
 		void bidsSnapshot_isIndependentCopy() {
 			orderBook.add(newBuyOrder(10_000, 5));
-			NavigableMap<Price, Long> snapshot = orderBook.bidsSnapshot();
+			NavigableMap<Price, Quantity> snapshot = orderBook.bidsSnapshot();
 
 			orderBook.add(newBuyOrder(9_000, 3));
 
@@ -577,7 +603,7 @@ class OrderBookTest {
 			orderBook.add(newSellOrder(10_000, 5));
 
 			assertThat(orderBook.asksSnapshot())
-				.containsEntry(new Price(10_000), 5L);
+				.containsEntry(new Price(10_000), new Quantity(5));
 		}
 
 		@Test
@@ -587,7 +613,7 @@ class OrderBookTest {
 			orderBook.add(newSellOrder(10_000, 6));
 
 			assertThat(orderBook.asksSnapshot())
-				.containsEntry(new Price(10_000), 10L);
+				.containsEntry(new Price(10_000), new Quantity(10));
 		}
 
 		@Test
@@ -597,7 +623,7 @@ class OrderBookTest {
 			orderBook.add(newSellOrder(9_000, 1));
 			orderBook.add(newSellOrder(10_000, 1));
 
-			NavigableMap<Price, Long> snapshot = orderBook.asksSnapshot();
+			NavigableMap<Price, Quantity> snapshot = orderBook.asksSnapshot();
 
 			assertThat(snapshot.firstKey()).isEqualTo(new Price(9_000));
 			assertThat(snapshot.lastKey()).isEqualTo(new Price(11_000));
@@ -614,19 +640,18 @@ class OrderBookTest {
 		@Test
 		@DisplayName("부분 체결된 SELL 주문의 remaining 잔량이 반영된다")
 		void asksSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
-			Order order = newSellOrder(10_000, 10);
-			order.fill(new Quantity(4), DEFAULT_PRICE); // remaining = 6
+			Order order = newSellOrder(10_000, 10).fill(new Quantity(4), DEFAULT_PRICE); // remaining = 6
 			orderBook.add(order);
 
 			assertThat(orderBook.asksSnapshot())
-				.containsEntry(new Price(10_000), 6L);
+				.containsEntry(new Price(10_000), new Quantity(6));
 		}
 
 		@Test
 		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
 		void asksSnapshot_isIndependentCopy() {
 			orderBook.add(newSellOrder(10_000, 5));
-			NavigableMap<Price, Long> snapshot = orderBook.asksSnapshot();
+			NavigableMap<Price, Quantity> snapshot = orderBook.asksSnapshot();
 
 			orderBook.add(newSellOrder(11_000, 3));
 
@@ -684,6 +709,93 @@ class OrderBookTest {
 			orderBook.add(laterLow);
 
 			assertThat(orderBook.poll(Side.SELL)).contains(laterLow);
+		}
+	}
+
+	// ── replaceOrder() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("replaceOrder()")
+	class ReplaceOrder {
+
+		@Test
+		@DisplayName("정상 교체: 부분 체결 후 remaining 갱신된 주문으로 교체된다")
+		void normalReplace_updatesIndex() {
+			Order order = newBuyOrder(10_000, 10);
+			orderBook.add(order);
+			Order partiallyFilled = order.fill(new Quantity(3), DEFAULT_PRICE);
+
+			orderBook.replaceOrder(partiallyFilled);
+
+			assertThat(orderBook.peek(Side.BUY)).contains(partiallyFilled);
+		}
+
+		@Test
+		@DisplayName("교체 후 FIFO 위치가 유지된다")
+		void replace_preservesFifoPosition() {
+			Order first  = newBuyOrder(10_000, 10);
+			Order second = newBuyOrder(10_000, 5);
+			orderBook.add(first);
+			orderBook.add(second);
+			Order updated = first.fill(new Quantity(3), DEFAULT_PRICE);
+
+			orderBook.replaceOrder(updated);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(updated);
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+		}
+
+		@Test
+		@DisplayName("book에 없는 주문 교체 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceNonExistentOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(order))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("비활성(CANCELLED) updatedOrder 교체 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceWithInactiveOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order cancelled = order.cancel();
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(cancelled))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("side 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceSideMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order sideMismatch = order.toBuilder().side(Side.SELL).build();
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(sideMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("symbol 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceSymbolMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order symbolMismatch = order.toBuilder().symbol(new Symbol("ETH")).build();
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(symbolMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("price 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replacePriceMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order priceMismatch = order.toBuilder().price(new Price(9_000)).build();
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(priceMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
 		}
 	}
 

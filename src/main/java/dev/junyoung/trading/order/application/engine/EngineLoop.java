@@ -47,7 +47,7 @@ public class EngineLoop implements Runnable {
 	// 진입점
 	// -------------------------------------------------------------------------
 
-	/** engine-thread를 시작한다. {@link EngineContext}의 생성자에서 호출된다. */
+	/** engine-thread를 시작한다. {@link EngineRuntime}의 생성자에서 호출된다. */
 	protected void start() {
 		engineThread.start(this);
 	}

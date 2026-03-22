@@ -1,6 +1,6 @@
 package dev.junyoung.trading.order.application.service;
 
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OrderBookQueryServiceTest {
 
     @Mock
-    private OrderBookCachePort orderBookCachePort;
+    private OrderBookCache orderBookCache;
 
     @InjectMocks
     private OrderBookQueryService sut;
@@ -39,15 +39,11 @@ class OrderBookQueryServiceTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private Order activatedBuy(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     private Order activatedSell(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     // ── getOrderBookCache() ───────────────────────────────────────────────
@@ -64,18 +60,18 @@ class OrderBookQueryServiceTest {
             book.add(activatedBuy(9_000, 3));
             book.add(activatedSell(11_000, 2));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
-            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
+            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
-            assertThat(result.bids()).hasSize(2).containsEntry(10_000L, 5L).containsEntry(9_000L, 3L);
-            assertThat(result.asks()).hasSize(1).containsEntry(11_000L, 2L);
+            assertThat(result.bids()).hasSize(2).containsEntry(new Price(10_000), new Quantity(5)).containsEntry(new Price(9_000), new Quantity(3));
+            assertThat(result.asks()).hasSize(1).containsEntry(new Price(11_000), new Quantity(2));
         }
 
         @Test
         @DisplayName("캐시가 비어 있으면 bids/asks가 빈 맵으로 반환된다")
         void getOrderBookCache_emptyCache_returnsEmptyMaps() {
-            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(OrderBookSnapshot.EMPTY);
+            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(OrderBookSnapshot.EMPTY);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
@@ -93,12 +89,12 @@ class OrderBookQueryServiceTest {
             book.add(activatedSell(12_000, 1));
             book.add(activatedSell(11_000, 2));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
-            when(orderBookCachePort.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
+            when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
-            assertThat(result.bids().firstKey()).isEqualTo(10_000L);
-            assertThat(result.asks().firstKey()).isEqualTo(11_000L);
+            assertThat(result.bids().firstKey()).isEqualTo(new Price(10_000));
+            assertThat(result.asks().firstKey()).isEqualTo(new Price(11_000));
         }
     }
 }

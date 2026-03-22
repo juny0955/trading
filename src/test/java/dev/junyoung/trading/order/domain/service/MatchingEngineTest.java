@@ -1,32 +1,37 @@
 package dev.junyoung.trading.order.domain.service;
 
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-import dev.junyoung.trading.order.fixture.OrderFixture;
-import dev.junyoung.trading.common.exception.ConflictException;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import dev.junyoung.trading.order.application.engine.OrderBookViewFactory;
+import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.CancelResultCode;
+import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.domain.service.state.OrderBookView;
+import dev.junyoung.trading.order.fixture.OrderFixture;
 
 @DisplayName("MatchingEngine")
 public class MatchingEngineTest {
+
+	private static final Symbol SYMBOL = new Symbol("BTC");
 
 	private OrderBook orderBook;
 	private MatchingEngine engine;
@@ -34,39 +39,69 @@ public class MatchingEngineTest {
 	@BeforeEach
 	void setUp() {
 		orderBook = new OrderBook();
-		engine = new MatchingEngine(orderBook);
+		engine = new MatchingEngine();
 	}
 
 	// ── 헬퍼 ──────────────────────────────────────────────────────────────
 
-	private static final Symbol SYMBOL = new Symbol("BTC");
+	/** 현재 orderBook 상태로 OrderBookView 스냅샷을 생성한다. 매칭 직전에 호출한다. */
+	private OrderBookView view() {
+		return OrderBookViewFactory.create(orderBook);
+	}
 
-	/** ACCEPTED 상태 BUY 주문 — 엔진에 직접 전달용 */
-	private Order buyOrder(long price, long qty) {
+	/** ACCEPTED 상태 GTC LIMIT BUY taker */
+	private Order takerBuy(long price, long qty) {
 		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
-	/** ACCEPTED 상태 SELL 주문 — 엔진에 직접 전달용 */
-	private Order sellOrder(long price, long qty) {
+	/** ACCEPTED 상태 GTC LIMIT SELL taker */
+	private Order takerSell(long price, long qty) {
 		return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 	}
 
-	/** ACCEPTED → activate() → NEW 상태 SELL 주문 — orderBook 사전 등록용 */
-	private Order activatedSellOrder(long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
-	}
-
-	/** ACCEPTED → activate() → NEW 상태 BUY 주문 — orderBook 사전 등록용 */
-	private Order activatedBuyOrder(long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
-	}
-
-	private Order marketSellOrder(long qty) {
+	/** ACCEPTED 상태 MARKET SELL taker */
+	private Order takerMarketSell(long qty) {
 		return OrderFixture.createMarketSell(SYMBOL, new Quantity(qty));
+	}
+
+	/** ACCEPTED 상태 quoteQty 기반 MARKET BUY taker */
+	private Order takerMarketBuy(long quoteQtyValue) {
+		return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQtyValue));
+	}
+
+	/** ACTIVATED LIMIT SELL maker를 orderBook에 등록하고 반환한다 */
+	private Order addMakerSell(long price, long qty) {
+		Order activated = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
+		orderBook.add(activated);
+		return activated;
+	}
+
+	/** ACTIVATED LIMIT BUY maker를 orderBook에 등록하고 반환한다 */
+	private Order addMakerBuy(long price, long qty) {
+		Order activated = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
+		orderBook.add(activated);
+		return activated;
+	}
+
+	private PlaceCalculationResult place(Order order) {
+		return engine.calculatePlace(new PlaceCalculationInput(view(), order));
+	}
+
+	private CancelCalculationResult cancel(Order target) {
+		return engine.calculateCancel(new CancelCalculationInput(view(), target));
+	}
+
+	/** PlaceCalculationResult가 Accepted임을 단언하며 추출한다 */
+	private static PlaceCalculationResult.Accepted accepted(PlaceCalculationResult result) {
+		return assertInstanceOf(PlaceCalculationResult.Accepted.class, result);
+	}
+
+	/** updatedOrders에서 orderId로 최종 주문 상태를 찾는다 */
+	private static Order findOrder(PlaceCalculationResult.Accepted result, OrderId id) {
+		return result.updatedOrders().stream()
+			.filter(o -> o.getOrderId().equals(id))
+			.findFirst()
+			.orElseThrow(() -> new AssertionError("orderId " + id + " not found in updatedOrders"));
 	}
 
 	// ── 매칭 없음 ──────────────────────────────────────────────────────────
@@ -76,55 +111,53 @@ public class MatchingEngineTest {
 	class NoMatch {
 
 		@Test
-		@DisplayName("반대 사이드 주문이 없으면 Trade가 발생하지 않고 orderBook에 등록된다")
-		void buyWithNoAsks_registeredToOrderBook() {
-			Order buy = buyOrder(10_000, 5);
+		@DisplayName("반대 사이드 주문이 없으면 Trade가 발생하지 않고 bookOps에 Add가 포함된다")
+		void buyWithNoAsks_registeredAsAdd() {
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			List<Trade> trades = engine.placeLimitOrder(buy).trades();
-
-			assertThat(trades).isEmpty();
-			assertThat(buy.getStatus()).isEqualTo(OrderStatus.NEW);
-			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+			assertThat(result.trades()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
-		@DisplayName("SELL 진입 시 반대 BID가 없으면 Trade 없이 orderBook에 등록된다")
-		void sellWithNoBids_registeredToOrderBook() {
-			Order sell = sellOrder(10_000, 5);
+		@DisplayName("SELL 진입 시 반대 BID가 없으면 Trade 없이 bookOps에 Add가 포함된다")
+		void sellWithNoBids_registeredAsAdd() {
+			Order taker = takerSell(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			List<Trade> trades = engine.placeLimitOrder(sell).trades();
-
-			assertThat(trades).isEmpty();
-			assertThat(sell.getStatus()).isEqualTo(OrderStatus.NEW);
-			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+			assertThat(result.trades()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
-		@DisplayName("BUY 가격 < bestAsk 이면 가격 불일치로 체결되지 않고 orderBook에 등록된다")
+		@DisplayName("BUY 가격 < bestAsk 이면 가격 불일치로 체결되지 않고 bookOps에 Add가 포함된다")
 		void buyPriceBelowBestAsk_noMatch() {
-			orderBook.add(activatedSellOrder(11_000, 5));
+			addMakerSell(11_000, 5);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order buy = buyOrder(10_000, 5);
-			List<Trade> trades = engine.placeLimitOrder(buy).trades();
-
-			assertThat(trades).isEmpty();
-			assertThat(buy.getStatus()).isEqualTo(OrderStatus.NEW);
-			assertThat(orderBook.bestBid()).contains(new Price(10_000));
-			assertThat(orderBook.bestAsk()).contains(new Price(11_000)); // ask 그대로
+			assertThat(result.trades()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
-		@DisplayName("SELL 가격 > bestBid 이면 가격 불일치로 체결되지 않고 orderBook에 등록된다")
+		@DisplayName("SELL 가격 > bestBid 이면 가격 불일치로 체결되지 않고 bookOps에 Add가 포함된다")
 		void sellPriceAboveBestBid_noMatch() {
-			orderBook.add(activatedBuyOrder(9_000, 5));
+			addMakerBuy(9_000, 5);
+			Order taker = takerSell(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order sell = sellOrder(10_000, 5);
-			List<Trade> trades = engine.placeLimitOrder(sell).trades();
-
-			assertThat(trades).isEmpty();
-			assertThat(sell.getStatus()).isEqualTo(OrderStatus.NEW);
-			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
-			assertThat(orderBook.bestBid()).contains(new Price(9_000)); // bid 그대로
+			assertThat(result.trades()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
 		}
 	}
 
@@ -137,37 +170,35 @@ public class MatchingEngineTest {
 		@Test
 		@DisplayName("taker qty == maker qty 이면 양쪽 모두 FILLED, Trade 1건 발생")
 		void exactQtyMatch_bothFilled() {
-			Order maker = activatedSellOrder(10_000, 5);
-			orderBook.add(maker);
+			Order maker = addMakerSell(10_000, 5);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 5);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(result.trades()).hasSize(1);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
-		@DisplayName("완전 체결 후 orderBook은 비어있다")
-		void exactQtyMatch_orderBookEmpty() {
-			orderBook.add(activatedSellOrder(10_000, 5));
+		@DisplayName("완전 체결 후 bookOps에 taker Add 없음, maker Remove 있음")
+		void exactQtyMatch_bookOpsHasRemoveForMaker() {
+			Order maker = addMakerSell(10_000, 5);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			engine.placeLimitOrder(buyOrder(10_000, 5));
-
-			assertThat(orderBook.bestBid()).isEmpty();
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(result.bookOps()).noneMatch(op -> op instanceof BookOperation.Add);
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Remove r && r.orderId().equals(maker.getOrderId()));
 		}
 
 		@Test
 		@DisplayName("Trade에 buyOrderId, sellOrderId, executedQty가 올바르게 기록된다")
 		void tradeRecordsCorrectFields() {
-			Order maker = activatedSellOrder(10_000, 5);
-			orderBook.add(maker);
+			Order maker = addMakerSell(10_000, 5);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 5);
-			Trade trade = engine.placeLimitOrder(taker).trades().getFirst();
-
+			var trade = result.trades().getFirst();
 			assertThat(trade.buyOrderId()).isEqualTo(taker.getOrderId());
 			assertThat(trade.sellOrderId()).isEqualTo(maker.getOrderId());
 			assertThat(trade.quantity()).isEqualTo(new Quantity(5));
@@ -176,16 +207,14 @@ public class MatchingEngineTest {
 		@Test
 		@DisplayName("SELL taker가 BUY maker와 완전 체결된다")
 		void sellTakerFullyMatchesBuyMaker() {
-			Order maker = activatedBuyOrder(10_000, 3);
-			orderBook.add(maker);
+			Order maker = addMakerBuy(10_000, 3);
+			Order taker = takerSell(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = sellOrder(10_000, 3);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			Trade trade = trades.getFirst();
+			assertThat(result.trades()).hasSize(1);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			var trade = result.trades().getFirst();
 			assertThat(trade.buyOrderId()).isEqualTo(maker.getOrderId());
 			assertThat(trade.sellOrderId()).isEqualTo(taker.getOrderId());
 		}
@@ -198,39 +227,37 @@ public class MatchingEngineTest {
 	class PartialMatch {
 
 		@Test
-		@DisplayName("taker qty > maker qty: maker FILLED, taker PARTIALLY_FILLED 후 orderBook에 등록")
-		void takerLargerThanMaker_takerRemainInBook() {
-			Order maker = activatedSellOrder(10_000, 3);
-			orderBook.add(maker);
+		@DisplayName("taker qty > maker qty: maker FILLED, taker PARTIALLY_FILLED 후 bookOps에 Add")
+		void takerLargerThanMaker_takerAddsToBook() {
+			Order maker = addMakerSell(10_000, 3);
+			Order taker = takerBuy(10_000, 10);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 10);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(trades.getFirst().quantity()).isEqualTo(new Quantity(3));
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
-			assertThat(taker.getRemaining()).isEqualTo(new Quantity(7));
-			assertThat(orderBook.bestBid()).contains(new Price(10_000)); // taker가 bid에 등록됨
-			assertThat(orderBook.bestAsk()).isEmpty(); // maker 소진
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(7));
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
-		@DisplayName("taker qty < maker qty: taker FILLED, maker PARTIALLY_FILLED 상태로 orderBook에 잔류")
-		void takerSmallerThanMaker_makerRemainsInBook() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
+		@DisplayName("taker qty < maker qty: taker FILLED, maker PARTIALLY_FILLED, bookOps에 Replace")
+		void takerSmallerThanMaker_makerReplaced() {
+			Order maker = addMakerSell(10_000, 10);
+			Order taker = takerBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 3);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(trades.getFirst().quantity()).isEqualTo(new Quantity(3));
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
-			assertThat(maker.getRemaining()).isEqualTo(new Quantity(7));
-			assertThat(orderBook.bestAsk()).contains(new Price(10_000)); // maker 잔류
-			assertThat(orderBook.bestBid()).isEmpty(); // taker 체결 완료
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			Order finalMaker = findOrder(result, maker.getOrderId());
+			assertThat(finalMaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(finalMaker.getRemaining()).isEqualTo(new Quantity(7));
+			assertThat(result.bookOps()).anyMatch(op ->
+				op instanceof BookOperation.Replace r && r.updatedOrder().getOrderId().equals(maker.getOrderId()));
 		}
 	}
 
@@ -243,53 +270,44 @@ public class MatchingEngineTest {
 		@Test
 		@DisplayName("단일 BUY가 여러 ask를 순서대로 체결하면 Trade가 복수 발생한다")
 		void singleBuySweepsMultipleAsks() {
-			Order ask1 = activatedSellOrder(10_000, 3);
-			Order ask2 = activatedSellOrder(10_000, 4);
-			orderBook.add(ask1);
-			orderBook.add(ask2);
+			Order ask1 = addMakerSell(10_000, 3);
+			Order ask2 = addMakerSell(10_000, 4);
+			Order taker = takerBuy(10_000, 7);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 7);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(2);
-			assertThat(trades.get(0).quantity()).isEqualTo(new Quantity(3));
-			assertThat(trades.get(1).quantity()).isEqualTo(new Quantity(4));
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask1.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask2.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(result.trades()).hasSize(2);
+			assertThat(result.trades().get(0).quantity()).isEqualTo(new Quantity(3));
+			assertThat(result.trades().get(1).quantity()).isEqualTo(new Quantity(4));
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask1.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask2.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("BUY가 여러 가격 레벨을 순차 체결한다")
 		void buySweeepsMultiplePriceLevels() {
-			orderBook.add(activatedSellOrder(9_000, 2));
-			orderBook.add(activatedSellOrder(10_000, 3));
+			addMakerSell(9_000, 2);
+			addMakerSell(10_000, 3);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 5);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(2);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(result.trades()).hasSize(2);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
-		@DisplayName("체결 수량이 부족해 일부 ask만 체결되면 나머지 ask는 orderBook에 잔류한다")
-		void partialSweep_remainingAskStaysInBook() {
-			Order ask1 = activatedSellOrder(10_000, 3);
-			Order ask2 = activatedSellOrder(10_000, 5);
-			orderBook.add(ask1);
-			orderBook.add(ask2);
+		@DisplayName("체결 수량이 부족해 일부 ask만 체결되면 나머지 ask는 updatedOrders에 포함되지 않는다")
+		void partialSweep_untouchedAskNotInUpdatedOrders() {
+			Order ask1 = addMakerSell(10_000, 3);
+			Order ask2 = addMakerSell(10_000, 5);
+			Order taker = takerBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 3);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask1.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask2.getStatus()).isEqualTo(OrderStatus.NEW);
-			assertThat(orderBook.bestAsk()).contains(new Price(10_000)); // ask2 잔류
+			assertThat(result.trades()).hasSize(1);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask1.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(result.updatedOrders().stream()
+				.noneMatch(o -> o.getOrderId().equals(ask2.getOrderId()))).isTrue();
 		}
 	}
 
@@ -302,33 +320,29 @@ public class MatchingEngineTest {
 		@Test
 		@DisplayName("BUY 진입 시 더 낮은 ask 가격이 먼저 체결된다")
 		void buyMatchesLowestAskFirst() {
-			Order highAsk = activatedSellOrder(11_000, 2);
-			Order lowAsk  = activatedSellOrder(9_000, 2);
-			orderBook.add(highAsk);
-			orderBook.add(lowAsk);
+			Order highAsk = addMakerSell(11_000, 2);
+			Order lowAsk  = addMakerSell(9_000, 2);
+			Order taker = takerBuy(11_000, 2);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(11_000, 2);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(lowAsk.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(highAsk.getStatus()).isEqualTo(OrderStatus.NEW); // 미체결
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().sellOrderId()).isEqualTo(lowAsk.getOrderId());
+			assertThat(result.updatedOrders().stream()
+				.noneMatch(o -> o.getOrderId().equals(highAsk.getOrderId()))).isTrue();
 		}
 
 		@Test
 		@DisplayName("SELL 진입 시 더 높은 bid 가격이 먼저 체결된다")
 		void sellMatchesHighestBidFirst() {
-			Order lowBid  = activatedBuyOrder(9_000, 2);
-			Order highBid = activatedBuyOrder(11_000, 2);
-			orderBook.add(lowBid);
-			orderBook.add(highBid);
+			Order lowBid  = addMakerBuy(9_000, 2);
+			Order highBid = addMakerBuy(11_000, 2);
+			Order taker = takerSell(9_000, 2);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = sellOrder(9_000, 2);
-			List<Trade> trades = engine.placeLimitOrder(taker).trades();
-
-			assertThat(trades).hasSize(1);
-			assertThat(highBid.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(lowBid.getStatus()).isEqualTo(OrderStatus.NEW); // 미체결
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().buyOrderId()).isEqualTo(highBid.getOrderId());
+			assertThat(result.updatedOrders().stream()
+				.noneMatch(o -> o.getOrderId().equals(lowBid.getOrderId()))).isTrue();
 		}
 	}
 
@@ -341,603 +355,557 @@ public class MatchingEngineTest {
 		@Test
 		@DisplayName("동일 ask 가격에서 먼저 등록된 주문이 먼저 체결된다")
 		void samePriceAsks_earlierRegisteredMatchedFirst() {
-			Order first  = activatedSellOrder(10_000, 3);
-			Order second = activatedSellOrder(10_000, 3);
-			orderBook.add(first);
-			orderBook.add(second);
+			Order first  = addMakerSell(10_000, 3);
+			Order second = addMakerSell(10_000, 3);
+			Order taker = takerBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 3);
-			engine.placeLimitOrder(taker);
-
-			assertThat(first.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(second.getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().sellOrderId()).isEqualTo(first.getOrderId());
+			assertThat(result.updatedOrders().stream()
+				.noneMatch(o -> o.getOrderId().equals(second.getOrderId()))).isTrue();
 		}
 
 		@Test
 		@DisplayName("동일 bid 가격에서 먼저 등록된 주문이 먼저 체결된다")
 		void samePriceBids_earlierRegisteredMatchedFirst() {
-			Order first  = activatedBuyOrder(10_000, 3);
-			Order second = activatedBuyOrder(10_000, 3);
-			orderBook.add(first);
-			orderBook.add(second);
+			Order first  = addMakerBuy(10_000, 3);
+			Order second = addMakerBuy(10_000, 3);
+			Order taker = takerSell(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-
-			Order taker = sellOrder(10_000, 3);
-			engine.placeLimitOrder(taker);
-
-			assertThat(first.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(second.getStatus()).isEqualTo(OrderStatus.NEW);
+			assertThat(result.trades()).hasSize(1);
+			assertThat(result.trades().getFirst().buyOrderId()).isEqualTo(first.getOrderId());
+			assertThat(result.updatedOrders().stream()
+				.noneMatch(o -> o.getOrderId().equals(second.getOrderId()))).isTrue();
 		}
 	}
 
-	// ── placeMarketSellOrder() ────────────────────────────────────────────
+	// ── MARKET SELL ────────────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("placeMarketSellOrder()")
+	@DisplayName("MARKET SELL")
 	class PlaceMarketSellOrder {
 
 		@Test
-		@DisplayName("SELL MARKET — 호가창이 비어있으면 체결 없이 즉시 CANCELLED")
+		@DisplayName("호가창이 비어있으면 체결 없이 즉시 CANCELLED")
 		void sellMarket_emptyBook_immediatelyCancelled() {
-			Order taker = marketSellOrder(5);
-			engine.placeMarketSellOrder(taker);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			Order taker = takerMarketSell(5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.trades()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
-		@DisplayName("SELL MARKET — 전량 체결 → FILLED, remaining = 0")
+		@DisplayName("전량 체결 → FILLED, remaining = 0")
 		void sellMarket_exactMatch_filled() {
-			orderBook.add(activatedBuyOrder(10_000, 5));
-			Order taker = marketSellOrder(5);
-			List<Trade> trades = engine.placeMarketSellOrder(taker).trades();
-			assertThat(trades).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(taker.getRemaining()).isEqualTo(new Quantity(0));
+			addMakerBuy(10_000, 5);
+			Order taker = takerMarketSell(5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.trades()).hasSize(1);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(0));
 		}
 
 		@Test
-		@DisplayName("SELL MARKET — 유동성 부족 → 부분 체결 후 잔량 CANCELLED")
+		@DisplayName("유동성 부족 → 부분 체결 후 잔량 CANCELLED")
 		void sellMarket_insufficientLiquidity_partialFillThenCancelled() {
-			orderBook.add(activatedBuyOrder(10_000, 3));
-			Order taker = marketSellOrder(10);
-			List<Trade> trades = engine.placeMarketSellOrder(taker).trades();
-			assertThat(trades).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(taker.getRemaining()).isEqualTo(new Quantity(7));
+			addMakerBuy(10_000, 3);
+			Order taker = takerMarketSell(10);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.trades()).hasSize(1);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(7));
 		}
 
 		@Test
-		@DisplayName("MARKET 주문은 잔량이 남아도 orderBook에 등록되지 않는다")
-		void marketOrder_remainingNotAddedToOrderBook() {
-			Order taker = marketSellOrder(5);
-			engine.placeMarketSellOrder(taker);
-			assertThat(orderBook.bestBid()).isEmpty();
-			assertThat(orderBook.bestAsk()).isEmpty();
+		@DisplayName("MARKET 주문은 잔량이 남아도 bookOps에 Add가 없다")
+		void marketOrder_remainingNotAddedToBook() {
+			Order taker = takerMarketSell(5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.bookOps()).noneMatch(op -> op instanceof BookOperation.Add);
 		}
 
 		@Test
-		@DisplayName("PlaceResult의 updatedOrders에 taker가 항상 포함된다")
-		void placeMarketSellOrder_updatedOrdersAlwaysContainsTaker() {
-			Order taker = marketSellOrder(5);
-			PlaceResult result = engine.placeMarketSellOrder(taker);
-			assertThat(result.updatedOrders()).contains(taker);
+		@DisplayName("updatedOrders에 taker가 항상 포함된다")
+		void updatedOrdersAlwaysContainsTaker() {
+			Order taker = takerMarketSell(5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.updatedOrders().stream()
+				.anyMatch(o -> o.getOrderId().equals(taker.getOrderId()))).isTrue();
 		}
 	}
 
-	// ── PlaceResult.updatedOrders 영속화 계약 ──────────────────────────────
+	// ── updatedOrders 영속화 계약 ──────────────────────────────────────────
 
 	/**
-	 * 부분 체결된 maker가 updatedOrders에서 누락되는 버그를 검증한다.
+	 * 부분 체결된 maker가 updatedOrders에서 누락되는 버그를 방지한다.
 	 *
- * <p>이전 구현에서는 완전 체결(FILLED)된 maker만 updatedOrders에 포함시키는 버그가 있었습니다.
- * 부분 체결(PARTIALLY_FILLED)된 maker는 메모리 상태가 변경됐음에도 누락되어
- * 영속 DB 전환 시 이중 체결(double execution)을 유발할 수 있다.</p>
+	 * <p>이전 구현에서는 완전 체결(FILLED)된 maker만 updatedOrders에 포함시키는 버그가 있었다.
+	 * 부분 체결(PARTIALLY_FILLED)된 maker는 상태가 변경됐음에도 누락되어
+	 * 영속 DB 전환 시 이중 체결(double execution)을 유발할 수 있다.</p>
 	 */
 	@Nested
-	@DisplayName("PlaceResult.updatedOrders 영속화 계약")
+	@DisplayName("updatedOrders 영속화 계약")
 	class UpdatedOrdersPersistenceContract {
 
 		@Test
 		@DisplayName("LIMIT taker가 maker를 부분 체결하면 부분 체결된 maker가 updatedOrders에 포함되어야 한다")
 		void limitOrder_partiallyFilledMaker_mustBeInUpdatedOrders() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
+			Order maker = addMakerSell(10_000, 10);
+			Order taker = takerBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 3); // taker qty(3) < maker qty(10) → maker PARTIALLY_FILLED
-			PlaceResult result = engine.placeLimitOrder(taker);
-
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
-			assertThat(result.updatedOrders()).contains(maker);
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 		}
 
 		@Test
 		@DisplayName("완전 체결된 maker는 updatedOrders에 포함된다 (기존 동작 보호)")
 		void limitOrder_fullyFilledMaker_isInUpdatedOrders() {
-			Order maker = activatedSellOrder(10_000, 5);
-			orderBook.add(maker);
+			Order maker = addMakerSell(10_000, 5);
+			Order taker = takerBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrder(taker);
-
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(result.updatedOrders()).contains(maker);
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("체결에 참여한 taker와 부분 체결된 maker 모두 updatedOrders에 포함되어야 한다")
 		void limitOrder_allAffectedOrders_includedInUpdatedOrders() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
+			Order maker = addMakerSell(10_000, 10);
+			Order taker = takerBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			Order taker = buyOrder(10_000, 3);
-			PlaceResult result = engine.placeLimitOrder(taker);
-
-			assertThat(result.updatedOrders()).containsExactlyInAnyOrder(taker, maker);
+			assertThat(result.updatedOrders().stream().map(Order::getOrderId).toList())
+				.containsExactlyInAnyOrder(taker.getOrderId(), maker.getOrderId());
 		}
 	}
 
-	// ── placeLimitOrderIOC() ─────────────────────────────────────────────
+	// ── IOC ──────────────────────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("placeLimitOrderIOC()")
+	@DisplayName("IOC")
 	class PlaceLimitOrderIOC {
 
-		private Order iocBuyOrder(long price, long qty) {
+		private Order iocBuy(long price, long qty) {
 			return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
 		}
 
-		private Order iocSellOrder(long price, long qty) {
+		private Order iocSell(long price, long qty) {
 			return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.IOC, new Price(price), new Quantity(qty));
 		}
 
 		@Test
 		@DisplayName("반대 호가 없음 → 체결 없이 즉시 CANCELLED")
 		void noOppositeOrder_immediatelyCancelled() {
-			Order taker = iocBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			Order taker = iocBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("가격 불일치 → 체결 없이 즉시 CANCELLED")
 		void priceMismatch_immediatelyCancelled() {
-			orderBook.add(activatedSellOrder(11_000, 5));
-			Order taker = iocBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			addMakerSell(11_000, 5);
+			Order taker = iocBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("전량 체결 → taker FILLED, Trade 1건 발생")
 		void exactMatch_takerFilled() {
-			orderBook.add(activatedSellOrder(10_000, 5));
-			Order taker = iocBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			addMakerSell(10_000, 5);
+			Order taker = iocBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("부분 체결 — taker qty > maker qty → maker FILLED, taker 잔량 CANCELLED")
 		void partialMatch_takerLarger_makerFilledTakerCancelled() {
-			Order maker = activatedSellOrder(10_000, 3);
-			orderBook.add(maker);
-			Order taker = iocBuyOrder(10_000, 10);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			Order maker = addMakerSell(10_000, 3);
+			Order taker = iocBuy(10_000, 10);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(1);
 			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(taker.getRemaining()).isEqualTo(new Quantity(7));
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(7));
 		}
 
 		@Test
 		@DisplayName("부분 체결 — taker qty < maker qty → taker FILLED, maker PARTIALLY_FILLED")
 		void partialMatch_takerSmaller_takerFilledMakerPartiallyFilled() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
-			Order taker = iocBuyOrder(10_000, 3);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			Order maker = addMakerSell(10_000, 10);
+			Order taker = iocBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
-			assertThat(maker.getRemaining()).isEqualTo(new Quantity(7));
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			Order finalMaker = findOrder(result, maker.getOrderId());
+			assertThat(finalMaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(finalMaker.getRemaining()).isEqualTo(new Quantity(7));
 		}
 
 		@Test
 		@DisplayName("여러 maker와 연속 체결 후 잔량 → taker CANCELLED, trades N건")
 		void multipleMatchesThenRemaining_takerCancelled() {
-			orderBook.add(activatedSellOrder(10_000, 2));
-			orderBook.add(activatedSellOrder(10_000, 3));
-			Order taker = iocBuyOrder(10_000, 10);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			addMakerSell(10_000, 2);
+			addMakerSell(10_000, 3);
+			Order taker = iocBuy(10_000, 10);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(2);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(taker.getRemaining()).isEqualTo(new Quantity(5));
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(5));
 		}
 
 		@Test
-		@DisplayName("IOC taker는 잔량이 있어도 orderBook에 등록되지 않는다")
-		void iocTaker_remainingNotAddedToOrderBook() {
-			Order taker = iocBuyOrder(10_000, 5);
-			engine.placeLimitOrderIOC(taker);
-			assertThat(orderBook.bestBid()).isEmpty();
-			assertThat(orderBook.bestAsk()).isEmpty();
-		}
+		@DisplayName("IOC taker는 잔량이 있어도 bookOps에 Add가 없다")
+		void iocTaker_remainingNotAddedToBook() {
+			Order taker = iocBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-		@Test
-		@DisplayName("부분 체결 후 잔량이 남아도 IOC taker가 orderBook에 없다")
-		void partialMatch_iocTakerNotInOrderBook() {
-			orderBook.add(activatedSellOrder(10_000, 3));
-			Order taker = iocBuyOrder(10_000, 10);
-			engine.placeLimitOrderIOC(taker);
-			assertThat(orderBook.bestBid()).isEmpty();
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(result.bookOps()).noneMatch(op -> op instanceof BookOperation.Add);
 		}
 
 		@Test
 		@DisplayName("IOC SELL — 반대 호가 없음 → 즉시 CANCELLED")
 		void iocSell_noOppositeOrder_immediatelyCancelled() {
-			Order taker = iocSellOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
+			Order taker = iocSell(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
-		@DisplayName("PlaceResult의 updatedOrders에 IOC taker가 항상 포함된다")
-		void placeLimitOrderIOC_updatedOrdersAlwaysContainsTaker() {
-			Order taker = iocBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderIOC(taker);
-			assertThat(result.updatedOrders()).contains(taker);
+		@DisplayName("updatedOrders에 IOC taker가 항상 포함된다")
+		void updatedOrdersAlwaysContainsTaker() {
+			Order taker = iocBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.updatedOrders().stream()
+				.anyMatch(o -> o.getOrderId().equals(taker.getOrderId()))).isTrue();
 		}
 	}
 
-	// ── placeLimitOrderFOK() ─────────────────────────────────────────────
+	// ── FOK ──────────────────────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("placeLimitOrderFOK()")
+	@DisplayName("FOK")
 	class PlaceLimitOrderFOK {
 
-		private Order fokBuyOrder(long price, long qty) {
+		private Order fokBuy(long price, long qty) {
 			return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
 		}
 
-		private Order fokSellOrder(long price, long qty) {
+		private Order fokSell(long price, long qty) {
 			return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.FOK, new Price(price), new Quantity(qty));
 		}
 
 		@Test
 		@DisplayName("반대 호가 없음 → 체결 없이 즉시 CANCELLED")
 		void noOppositeOrder_immediatelyCancelled() {
-			Order taker = fokBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			Order taker = fokBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("가격 불일치 → 체결 없이 즉시 CANCELLED")
 		void priceMismatch_immediatelyCancelled() {
-			orderBook.add(activatedSellOrder(11_000, 5));
-			Order taker = fokBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			addMakerSell(11_000, 5);
+			Order taker = fokBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("유동성 부족 (일부만 충족) → 체결 없이 즉시 CANCELLED")
 		void insufficientLiquidity_immediatelyCancelled() {
-			orderBook.add(activatedSellOrder(10_000, 3));
-			Order taker = fokBuyOrder(10_000, 10);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			addMakerSell(10_000, 3);
+			Order taker = fokBuy(10_000, 10);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("단일 maker 전량 체결 → Trade 1건, taker FILLED")
 		void exactMatch_singleMaker_filled() {
-			Order maker = activatedSellOrder(10_000, 5);
-			orderBook.add(maker);
-			Order taker = fokBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			Order maker = addMakerSell(10_000, 5);
+			Order taker = fokBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, maker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("여러 maker와 전량 체결 → Trade N건, taker FILLED")
 		void multiMaker_fullFill_filled() {
-			orderBook.add(activatedSellOrder(10_000, 3));
-			orderBook.add(activatedSellOrder(10_000, 4));
-			Order taker = fokBuyOrder(10_000, 7);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			addMakerSell(10_000, 3);
+			addMakerSell(10_000, 4);
+			Order taker = fokBuy(10_000, 7);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(2);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("taker qty < maker qty → taker FILLED, maker PARTIALLY_FILLED")
 		void takerSmallerThanMaker_takerFilledMakerPartiallyFilled() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
-			Order taker = fokBuyOrder(10_000, 3);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			Order maker = addMakerSell(10_000, 10);
+			Order taker = fokBuy(10_000, 3);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(maker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
-			assertThat(maker.getRemaining()).isEqualTo(new Quantity(7));
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			Order finalMaker = findOrder(result, maker.getOrderId());
+			assertThat(finalMaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			assertThat(finalMaker.getRemaining()).isEqualTo(new Quantity(7));
 		}
 
 		@Test
-		@DisplayName("FOK taker는 체결 여부와 무관하게 orderBook에 등록되지 않는다")
-		void fokTaker_neverAddedToOrderBook() {
-			Order taker = fokBuyOrder(10_000, 5);
-			engine.placeLimitOrderFOK(taker);
-			assertThat(orderBook.bestBid()).isEmpty();
-			assertThat(orderBook.bestAsk()).isEmpty();
+		@DisplayName("FOK taker는 체결 여부와 무관하게 bookOps에 Add가 없다")
+		void fokTaker_neverAddedToBook() {
+			Order taker = fokBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.bookOps()).noneMatch(op -> op instanceof BookOperation.Add);
 		}
 
 		@Test
 		@DisplayName("FOK SELL — 반대 호가 없음 → 즉시 CANCELLED")
 		void fokSell_noOppositeOrder_immediatelyCancelled() {
-			Order taker = fokSellOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
+			Order taker = fokSell(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
-		@DisplayName("PlaceResult의 updatedOrders에 FOK taker가 항상 포함된다")
-		void placeLimitOrderFOK_updatedOrdersAlwaysContainsTaker() {
-			Order taker = fokBuyOrder(10_000, 5);
-			PlaceResult result = engine.placeLimitOrderFOK(taker);
-			assertThat(result.updatedOrders()).contains(taker);
+		@DisplayName("updatedOrders에 FOK taker가 항상 포함된다")
+		void updatedOrdersAlwaysContainsTaker() {
+			Order taker = fokBuy(10_000, 5);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
+
+			assertThat(result.updatedOrders().stream()
+				.anyMatch(o -> o.getOrderId().equals(taker.getOrderId()))).isTrue();
 		}
 	}
 
-	// ── placeMarketBuyOrderWithQuoteQty() ─────────────────────────────────
+	// ── MARKET BUY (quoteQty 기반) ─────────────────────────────────────────
 
 	@Nested
-	@DisplayName("placeMarketBuyOrderWithQuoteQty()")
-	class PlaceMarketBuyOrderWithQuoteQty {
-
-		private Order quoteQtyBuyOrder(long quoteQtyValue) {
-			return OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(quoteQtyValue));
-		}
+	@DisplayName("MARKET BUY (quoteQty 기반)")
+	class PlaceMarketBuyOrder {
 
 		@Test
 		@DisplayName("ask 없음 → 체결 없이 CANCELLED, trades 0건")
 		void noAsk_thenCancelled() {
-			Order taker = quoteQtyBuyOrder(50_000L);
-			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+			Order taker = takerMarketBuy(50_000L);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("ask 1건, 예산 완전 소진 → FILLED, trades 1건")
 		void singleAsk_fullyConsumed_thenFilled() {
-			orderBook.add(activatedSellOrder(10_000, 5)); // 10_000 * 5 = 50_000
-			Order taker = quoteQtyBuyOrder(50_000L);
-			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+			addMakerSell(10_000, 5); // 10_000 * 5 = 50_000
+			Order taker = takerMarketBuy(50_000L);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
 			assertThat(result.trades()).hasSize(1);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("ask 여러 건, 예산 소진 → FILLED, trades > 1건")
 		void multipleAsks_budgetExhausted_thenFilled() {
-			Order ask1 = activatedSellOrder(10_000, 2);
-			Order ask2 = activatedSellOrder(10_000, 2);
-			orderBook.add(ask1);
-			orderBook.add(ask2);
-			Order taker = quoteQtyBuyOrder(40_000L); // 10_000 * (2 + 2) = 40_000
-			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+			Order ask1 = addMakerSell(10_000, 2);
+			Order ask2 = addMakerSell(10_000, 2);
+			Order taker = takerMarketBuy(40_000L); // 10_000 * (2 + 2) = 40_000
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
 			assertThat(result.trades()).hasSize(2);
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask1.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask2.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask1.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask2.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("예산 < ask 최저가 → 체결 없이 CANCELLED, trades 0건")
 		void budgetLessThanMinAskPrice_thenCancelled() {
-			orderBook.add(activatedSellOrder(10_000, 5));
-			Order taker = quoteQtyBuyOrder(9_999L); // 예산 9_999 < 최저가 10_000
-
-			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+			addMakerSell(10_000, 5);
+			Order taker = takerMarketBuy(9_999L); // 예산 9_999 < 최저가 10_000
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
 			assertThat(result.trades()).isEmpty();
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
 		@DisplayName("체결 후 예산 잔여 → FILLED (잔여 예산 무관)")
 		void partialBudgetRemaining_thenFilled() {
-			Order ask = activatedSellOrder(10_000, 3);
-			orderBook.add(ask); // 3건 체결 = 30_000 소진
-			Order taker = quoteQtyBuyOrder(35_000L); // 5_000 잔여
-
-			PlaceResult result = engine.placeMarketBuyOrderWithQuoteQty(taker);
+			Order ask = addMakerSell(10_000, 3); // 3건 체결 = 30_000 소진
+			Order taker = takerMarketBuy(35_000L); // 5_000 잔여
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
 			assertThat(result.trades()).hasSize(1);
 			assertThat(result.trades().getFirst().quantity()).isEqualTo(new Quantity(3));
-			assertThat(taker.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(ask.getStatus()).isEqualTo(OrderStatus.FILLED);
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
+			assertThat(findOrder(result, ask.getOrderId()).getStatus()).isEqualTo(OrderStatus.FILLED);
 		}
 
 		@Test
 		@DisplayName("단일 ask 체결 후 cumQuoteQty/cumBaseQty가 누적된다")
 		void singleAsk_accumulates_cumQuoteQtyAndCumBaseQty() {
-			orderBook.add(activatedSellOrder(10_000, 5)); // 10_000 * 5 = 50_000
-			Order taker = quoteQtyBuyOrder(50_000L);
+			addMakerSell(10_000, 5); // 10_000 * 5 = 50_000
+			Order taker = takerMarketBuy(50_000L);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			engine.placeMarketBuyOrderWithQuoteQty(taker);
-
-			assertThat(taker.getCumQuoteQty().value()).isEqualTo(50_000L);
-			assertThat(taker.getCumBaseQty().value()).isEqualTo(5L);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getCumQuoteQty().value()).isEqualTo(50_000L);
+			assertThat(finalTaker.getCumBaseQty().value()).isEqualTo(5L);
 		}
 
 		@Test
 		@DisplayName("복수 ask 체결 후 cumQuoteQty/cumBaseQty가 루프마다 누적된다")
 		void multipleAsks_accumulates_acrossAllTrades() {
-			orderBook.add(activatedSellOrder(10_000, 2)); // 20_000
-			orderBook.add(activatedSellOrder(10_000, 2)); // 20_000
-			Order taker = quoteQtyBuyOrder(40_000L);
+			addMakerSell(10_000, 2); // 20_000
+			addMakerSell(10_000, 2); // 20_000
+			Order taker = takerMarketBuy(40_000L);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			engine.placeMarketBuyOrderWithQuoteQty(taker);
-
-			assertThat(taker.getCumQuoteQty().value()).isEqualTo(40_000L);
-			assertThat(taker.getCumBaseQty().value()).isEqualTo(4L);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getCumQuoteQty().value()).isEqualTo(40_000L);
+			assertThat(finalTaker.getCumBaseQty().value()).isEqualTo(4L);
 		}
 
 		@Test
 		@DisplayName("체결 없으면 cumQuoteQty/cumBaseQty는 0")
 		void noFill_cumFieldsAreZero() {
-			Order taker = quoteQtyBuyOrder(50_000L);
+			Order taker = takerMarketBuy(50_000L);
+			PlaceCalculationResult.Accepted result = accepted(place(taker));
 
-			engine.placeMarketBuyOrderWithQuoteQty(taker);
-
-			assertThat(taker.getCumQuoteQty().value()).isEqualTo(0L);
-			assertThat(taker.getCumBaseQty().value()).isEqualTo(0L);
+			Order finalTaker = findOrder(result, taker.getOrderId());
+			assertThat(finalTaker.getCumQuoteQty().value()).isEqualTo(0L);
+			assertThat(finalTaker.getCumBaseQty().value()).isEqualTo(0L);
 		}
 	}
 
-	// ── cancelOrder() ──────────────────────────────────────────────────────
+	// ── 취소 (calculateCancel) ────────────────────────────────────────────────
 
 	@Nested
-	@DisplayName("cancelOrder()")
+	@DisplayName("취소 (calculateCancel)")
 	class CancelOrder {
 
 		@Test
-		@DisplayName("NEW 상태 BUY 주문이면 CANCELLED로 전이되고 orderBook에서 제거된다")
-		void newBuyOrder_cancelledAndRemovedFromBook() {
-			Order order = buyOrder(10_000, 5);
-			engine.placeLimitOrder(order);
+		@DisplayName("NEW 상태 주문 취소 → Cancelled, updatedOrders에 CANCELLED 주문, bookOps에 Remove")
+		void newOrder_cancelled_hasCorrectResultAndBookOps() {
+			Order maker = addMakerSell(10_000, 5);
+			CancelCalculationResult result = cancel(maker);
 
-			engine.cancelOrder(order.getOrderId());
-
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(orderBook.bestBid()).isEmpty();
+			assertInstanceOf(CancelCalculationResult.Cancelled.class, result);
+			CancelCalculationResult.Cancelled cancelled = (CancelCalculationResult.Cancelled) result;
+			assertThat(cancelled.updatedOrders()).hasSize(1);
+			assertThat(cancelled.updatedOrders().getFirst().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+			assertThat(cancelled.bookOps()).containsExactly(new BookOperation.Remove(maker.getOrderId()));
 		}
 
 		@Test
-		@DisplayName("NEW 상태 SELL 주문이면 CANCELLED로 전이되고 orderBook에서 제거된다")
-		void newSellOrder_cancelledAndRemovedFromBook() {
-			Order order = sellOrder(10_000, 5);
-			engine.placeLimitOrder(order);
+		@DisplayName("PARTIALLY_FILLED 주문 취소 → Cancelled")
+		void partiallyFilledOrder_cancelled() {
+			Order maker = addMakerSell(10_000, 10);
+			Order partiallyFilled = maker.fill(new Quantity(3), new Price(10_000));
+			orderBook.replaceOrder(partiallyFilled);
 
-			engine.cancelOrder(order.getOrderId());
+			CancelCalculationResult result = cancel(partiallyFilled);
 
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(orderBook.bestAsk()).isEmpty();
+			assertInstanceOf(CancelCalculationResult.Cancelled.class, result);
+			assertThat(((CancelCalculationResult.Cancelled) result)
+				.updatedOrders().getFirst().getStatus()).isEqualTo(OrderStatus.CANCELLED);
 		}
 
 		@Test
-		@DisplayName("PARTIALLY_FILLED 주문이면 CANCELLED로 전이되고 orderBook에서 제거된다")
-		void partiallyFilledOrder_cancelledAndRemovedFromBook() {
-			orderBook.add(activatedSellOrder(10_000, 3));
+		@DisplayName("같은 가격 레벨에 주문 2개일 때 하나만 취소 → 나머지는 live orderBook에 잔류")
+		void twoOrdersSameLevel_cancelOne_otherRemainsInBook() {
+			addMakerSell(10_000, 5);
+			Order second = addMakerSell(10_000, 3);
 
-			Order order = buyOrder(10_000, 10); // qty=10, ask=3 → 7 잔량으로 PARTIALLY_FILLED 후 book 등록
-			engine.placeLimitOrder(order);
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+			Order first = orderBook.getIndex().values().stream()
+				.filter(o -> !o.getOrderId().equals(second.getOrderId()))
+				.findFirst().orElseThrow();
 
-			engine.cancelOrder(order.getOrderId());
+			cancel(first); // view만 변경 — live orderBook은 EngineHandler가 처리
 
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(orderBook.bestBid()).isEmpty();
+			assertThat(orderBook.getIndex().containsKey(second.getOrderId())).isTrue();
 		}
 
 		@Test
-		@DisplayName("같은 가격 레벨에 주문이 2개이면 나머지 주문은 orderBook에 잔류한다")
-		void oneOfTwoOrders_otherAtSameLevelRemains() {
-			Order order1 = buyOrder(10_000, 3);
-			Order order2 = buyOrder(10_000, 5);
-			engine.placeLimitOrder(order1);
-			engine.placeLimitOrder(order2);
+		@DisplayName("FILLED(final) 주문 취소 → Skipped(ORDER_ALREADY_FINAL)")
+		void filledOrder_skipped() {
+			Order maker = addMakerSell(10_000, 5);
+			Order filled = maker.fill(new Quantity(5), new Price(10_000));
 
-			engine.cancelOrder(order1.getOrderId());
+			CancelCalculationResult result = cancel(filled);
 
-			assertThat(order1.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-			assertThat(orderBook.bestBid()).contains(new Price(10_000)); // order2 잔류
+			assertInstanceOf(CancelCalculationResult.Skipped.class, result);
+			assertThat(((CancelCalculationResult.Skipped) result).reasonCode())
+				.isEqualTo(CancelResultCode.ORDER_ALREADY_FINAL);
 		}
 
 		@Test
-		@DisplayName("FILLED 주문 취소 시 ConflictException이 발생한다")
-		void filledOrder_throwsConflictException() {
-			orderBook.add(activatedSellOrder(10_000, 5));
-			Order order = buyOrder(10_000, 5);
-			engine.placeLimitOrder(order);
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
+		@DisplayName("CANCELLED(final) 주문 취소 → Skipped(ORDER_ALREADY_FINAL)")
+		void cancelledOrder_skipped() {
+			Order maker = addMakerSell(10_000, 5);
+			Order alreadyCancelled = maker.cancel();
 
-			assertThrows(ConflictException.class, () -> engine.cancelOrder(order.getOrderId()));
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
+			CancelCalculationResult result = cancel(alreadyCancelled);
+
+			assertInstanceOf(CancelCalculationResult.Skipped.class, result);
+			assertThat(((CancelCalculationResult.Skipped) result).reasonCode())
+				.isEqualTo(CancelResultCode.ORDER_ALREADY_FINAL);
 		}
 
 		@Test
-		@DisplayName("이미 CANCELLED된 주문 취소 시 ConflictException이 발생한다")
-		void alreadyCancelledOrder_throwsConflictException() {
-			Order order = buyOrder(10_000, 5);
-			engine.placeLimitOrder(order);
-			engine.cancelOrder(order.getOrderId());
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+		@DisplayName("Cancelled 결과의 symbol과 acceptedSeq는 원본 주문과 동일하다")
+		void cancelledResult_symbolAndAcceptedSeq_matchOriginal() {
+			Order maker = addMakerSell(10_000, 5);
+			CancelCalculationResult.Cancelled result =
+				(CancelCalculationResult.Cancelled) cancel(maker);
 
-			assertThrows(ConflictException.class, () -> engine.cancelOrder(order.getOrderId()));
-			assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-		}
-	}
-
-	@Nested
-	@DisplayName("누적 체결값")
-	class CumulativeFields {
-
-		@Test
-		@DisplayName("LIMIT taker 체결 시 cumQuoteQty/cumBaseQty가 갱신된다")
-		void limitTaker_accumulates_cumQuoteQtyAndCumBaseQty() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
-
-			Order taker = buyOrder(10_000, 3);
-			engine.placeLimitOrder(taker);
-
-			assertThat(taker.getCumQuoteQty().value()).isEqualTo(30_000L);
-			assertThat(taker.getCumBaseQty().value()).isEqualTo(3L);
-		}
-
-		@Test
-		@DisplayName("maker 체결 시에도 cumQuoteQty/cumBaseQty가 갱신된다")
-		void maker_accumulates_cumQuoteQtyAndCumBaseQty() {
-			Order maker = activatedSellOrder(10_000, 10);
-			orderBook.add(maker);
-
-			Order taker = buyOrder(10_000, 3);
-			engine.placeLimitOrder(taker);
-
-			assertThat(maker.getCumQuoteQty().value()).isEqualTo(30_000L);
-			assertThat(maker.getCumBaseQty().value()).isEqualTo(3L);
-		}
-
-		@Test
-		@DisplayName("SELL MARKET 체결 시 cumQuoteQty/cumBaseQty가 갱신된다")
-		void sellMarket_accumulates_cumQuoteQtyAndCumBaseQty() {
-			orderBook.add(activatedBuyOrder(10_000, 3));
-			Order taker = marketSellOrder(10);
-
-			engine.placeMarketSellOrder(taker);
-
-			assertThat(taker.getCumQuoteQty().value()).isEqualTo(30_000L);
-			assertThat(taker.getCumBaseQty().value()).isEqualTo(3L);
+			assertThat(result.symbol()).isEqualTo(maker.getSymbol());
+			assertThat(result.acceptedSeq()).isEqualTo(maker.getAcceptedSeq());
 		}
 	}
 }

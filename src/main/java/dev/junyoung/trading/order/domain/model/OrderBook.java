@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
+import lombok.Getter;
 
 /**
  * 단일 종목 호가창. bids(매수 내림차순) / asks(매도 오름차순), 동일 가격 FIFO.
@@ -25,6 +26,7 @@ import dev.junyoung.trading.order.domain.model.value.Quantity;
  *       queue 내 위치와 불일치하는 경우에만 {@link OrderBookInvariantViolationException}을 던진다.</li>
  * </ul>
  */
+@Getter
 public class OrderBook {
 
 	/** 매수: 높은 가격 우선 */
@@ -54,35 +56,14 @@ public class OrderBook {
 	 * @return 최우선 매수 호가(Best Bid). 없으면 {@link Optional#empty()}
 	 */
 	public Optional<Price> bestBid() {
-		return firstKeyOf(bids);
+		return peek(Side.BUY).map(Order::getLimitPriceOrThrow);
 	}
 
 	/**
 	 * @return 최우선 매도 호가(Best Ask). 없으면 {@link Optional#empty()}
 	 */
 	public Optional<Price> bestAsk() {
-		return firstKeyOf(asks);
-	}
-
-	/**
-	 * 지정 사이드에서 가격 조건을 만족하는 전체 잔량을 집계한다 (FOK 사전 충족성 검사용).
-	 * - makerSide == SELL (asks 오름차순): price ≤ limitPrice 인 레벨 합산
-	 * - makerSide == BUY  (bids 내림차순): price ≥ limitPrice 인 레벨 합산
-	 *
-	 * @param makerSide  조회할 사이드 (taker의 반대 사이드)
-	 * @param limitPrice taker의 가격 한도
-	 * @return 체결 가능한 총 수량
-	 */
-	public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
-		NavigableMap<Price, Deque<OrderId>> book = bookOf(makerSide);
-		return new Quantity(
-			book.headMap(limitPrice, true).values().stream()
-				.flatMap(Deque::stream)
-				.map(index::get)
-				.filter(Objects::nonNull)
-				.mapToLong(order -> order.getRemaining().value())
-				.sum()
-		);
+		return peek(Side.SELL).map(Order::getLimitPriceOrThrow);
 	}
 
 	/** 매수 호가창 스냅샷. 가격 → 잔량 합계 (내림차순) */
@@ -251,11 +232,6 @@ public class OrderBook {
 		Map.Entry<Price, Deque<OrderId>> level
 	) {
 		if (level.getValue().isEmpty()) book.remove(level.getKey());
-	}
-
-	/** 호가창의 최우선 가격(firstKey)을 반환한다. 비어 있으면 {@link Optional#empty()}. */
-	private Optional<Price> firstKeyOf(NavigableMap<Price, Deque<OrderId>> book) {
-		return book.isEmpty() ? Optional.empty() : Optional.of(book.firstKey());
 	}
 
 	/**

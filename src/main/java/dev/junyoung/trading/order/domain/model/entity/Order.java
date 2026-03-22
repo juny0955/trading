@@ -126,7 +126,7 @@ public class Order {
         return switch (orderType) {
             case LIMIT -> createLimit(orderId, accountId, clientOrderId, acceptedSeq, side, symbol, tif != null ? tif : TimeInForce.defaultValue(), price, quantity);
             case MARKET -> side.isBuy()
-                ? createMarketBuyWithQuoteQty(orderId, accountId, clientOrderId, acceptedSeq, side, symbol, quoteQty)
+                ? createMarketBuy(orderId, accountId, clientOrderId, acceptedSeq, side, symbol, quoteQty)
                 : createMarketSell(orderId, accountId, clientOrderId, acceptedSeq, side, symbol, quantity);
         };
     }
@@ -248,7 +248,7 @@ public class Order {
      * quoteQty 기반 시장가 BUY 주문을 생성한다.
      * quantity는 null이며, 완료 처리는 {@link #markFilledByMarketBuy()}를 통해 이루어진다.
      */
-    private static Order createMarketBuyWithQuoteQty(OrderId orderId, AccountId accountId, String clientOrderId, long acceptedSeq,
+    private static Order createMarketBuy(OrderId orderId, AccountId accountId, String clientOrderId, long acceptedSeq,
         Side side, Symbol symbol, QuoteQty quoteQty) {
 
         return Order.builder()
@@ -275,6 +275,10 @@ public class Order {
 
     public boolean isMarket() {
         return orderType.isMarket();
+    }
+
+    public boolean isBuy() {
+        return side.isBuy();
     }
 
     /** quoteQty 기반 시장가 BUY 모드이면 true를 반환한다. */

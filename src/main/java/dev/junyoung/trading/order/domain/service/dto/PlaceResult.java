@@ -28,4 +28,8 @@ public record PlaceResult(List<Order> updatedOrders, List<Trade> trades) {
 	public static PlaceResult of(List<Order> updatedOrders, List<Trade> trades) {
 		return new PlaceResult(updatedOrders, trades);
 	}
+
+	public static PlaceResult empty() {
+		return new PlaceResult(List.of(), List.of());
+	}
 }

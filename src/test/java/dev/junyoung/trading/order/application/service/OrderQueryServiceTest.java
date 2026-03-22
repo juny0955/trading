@@ -156,9 +156,8 @@ class OrderQueryServiceTest {
         @Test
         @DisplayName("quoteQty 모드의 leftoverQuoteQty는 requestedQuoteQty - cumQuoteQty다")
         void getOrder_quoteQtyMode_leftoverQuoteQtyConsistency() {
-            Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L));
-            order.activate();
-            order.fillQuoteMode(new Quantity(3), new Price(10_000));
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_ID, Side.BUY, SYMBOL, new QuoteQty(50_000L))
+                    .activate().fillQuoteMode(new Quantity(3), new Price(10_000));
             when(orderRepository.findById(order.getOrderId()))
                     .thenReturn(Optional.of(order));
 

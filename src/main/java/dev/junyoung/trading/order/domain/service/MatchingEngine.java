@@ -1,222 +1,168 @@
 package dev.junyoung.trading.order.domain.service;
 
-import dev.junyoung.trading.common.exception.ConflictException;
-import dev.junyoung.trading.order.domain.model.OrderBook;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-import lombok.RequiredArgsConstructor;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
+
+import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.CancelResultCode;
+import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.entity.Trade;
+import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.order.domain.model.value.Price;
+import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
+import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 
 /**
  * 단일 종목 주문 매칭 엔진. 가격-시간 우선(Price-Time Priority)으로 체결을 수행한다.
- * <p>{@link OrderBook} 상태 변경은 이 클래스 내부에서만 이루어지며, 체결 결과는 {@link PlaceResult}로 반환한다.</p>
+ * <p>계산 전용 stateless 클래스. {@link OrderBookView}를 입력으로 받아 변경안을 계산하고,
+ * 결과를 {@link PlaceCalculationResult}로 반환한다. live {@link OrderBookView}는 변경하지 않는다.</p>
  */
-@RequiredArgsConstructor
 public final class MatchingEngine {
-
-	// -------------------------------------------------------------------------
-	// 생성자
-	// -------------------------------------------------------------------------
-
-	private final OrderBook orderBook;
 
 	// -------------------------------------------------------------------------
 	// 진입점 (public API)
 	// -------------------------------------------------------------------------
 
-	/**
-	 * 지정가 주문을 처리하고 반대 사이드 호가창과 매칭한다.
-	 * <ol>
-	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
-	 *   <li>가격 조건을 만족하는 maker와 순서대로 체결한다 (가격 우선 → FIFO).</li>
-	 *   <li>체결 후 잔량이 남으면 자신의 사이드 호가창에 등록한다.</li>
-	 * </ol>
-	 *
-	 * @param taker 처리할 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	public PlaceResult placeLimitOrder(Order taker) {
-		return placeOrder(taker, t -> { orderBook.add(t); return t; });
-	}
+	public PlaceCalculationResult calculatePlace(PlaceCalculationInput input) {
+		Order taker = input.taker();
+		OrderBookView view = input.view();
 
-	/**
-	 * 지정가 IOC 주문을 처리한다. 가격 조건을 만족하는 반대 사이드 호가와 즉시 체결을 시도한다.
-	 * <ol>
-	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
-	 *   <li>호가창이 빌 때까지 또는 잔량이 0이 될 때까지 체결한다.</li>
-	 *   <li>체결 후 잔량이 남으면 {@link Order#cancel()}을 호출한다. 호가창에는 추가하지 않는다.</li>
-	 * </ol>
-	 *
-	 * @param taker 처리할 지정가 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	public PlaceResult placeLimitOrderIOC(Order taker) {
-		return placeOrder(taker, Order::cancel);
-	}
-
-	/**
-	 * 지정가 FOK 주문을 처리한다. 전량 즉시 체결 가능한 경우에만 체결한다.
-	 * <ol>
-	 *   <li>반대 사이드에서 가격 조건을 만족하는 총 유동성을 집계한다.</li>
-	 *   <li>유동성이 부족하면 {@link Order#activate()}와 {@link Order#cancel()}을 호출해
-	 *       체결 없이 {@link OrderStatus#CANCELLED}로 전환한다. 호가창에는 추가하지 않는다.</li>
-	 *   <li>유동성이 충분하면 일반 매칭 루프를 실행해 전량 체결한다 (결과는 항상 {@link OrderStatus#FILLED}).</li>
-	 * </ol>
-	 *
-	 * @param taker 처리할 지정가 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	public PlaceResult placeLimitOrderFOK(Order taker) {
-		Side makerSide = taker.getSide().opposite();
-		Quantity availableQty = orderBook.totalAvailableQty(makerSide, taker.getLimitPriceOrThrow());
-
-		if (availableQty.value() < taker.getQuantity().value()) {
-			taker = taker.activate();
-			taker = taker.cancel();
-			return PlaceResult.of(List.of(taker), List.of());
+		if (taker.isMarket()) {
+			if (taker.isBuy()) {
+				if (!taker.isQuoteQtyMode())
+					return new PlaceCalculationResult.Rejected(taker.getSymbol(), taker.getAcceptedSeq(), PlaceRejectCode.INVALID_QUANTITY_MODE);
+				return calculateMarketBuy(view, taker);
+			}
+			return calculatePlaceOrder(view, taker, false);
 		}
 
-		return placeOrder(taker, Order::cancel);
+		return switch (taker.getTif()) {
+			case GTC -> calculatePlaceOrder(view, taker, true);
+			case IOC -> calculatePlaceOrder(view, taker, false);
+			case FOK -> calculateFOK(view, taker);
+		};
 	}
 
-	/**
-	 * MARKET SELL 주문을 처리한다. 가격 조건 없이 반대 사이드 최우선 호가부터 순차 체결한다.
-	 * <ol>
-	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
-	 *   <li>호가창이 빌 때까지 또는 잔량이 0이 될 때까지 체결한다.</li>
-	 *   <li>체결 후 잔량이 남으면 {@link Order#cancel()}을 호출한다. 호가창에는 추가하지 않는다.</li>
-	 * </ol>
-	 *
-	 * @param taker 처리할 MARKET SELL 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	public PlaceResult placeMarketSellOrder(Order taker) {
-		return placeOrder(taker, Order::cancel);
-	}
+	public CancelCalculationResult calculateCancel(CancelCalculationInput input) {
+		Order target = input.target();
+		OrderBookView view = input.view();
 
-	/**
-	 * quoteQty(예산) 기반 MARKET BUY 주문을 처리한다.
-	 * <ol>
-	 *   <li>주문 상태를 {@link OrderStatus#NEW}로 전환한다.</li>
-	 *   <li>예산이 소진되거나 호가창이 빌 때까지 SELL 호가와 체결한다.</li>
-	 *   <li>1건 이상 체결됐으면 {@link Order#markFilledByMarketBuy()}로 FILLED 전이.</li>
-	 *   <li>체결 0건이면 {@link Order#cancel()}로 CANCELLED 전이.</li>
-	 * </ol>
-	 *
-	 * @param taker quoteQty 모드 MARKET BUY 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	public PlaceResult placeMarketBuyOrderWithQuoteQty(Order taker) {
-		taker = taker.activate();
+		if (target.isFinal())
+			return new CancelCalculationResult.Skipped(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.ORDER_ALREADY_FINAL);
 
-		long remainingQuote = taker.getQuoteQty().value();
-		int executedTradeCount = 0;
-		List<Trade> trades = new ArrayList<>();
-		List<Order> updatedMakers = new ArrayList<>();
+		Order cancelled = target.cancel();
+		view.removeInIndex(target.getOrderId());
 
-		while (true) {
-			Optional<Order> best = orderBook.peek(Side.SELL);
-			if (best.isEmpty()) break;
-
-			Order maker = best.get();
-			Price executedPrice = maker.getLimitPriceOrThrow();
-			long maxExecQty = remainingQuote / executedPrice.value();
-			if (maxExecQty == 0) break;
-
-			Quantity executedQty = new Quantity(Math.min(maxExecQty, maker.getRemaining().value()));
-			trades.add(Trade.of(taker, maker, executedQty));
-			long tradedQuote = Math.multiplyExact(executedPrice.value(), executedQty.value());
-
-			maker = maker.fill(executedQty, executedPrice);
-			taker = taker.fillQuoteMode(executedQty, executedPrice);
-			remainingQuote = Math.subtractExact(remainingQuote, tradedQuote);
-			executedTradeCount++;
-
-			if (maker.getRemaining().value() == 0)
-				orderBook.poll(Side.SELL);
-			updatedMakers.add(maker);
-		}
-
-		if (executedTradeCount > 0)
-			taker = taker.markFilledByMarketBuy();
-		else
-			taker = taker.cancel();
-
-		List<Order> updatedOrders = Stream.concat(updatedMakers.stream(), Stream.of(taker)).toList();
-		return PlaceResult.of(updatedOrders, trades);
-	}
-
-	/**
-	 * 주문을 취소한다.
-	 * <ol>
-	 *   <li>호가창에서 해당 주문을 제거한다. 이미 체결되어 없는 경우 무시한다.</li>
-	 *   <li>{@link Order#cancel()}을 호출해 상태를 {@link OrderStatus#CANCELLED}로 전환한다.</li>
-	 * </ol>
-	 *
-	 * @param orderId 취소할 주문 ID
-	 * @throws ConflictException 주문이 활성 상태({@link OrderStatus#NEW} /
-	 *                           {@link OrderStatus#PARTIALLY_FILLED})가 아닌 경우
-	 */
-	public Order cancelOrder(OrderId orderId) {
-		Order order = orderBook.remove(orderId)
-			.orElseThrow(() -> new ConflictException("ORDER_ALREADY_FINALIZED", "Already Processed or Cancelled Order"));
-
-		order = order.cancel();
-		return order;
+		return new CancelCalculationResult.Cancelled(
+			cancelled.getSymbol(),
+			cancelled.getAcceptedSeq(),
+			List.of(cancelled),
+			List.of(new BookOperation.Remove(cancelled.getOrderId()))
+		);
 	}
 
 	// -------------------------------------------------------------------------
 	// 내부 헬퍼
 	// -------------------------------------------------------------------------
 
-	/**
-	 * 주문 처리의 공통 흐름을 실행하는 템플릿 메서드.
-	 * <ol>
-	 *   <li>taker를 활성 상태({@link OrderStatus#NEW})로 전환한다.</li>
-	 *   <li>매칭 루프를 실행해 체결 가능한 maker와 순서대로 체결한다.</li>
-	 *   <li>잔량이 남은 경우 {@code onRemaining} 전략에 따라 처리한다.
-	 *       (예: 호가창 등록 또는 취소)</li>
-	 *   <li>상태가 변경된 모든 주문(maker + taker)과 체결 내역을 {@link PlaceResult}로 반환한다.</li>
-	 * </ol>
-	 *
-	 * @param taker       처리할 주문 ({@link OrderStatus#ACCEPTED} 상태)
-	 * @param onRemaining 체결 후 잔량 처리 전략
-	 *                    ({@code orderBook::add}: 호가창 등록 / {@code Order::cancel}: 즉시 취소)
-	 * @return 상태 변경된 주문 목록과 체결 내역을 담은 {@link PlaceResult}
-	 */
-	private PlaceResult placeOrder(Order taker, UnaryOperator<Order> onRemaining) {
+	private PlaceCalculationResult calculatePlaceOrder(OrderBookView view, Order taker, boolean resting) {
+		List<BookOperation> bookOps = new ArrayList<>();
 		taker = taker.activate();
-		MatchLoopResult loop = runMatchingLoop(taker);
-		taker = loop.updatedTaker();
-		if (taker.getRemaining().value() > 0)
-			taker = onRemaining.apply(taker);
 
-		List<Order> updatedOrders = Stream.concat(loop.updatedMakers().stream(), Stream.of(taker)).toList();
-		return PlaceResult.of(updatedOrders, loop.trades());
+		MatchLoopResult loop = runMatchingLoop(view, taker, bookOps);
+		taker = loop.updatedTaker();
+
+		if (taker.getRemaining().value() > 0) {
+			if (resting) {
+				view.add(taker);
+				bookOps.add(new BookOperation.Add(taker));
+			} else {
+				taker = taker.cancel();
+			}
+		}
+
+		List<Order> updatedOrders = Stream.concat(Stream.of(taker), loop.updatedMakers().stream()).toList();
+		return new PlaceCalculationResult.Accepted(taker.getSymbol(), taker.getAcceptedSeq(), updatedOrders, loop.trades(), bookOps);
+	}
+
+	private PlaceCalculationResult calculateFOK(OrderBookView view, Order taker) {
+		Side makerSide = taker.getSide().opposite();
+		Quantity available = view.totalAvailableQty(makerSide, taker.getLimitPriceOrThrow());
+
+		if (available.value() < taker.getQuantity().value()) {
+			taker = taker.activate();
+			taker = taker.cancel();
+
+			return new PlaceCalculationResult.Accepted(taker.getSymbol(), taker.getAcceptedSeq(), List.of(taker));
+		}
+
+		return calculatePlaceOrder(view, taker, false);
+	}
+
+	private PlaceCalculationResult calculateMarketBuy(OrderBookView view, Order taker) {
+		List<BookOperation> bookOps = new ArrayList<>();
+		List<Trade> trades = new ArrayList<>();
+		List<Order> updatedMakers = new ArrayList<>();
+
+		taker = taker.activate();
+
+		long remainingQuote = taker.getQuoteQty().value();
+		while (remainingQuote > 0) {
+			Optional<Order> best = view.peek(Side.SELL);
+			if (best.isEmpty()) break;
+
+			Order maker = best.get();
+			Price executedPrice = maker.getLimitPriceOrThrow();
+
+			if (executedPrice.value() > remainingQuote) break;
+
+			long maxExecQty = remainingQuote / executedPrice.value();
+			long executedBase = Math.min(maxExecQty, maker.getRemaining().value());
+			Quantity executedQty = new Quantity(executedBase);
+
+			trades.add(Trade.of(taker, maker, executedQty));
+
+			long tradedQuote = Math.multiplyExact(executedPrice.value(), executedQty.value());
+
+			maker = maker.fill(executedQty, executedPrice);
+			taker = taker.fillQuoteMode(executedQty, executedPrice);
+			remainingQuote = Math.subtractExact(remainingQuote, tradedQuote);
+
+			if (maker.getRemaining().value() == 0) {
+				view.poll(Side.SELL);
+				bookOps.add(new BookOperation.Remove(maker.getOrderId()));
+			} else {
+				view.replaceInIndex(maker);
+				bookOps.add(new BookOperation.Replace(maker));
+			}
+
+			updatedMakers.add(maker);
+		}
+
+		taker = trades.isEmpty() ? taker.cancel() : taker.markFilledByMarketBuy();
+
+		List<Order> updatedOrders = Stream.concat(Stream.of(taker), updatedMakers.stream()).toList();
+		return new PlaceCalculationResult.Accepted(taker.getSymbol(), taker.getAcceptedSeq(), updatedOrders, trades, bookOps);
 	}
 
 	/**
 	 * 반대 사이드 호가창을 순회하며 매칭 루프를 실행한다.
 	 * 가격이 맞는 maker와 순서대로 체결하고, 완전 체결된 maker를 수집해 반환한다.
 	 */
-	private MatchLoopResult runMatchingLoop(Order taker) {
+	private MatchLoopResult runMatchingLoop(OrderBookView view, Order taker, List<BookOperation> bookOps) {
 		List<Trade> trades = new ArrayList<>();
 		List<Order> updatedMakers = new ArrayList<>();
-		var side = taker.getSide().opposite();
+		Side side = taker.getSide().opposite();
 
 		while (taker.getRemaining().value() > 0) {
-			Optional<Order> best = orderBook.peek(side);
+			Optional<Order> best = view.peek(side);
 			if (best.isEmpty()) break;
 
 			Order maker = best.get();
@@ -228,9 +174,13 @@ public final class MatchingEngine {
 
 			maker = maker.fill(executedQty, executedPrice);
 			taker = taker.fill(executedQty, executedPrice);
-			if (maker.getRemaining().value() == 0)
-				orderBook.poll(side);
-
+			if (maker.getRemaining().value() == 0) {
+				view.poll(side);
+				bookOps.add(new BookOperation.Remove(maker.getOrderId()));
+			} else {
+				view.replaceInIndex(maker);
+				bookOps.add(new BookOperation.Replace(maker));
+			}
 			updatedMakers.add(maker);
 		}
 		return new MatchLoopResult(trades, updatedMakers, taker);

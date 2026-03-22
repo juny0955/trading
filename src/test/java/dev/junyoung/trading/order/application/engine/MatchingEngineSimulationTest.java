@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
@@ -26,7 +28,8 @@ import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
+import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
+import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 
 @DisplayName("MatchingEngine 시뮬레이션 — 랜덤 10만 건 불변식 검증")
 class MatchingEngineSimulationTest {
@@ -45,7 +48,7 @@ class MatchingEngineSimulationTest {
     @BeforeEach
     void setUp() {
         orderBook = new OrderBook();
-        engine    = new MatchingEngine(orderBook);
+        engine    = new MatchingEngine();
     }
 
     /** taker 사이드 기준으로 Trade에서 maker OrderId 추출 */
@@ -61,11 +64,31 @@ class MatchingEngineSimulationTest {
         return OrderFixture.createMarketSell(symbol, new Quantity(qty));
     }
 
-    private PlaceResult placeSupportedMarketOrder(MatchingEngine engine, Order order) {
-        if (order.getSide() == Side.BUY) {
-            return engine.placeMarketBuyOrderWithQuoteQty(order);
+    /**
+     * 주문을 계산하고 bookOps를 book에 반영한다.
+     * updatedOrders를 latestOrders 맵에 갱신한다.
+     * @return 체결 내역
+     */
+    private List<Trade> place(OrderBook book, Map<OrderId, Order> latestOrders, Order order) {
+        OrderBookView view = OrderBookViewFactory.create(book);
+        PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+        if (result instanceof PlaceCalculationResult.Accepted accepted) {
+            applyBookOps(book, accepted.bookOps());
+            accepted.updatedOrders().forEach(o -> latestOrders.put(o.getOrderId(), o));
+            return accepted.trades();
         }
-        return engine.placeMarketSellOrder(order);
+        latestOrders.put(order.getOrderId(), order);
+        return List.of();
+    }
+
+    private void applyBookOps(OrderBook book, List<BookOperation> ops) {
+        for (BookOperation op : ops) {
+            switch (op) {
+                case BookOperation.Add a    -> book.add(a.order());
+                case BookOperation.Replace r -> book.replaceOrder(r.updatedOrder());
+                case BookOperation.Remove r  -> book.remove(r.orderId());
+            }
+        }
     }
 
     @Test
@@ -77,8 +100,8 @@ class MatchingEngineSimulationTest {
         int fifoViolations            = 0;
         int stateTransitionViolations = 0;
 
-        List<Order>           allOrders     = new ArrayList<>(ORDER_COUNT);
         Map<OrderId, Integer> submissionSeq = new HashMap<>(ORDER_COUNT * 2);
+        Map<OrderId, Order>   latestOrders  = new HashMap<>(ORDER_COUNT * 2);
 
         // ── 시뮬레이션 루프 ────────────────────────────────────────────────
         for (int i = 0; i < ORDER_COUNT; i++) {
@@ -89,12 +112,11 @@ class MatchingEngineSimulationTest {
             Order order = OrderFixture.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
 
             submissionSeq.put(order.getOrderId(), i);
-            allOrders.add(order);
 
             // ── 불변식 4: 상태 전이 위반 ──────────────────────────────────
             List<Trade> trades;
             try {
-                trades = engine.placeLimitOrder(order).trades();
+                trades = place(orderBook, latestOrders, order);
             } catch (IllegalStateException e) {
                 stateTransitionViolations++;
                 continue;
@@ -126,7 +148,7 @@ class MatchingEngineSimulationTest {
         }
 
         // ── 불변식 3: remaining 음수 ───────────────────────────────────────
-        long negativeRemainingViolations = allOrders.stream()
+        long negativeRemainingViolations = latestOrders.values().stream()
             .filter(o -> o.getRemaining().value() < 0)
             .count();
 
@@ -147,8 +169,8 @@ class MatchingEngineSimulationTest {
         Random random = new Random(SEED);
 
         int stateViolations = 0;
-        List<Order> allOrders    = new ArrayList<>(ORDER_COUNT);
-        List<Order> marketOrders = new ArrayList<>();
+        Map<OrderId, Order>  latestOrders  = new HashMap<>(ORDER_COUNT * 2);
+        List<OrderId>        marketOrderIds = new ArrayList<>();
 
         for (int i = 0; i < ORDER_COUNT; i++) {
             Side side    = (random.nextInt(2) == 0) ? Side.BUY : Side.SELL;
@@ -158,28 +180,28 @@ class MatchingEngineSimulationTest {
             Order order;
             if (isMarket) {
                 order = createSupportedMarketOrder(side, SYMBOL, qty);
-                marketOrders.add(order);
+                marketOrderIds.add(order.getOrderId());
             } else {
                 long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
                 order = OrderFixture.createLimit(side, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
             }
-            allOrders.add(order);
 
             try {
-                if (isMarket) placeSupportedMarketOrder(engine, order);
-                else          engine.placeLimitOrder(order);
+                place(orderBook, latestOrders, order);
             } catch (IllegalStateException e) {
                 stateViolations++;
             }
         }
 
         // 불변식 1: remaining 음수 없음
-        long negativeRemaining = allOrders.stream()
+        long negativeRemaining = latestOrders.values().stream()
             .filter(o -> o.getRemaining().value() < 0)
             .count();
 
         // 불변식 2: MARKET 주문 최종 상태는 FILLED 또는 CANCELLED 이어야 함
-        long marketStateViolations = marketOrders.stream()
+        long marketStateViolations = marketOrderIds.stream()
+            .map(latestOrders::get)
+            .filter(o -> o != null)
             .filter(o -> o.getStatus() != OrderStatus.FILLED && o.getStatus() != OrderStatus.CANCELLED)
             .count();
 
@@ -196,41 +218,41 @@ class MatchingEngineSimulationTest {
     void multiSymbolSimulation_noInterference() {
         Symbol btcSym = new Symbol("BTC");
         Symbol ethSym = new Symbol("ETH");
-        MatchingEngine btcEngine = new MatchingEngine(new OrderBook());
-        MatchingEngine ethEngine = new MatchingEngine(new OrderBook());
+        OrderBook btcBook = new OrderBook();
+        OrderBook ethBook = new OrderBook();
 
         Random random = new Random(SEED);
-        Map<OrderId, Symbol> ownerMap = new HashMap<>();
+        Map<OrderId, Symbol> ownerMap    = new HashMap<>();
+        Map<OrderId, Order>  latestOrders = new HashMap<>();
         int interferenceViolations = 0;
         int stateViolations        = 0;
 
         for (int i = 0; i < ORDER_COUNT / 2; i++) {
             boolean isBtc  = random.nextBoolean();
             Symbol symbol  = isBtc ? btcSym : ethSym;
-            MatchingEngine engine = isBtc ? btcEngine : ethEngine;
+            OrderBook book = isBtc ? btcBook : ethBook;
 
             Side side = random.nextBoolean() ? Side.BUY : Side.SELL;
             long qty  = QTY_MIN + random.nextLong(QTY_MAX - QTY_MIN + 1);
             boolean isMarket = random.nextInt(10) < 3;
 
             Order order;
-            PlaceResult result;
+            List<Trade> trades;
             try {
                 if (isMarket) {
-                    order  = createSupportedMarketOrder(side, symbol, qty);
-                    result = placeSupportedMarketOrder(engine, order);
+                    order = createSupportedMarketOrder(side, symbol, qty);
                 } else {
                     long price = PRICE_MIN + random.nextLong(PRICE_MAX - PRICE_MIN + 1);
-                    order  = OrderFixture.createLimit(side, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
-                    result = engine.placeLimitOrder(order);
+                    order = OrderFixture.createLimit(side, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
                 }
+                trades = place(book, latestOrders, order);
             } catch (IllegalStateException e) {
                 stateViolations++;
                 continue;
             }
             ownerMap.put(order.getOrderId(), symbol);
 
-            for (Trade trade : result.trades()) {
+            for (Trade trade : trades) {
                 Symbol buyOwner  = ownerMap.get(trade.buyOrderId());
                 Symbol sellOwner = ownerMap.get(trade.sellOrderId());
                 if (buyOwner != null && sellOwner != null && !buyOwner.equals(sellOwner)) {

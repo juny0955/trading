@@ -80,6 +80,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.getBids()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
+		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
 		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner);
 	}
 
@@ -371,6 +372,29 @@ class EngineHandlerTest {
 
 			verify(runtimeOwner, never()).transitionToRebuilding();
 			verify(runtimeOwner, never()).transitionToDirty();
+		}
+
+		@Test
+		@DisplayName("calculate() 시스템 실패 시 transitionToDirty()가 호출되고 예외가 전파된다")
+		void calculateFails_transitionsToDirty() {
+			Order order = buyOrder(10_000, 5);
+			doThrow(new RuntimeException("engine bug")).when(engine).calculatePlace(any());
+
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner).transitionToDirty();
+			verify(runtimeOwner, never()).transitionToRebuilding();
+		}
+
+		@Test
+		@DisplayName("ACTIVE가 아닌 상태에서 커맨드 수신 시 engine/persist/cache를 호출하지 않는다")
+		void nonActiveState_commandDropped_noInteractions() {
+			Order order = buyOrder(10_000, 5);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolState.REBUILDING);
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
 		}
 	}
 }

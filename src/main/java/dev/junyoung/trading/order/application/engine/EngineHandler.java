@@ -1,11 +1,12 @@
 package dev.junyoung.trading.order.application.engine;
 
+import java.util.List;
+
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
-import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.SettlementService;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -13,10 +14,6 @@ import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
-import dev.junyoung.trading.order.domain.service.dto.PlaceResult;
-
-import java.util.List;
-
 import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +40,7 @@ public class EngineHandler {
 	private final MatchingEngine engine;
 	private final OrderBook orderBook;
 	private final OrderBookCachePort orderBookCachePort;
-	private final SettlementService settlementService;
+	private final EngineResultPersistenceService engineResultPersistenceService;
 
 	// -------------------------------------------------------------------------
 	// 진입점
@@ -73,9 +70,18 @@ public class EngineHandler {
 	// -------------------------------------------------------------------------
 
 	private void handlePlaceOrder(Order order) {
-		PlaceResult result = processPlaceOrder(order);
-		settlementService.settlement(result);
-		orderBookCachePort.update(symbol, orderBook);
+		OrderBookView view = OrderBookViewFactory.create(orderBook);
+		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+
+		switch (result) {
+			case PlaceCalculationResult.Accepted a -> {
+				engineResultPersistenceService.persistPlaceResult(a);
+				applyBookOps(a.bookOps());
+				orderBookCachePort.update(symbol, orderBook);
+			}
+			case PlaceCalculationResult.Rejected r ->
+				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+		}
 	}
 
 	private void handleCancelOrder(OrderId orderId) {
@@ -90,8 +96,8 @@ public class EngineHandler {
 
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
+				engineResultPersistenceService.persistCancelResult(c);
 				applyBookOps(c.bookOps());
-				settlementService.cancelSettlement(c.updatedOrders().getFirst());
 				orderBookCachePort.update(symbol, orderBook);
 			}
 			case CancelCalculationResult.Skipped s ->
@@ -99,26 +105,6 @@ public class EngineHandler {
 			case CancelCalculationResult.Rejected r ->
 				log.warn("Cancel rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
 		}
-	}
-
-	/**
-	 * {@link MatchingEngine#calculatePlace}를 호출해 변경안을 계산하고,
-	 * bookOps를 live {@link OrderBook}에 반영한 뒤 {@link PlaceResult}로 변환한다.
-	 */
-	private PlaceResult processPlaceOrder(Order order) {
-		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
-
-		return switch (result) {
-			case PlaceCalculationResult.Rejected r -> {
-				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
-				yield PlaceResult.empty();
-			}
-			case PlaceCalculationResult.Accepted a -> {
-				applyBookOps(a.bookOps());
-				yield PlaceResult.of(a.updatedOrders(), a.trades());
-			}
-		};
 	}
 
 	private void applyBookOps(List<BookOperation> ops) {

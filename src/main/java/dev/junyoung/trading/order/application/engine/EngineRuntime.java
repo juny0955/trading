@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -28,6 +29,7 @@ public class EngineRuntime implements EngineRuntimeOwner{
 
     private static final int QUEUE_CAPACITY = 10_000;
 
+    private final Symbol symbol;
     private final EngineLoop engineLoop;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
@@ -37,6 +39,7 @@ public class EngineRuntime implements EngineRuntimeOwner{
         OrderBookProjectionApplier orderBookProjectionApplier,
         EngineResultPersistenceService engineResultPersistenceService
     ) {
+        this.symbol = symbol;
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         OrderBook orderBook = new OrderBook();
         EngineThread engineThread = new EngineThread(symbol.value());
@@ -56,7 +59,11 @@ public class EngineRuntime implements EngineRuntimeOwner{
     protected void stop() { engineLoop.stop(); }
 
     /** 커맨드를 엔진 큐에 제출한다. */
-    protected void submit(EngineCommand engineCommand) { engineLoop.submit(engineCommand); }
+    protected void submit(EngineCommand engineCommand) {
+        if (state != EngineSymbolState.ACTIVE)
+            throw new EngineNotActiveException(state);
+        engineLoop.submit(engineCommand);
+    }
 
     @Override
     public EngineSymbolState state() {
@@ -66,18 +73,18 @@ public class EngineRuntime implements EngineRuntimeOwner{
     @Override
     public void transitionToRebuilding() {
         state = EngineSymbolState.REBUILDING;
-        log.warn("Engine transition to REBUILDING: symbol requires rebuilding.");
+        log.warn("[{}] Engine transitioning to REBUILDING — rebuild required", symbol.value());
     }
 
     @Override
     public void transitionToDirty() {
         state = EngineSymbolState.DIRTY;
-        log.error("Engine transitioning to DIRTY: manual intervention required");
+        log.error("[{}] Engine transitioning to DIRTY — manual intervention required", symbol.value());
     }
 
     @Override
     public void transitionToHalted() {
         state = EngineSymbolState.HALTED;
-        log.error("Engine HALTED: critical invariant violation or split-brain detected");
+        log.error("[{}] Engine HALTED — critical invariant violation or split-brain", symbol.value());
     }
 }

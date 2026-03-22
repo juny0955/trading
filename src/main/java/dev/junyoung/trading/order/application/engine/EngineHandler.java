@@ -58,6 +58,11 @@ public class EngineHandler {
 	 * </ul>
 	 */
 	protected void handle(EngineCommand command) {
+		if (runtimeOwner.state() != EngineSymbolState.ACTIVE) {
+			log.warn("Command dropped: engine not ACTIVE: state={}, symbol={}", runtimeOwner.state(), symbol);
+			return;
+		}
+
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
 			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId());
@@ -73,7 +78,13 @@ public class EngineHandler {
 
 	private void handlePlaceOrder(Order order) {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		PlaceCalculationResult result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+		PlaceCalculationResult result;
+		try {
+			result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+		} catch (Exception e) {
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
 
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
@@ -94,7 +105,14 @@ public class EngineHandler {
 		}
 
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
-		CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(view, order));
+		CancelCalculationResult result;
+
+		try {
+			result = engine.calculateCancel(new CancelCalculationInput(view, order));
+		} catch (Exception e) {
+			runtimeOwner.transitionToDirty();
+			throw e;
+		}
 
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {

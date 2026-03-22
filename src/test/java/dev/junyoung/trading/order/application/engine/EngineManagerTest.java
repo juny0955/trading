@@ -45,6 +45,9 @@ class EngineManagerTest {
 	@Mock
 	private EngineResultPersistenceService engineResultPersistenceService;
 
+	@Mock
+	private OrderBookProjectionApplier orderBookProjectionApplier;
+
 	private EngineManager engineManager;
 
 	@AfterEach
@@ -70,7 +73,7 @@ class EngineManagerTest {
 		@DisplayName("symbols가 비어 있으면 예외 없이 완료된다")
 		void start_emptySymbols_doesNotThrow() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of());
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 
 			assertDoesNotThrow(() -> engineManager.start());
 		}
@@ -79,7 +82,7 @@ class EngineManagerTest {
 		@DisplayName("단일 심볼로 시작하면 예외가 발생하지 않는다")
 		void start_singleSymbol_doesNotThrow() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 
 			assertDoesNotThrow(() -> engineManager.start());
 		}
@@ -88,7 +91,7 @@ class EngineManagerTest {
 		@DisplayName("복수 심볼로 시작하면 예외가 발생하지 않는다")
 		void start_multipleSymbols_doesNotThrow() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH", "SOL"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 
 			assertDoesNotThrow(() -> engineManager.start());
 		}
@@ -103,7 +106,7 @@ class EngineManagerTest {
 		@BeforeEach
 		void setUp() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 		}
 
@@ -148,7 +151,7 @@ class EngineManagerTest {
 		@BeforeEach
 		void setUp() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 		}
 
@@ -219,7 +222,7 @@ class EngineManagerTest {
 		@DisplayName("심볼 없이 시작한 뒤 stop()은 예외 없이 완료된다")
 		void stop_noSymbols_doesNotThrow() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of());
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 
 			assertDoesNotThrow(() -> engineManager.stop());
@@ -229,7 +232,7 @@ class EngineManagerTest {
 		@DisplayName("단일 심볼 엔진을 정상 종료한다")
 		void stop_singleSymbol_terminatesGracefully() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 
 			assertDoesNotThrow(() -> engineManager.stop());
@@ -239,7 +242,7 @@ class EngineManagerTest {
 		@DisplayName("복수 심볼의 모든 엔진을 정상 종료한다")
 		void stop_multipleSymbols_allTerminateGracefully() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH", "SOL"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 
 			assertDoesNotThrow(() -> engineManager.stop());
@@ -249,7 +252,7 @@ class EngineManagerTest {
 		@DisplayName("stop()을 여러 번 호출해도 예외가 발생하지 않는다")
 		void stop_calledMultipleTimes_doesNotThrow() {
 			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService);
+			engineManager = new EngineManager(tradingProperties, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier);
 			engineManager.start();
 
 			assertDoesNotThrow(() -> {

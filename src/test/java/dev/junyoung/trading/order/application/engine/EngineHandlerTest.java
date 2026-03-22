@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
@@ -26,6 +27,7 @@ import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -56,10 +58,16 @@ class EngineHandlerTest {
 	private OrderBook orderBook;
 
 	@Mock
+	private OrderBookProjectionApplier orderBookProjectionApplier;
+
+	@Mock
 	private OrderBookCachePort orderBookCachePort;
 
 	@Mock
 	private EngineResultPersistenceService engineResultPersistenceService;
+
+	@Mock
+	private EngineRuntimeOwner runtimeOwner;
 
 	private EngineHandler handler;
 
@@ -72,7 +80,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.getBids()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookCachePort, engineResultPersistenceService);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookProjectionApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -261,7 +269,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
 
-			verify(orderBook).remove(activatedOrder.getOrderId());
+			verify(orderBookProjectionApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
 		}
 
@@ -290,9 +298,9 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId()));
 
-			InOrder inOrder = inOrder(engineResultPersistenceService, orderBook, orderBookCachePort);
+			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookProjectionApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
-			inOrder.verify(orderBook).remove(activatedOrder.getOrderId());
+			inOrder.verify(orderBookProjectionApplier).apply(any(), any());
 			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
 	}
@@ -315,6 +323,54 @@ class EngineHandlerTest {
 			handler.handle(new EngineCommand.Shutdown());
 
 			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+		}
+	}
+
+	// ── 실패 시나리오 ─────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("실패 시나리오")
+	class FailureHandling {
+
+		@Test
+		@DisplayName("apply() 일반 실패 시 transitionToRebuilding()이 호출되고 예외가 전파된다")
+		void applyFails_transitionsToRebuilding() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+			doThrow(new RuntimeException("unexpected error")).when(orderBookProjectionApplier).apply(any(), any());
+
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner).transitionToRebuilding();
+			verify(runtimeOwner, never()).transitionToDirty();
+		}
+
+		@Test
+		@DisplayName("apply() invariant 위반 시 transitionToRebuilding()이 호출되고 예외가 전파된다")
+		void applyInvariantViolation_transitionsToRebuilding() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+			doThrow(new OrderBookInvariantViolationException("invariant violated"))
+				.when(orderBookProjectionApplier).apply(any(), any());
+
+			assertThrows(OrderBookInvariantViolationException.class,
+				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner).transitionToRebuilding();
+			verify(runtimeOwner, never()).transitionToDirty();
+		}
+
+		@Test
+		@DisplayName("cache update 실패 시 상태 전이 없이 예외가 전파되지 않는다")
+		void cacheUpdateFails_noStateTransition_noException() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+			doThrow(new RuntimeException("cache error")).when(orderBookCachePort).update(any(), any());
+
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(runtimeOwner, never()).transitionToRebuilding();
+			verify(runtimeOwner, never()).transitionToDirty();
 		}
 	}
 }

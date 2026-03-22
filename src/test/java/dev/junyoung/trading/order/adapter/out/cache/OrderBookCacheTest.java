@@ -42,15 +42,11 @@ class OrderBookCacheTest {
 	// ── 헬퍼 ──────────────────────────────────────────────────────────────
 
 	private Order activatedBuy(Symbol symbol, long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.BUY, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
+		return OrderFixture.createLimit(Side.BUY, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
 	}
 
 	private Order activatedSell(Symbol symbol, long price, long qty) {
-		Order order = OrderFixture.createLimit(Side.SELL, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty));
-		order.activate();
-		return order;
+		return OrderFixture.createLimit(Side.SELL, symbol, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
 	}
 
 	// ── 업데이트 전 기본값 ────────────────────────────────────────────────
@@ -62,7 +58,7 @@ class OrderBookCacheTest {
 		@Test
 		@DisplayName("등록되지 않은 심볼의 bids()는 빈 맵을 반환한다 (NPE 없음)")
 		void getSnapshot_unknownSymbol_bidsIsEmpty() {
-			NavigableMap<Long, Long> bids = cache.getSnapshot(new Symbol("UNKNOWN")).bids();
+			NavigableMap<Price, Quantity> bids = cache.getSnapshot(new Symbol("UNKNOWN")).bids();
 
 			assertThat(bids).isNotNull().isEmpty();
 		}
@@ -70,7 +66,7 @@ class OrderBookCacheTest {
 		@Test
 		@DisplayName("등록되지 않은 심볼의 asks()는 빈 맵을 반환한다 (NPE 없음)")
 		void getSnapshot_unknownSymbol_asksIsEmpty() {
-			NavigableMap<Long, Long> asks = cache.getSnapshot(new Symbol("UNKNOWN")).asks();
+			NavigableMap<Price, Quantity> asks = cache.getSnapshot(new Symbol("UNKNOWN")).asks();
 
 			assertThat(asks).isNotNull().isEmpty();
 		}
@@ -90,7 +86,7 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			assertThat(cache.getSnapshot(BTC).bids()).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(new Price(10_000));
 		}
 
 		@Test
@@ -103,9 +99,9 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
-			assertThat(bids.firstKey()).isEqualTo(11_000L);
-			assertThat(bids.lastKey()).isEqualTo(9_000L);
+			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
+			assertThat(bids.firstKey()).isEqualTo(new Price(11_000));
+			assertThat(bids.lastKey()).isEqualTo(new Price(9_000));
 		}
 
 		@Test
@@ -118,7 +114,7 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			assertThat(cache.getSnapshot(BTC).bids().get(10_000L)).isEqualTo(10L);
+			assertThat(cache.getSnapshot(BTC).bids().get(new Price(10_000))).isEqualTo(new Quantity(10));
 		}
 
 		@Test
@@ -147,7 +143,7 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			assertThat(cache.getSnapshot(BTC).asks()).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).asks()).containsKey(new Price(10_000));
 		}
 
 		@Test
@@ -160,9 +156,9 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
-			assertThat(asks.firstKey()).isEqualTo(9_000L);
-			assertThat(asks.lastKey()).isEqualTo(11_000L);
+			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
+			assertThat(asks.firstKey()).isEqualTo(new Price(9_000));
+			assertThat(asks.lastKey()).isEqualTo(new Price(11_000));
 		}
 
 		@Test
@@ -174,7 +170,7 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, book);
 
-			assertThat(cache.getSnapshot(BTC).asks().get(10_000L)).isEqualTo(10L);
+			assertThat(cache.getSnapshot(BTC).asks().get(new Price(10_000))).isEqualTo(new Quantity(10));
 		}
 
 		@Test
@@ -206,9 +202,9 @@ class OrderBookCacheTest {
 			book2.add(activatedBuy(BTC, 12_000, 3));
 			cache.update(BTC, book2);
 
-			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
-			assertThat(bids).containsKey(12_000L);
-			assertThat(bids).doesNotContainKey(10_000L);
+			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
+			assertThat(bids).containsKey(new Price(12_000));
+			assertThat(bids).doesNotContainKey(new Price(10_000));
 		}
 
 		@Test
@@ -222,9 +218,9 @@ class OrderBookCacheTest {
 			book2.add(activatedSell(BTC, 8_000, 3));
 			cache.update(BTC, book2);
 
-			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
-			assertThat(asks).containsKey(8_000L);
-			assertThat(asks).doesNotContainKey(10_000L);
+			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
+			assertThat(asks).containsKey(new Price(8_000));
+			assertThat(asks).doesNotContainKey(new Price(10_000));
 		}
 
 		@Test
@@ -250,8 +246,8 @@ class OrderBookCacheTest {
 
 			OrderBookSnapshot snapshot = cache.getSnapshot(BTC);
 
-			assertThat(snapshot.bids()).containsKey(9_000L);
-			assertThat(snapshot.asks()).containsKey(11_000L);
+			assertThat(snapshot.bids()).containsKey(new Price(9_000));
+			assertThat(snapshot.asks()).containsKey(new Price(11_000));
 		}
 	}
 
@@ -268,9 +264,9 @@ class OrderBookCacheTest {
 			book.add(activatedBuy(BTC, 10_000, 5));
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> bids = cache.getSnapshot(BTC).bids();
+			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
 
-			assertThatThrownBy(() -> bids.put(9_000L, 1L))
+			assertThatThrownBy(() -> bids.put(new Price(9_000), new Quantity(1)))
 					.isInstanceOf(UnsupportedOperationException.class);
 		}
 
@@ -281,9 +277,9 @@ class OrderBookCacheTest {
 			book.add(activatedSell(BTC, 10_000, 5));
 			cache.update(BTC, book);
 
-			NavigableMap<Long, Long> asks = cache.getSnapshot(BTC).asks();
+			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
 
-			assertThatThrownBy(() -> asks.put(11_000L, 1L))
+			assertThatThrownBy(() -> asks.put(new Price(11_000), new Quantity(1)))
 					.isInstanceOf(UnsupportedOperationException.class);
 		}
 	}
@@ -305,8 +301,8 @@ class OrderBookCacheTest {
 			ethBook.add(activatedBuy(ETH, 2_000, 10));
 			cache.update(ETH, ethBook);
 
-			assertThat(cache.getSnapshot(BTC).bids()).containsKey(30_000L).doesNotContainKey(2_000L);
-			assertThat(cache.getSnapshot(ETH).bids()).containsKey(2_000L).doesNotContainKey(30_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(new Price(30_000)).doesNotContainKey(new Price(2_000));
+			assertThat(cache.getSnapshot(ETH).bids()).containsKey(new Price(2_000)).doesNotContainKey(new Price(30_000));
 		}
 
 		@Test
@@ -318,7 +314,7 @@ class OrderBookCacheTest {
 
 			cache.update(BTC, new OrderBook()); // BTC 갱신
 
-			assertThat(cache.getSnapshot(ETH).bids()).containsKey(2_000L);
+			assertThat(cache.getSnapshot(ETH).bids()).containsKey(new Price(2_000));
 		}
 
 		@Test
@@ -330,7 +326,7 @@ class OrderBookCacheTest {
 
 			cache.getSnapshot(new Symbol("UNKNOWN")); // 부수 효과 없어야 함
 
-			assertThat(cache.getSnapshot(BTC).bids()).containsKey(10_000L);
+			assertThat(cache.getSnapshot(BTC).bids()).containsKey(new Price(10_000));
 		}
 	}
 }

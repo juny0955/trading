@@ -22,15 +22,11 @@ class OrderBookSnapshotTest {
     private static final Symbol BTC = new Symbol("BTC");
 
     private Order activatedBuy(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     private Order activatedSell(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     // ── EMPTY ─────────────────────────────────────────────────────────────
@@ -54,14 +50,14 @@ class OrderBookSnapshotTest {
         @Test
         @DisplayName("EMPTY.bids()는 수정 불가하다")
         void empty_bidsIsUnmodifiable() {
-            assertThatThrownBy(() -> OrderBookSnapshot.EMPTY.bids().put(1L, 1L))
+            assertThatThrownBy(() -> OrderBookSnapshot.EMPTY.bids().put(new Price(1), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
         @DisplayName("EMPTY.asks()는 수정 불가하다")
         void empty_asksIsUnmodifiable() {
-            assertThatThrownBy(() -> OrderBookSnapshot.EMPTY.asks().put(1L, 1L))
+            assertThatThrownBy(() -> OrderBookSnapshot.EMPTY.asks().put(new Price(1), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
     }
@@ -80,7 +76,7 @@ class OrderBookSnapshotTest {
 
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
 
-            assertThat(snapshot.bids()).containsKey(10_000L);
+            assertThat(snapshot.bids()).containsKey(new Price(10_000));
             assertThat(snapshot.asks()).isEmpty();
         }
 
@@ -92,7 +88,7 @@ class OrderBookSnapshotTest {
 
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
 
-            assertThat(snapshot.asks()).containsKey(10_000L);
+            assertThat(snapshot.asks()).containsKey(new Price(10_000));
             assertThat(snapshot.bids()).isEmpty();
         }
 
@@ -105,7 +101,7 @@ class OrderBookSnapshotTest {
 
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
 
-            assertThat(snapshot.bids().get(10_000L)).isEqualTo(10L);
+            assertThat(snapshot.bids().get(new Price(10_000))).isEqualTo(new Quantity(10));
         }
 
         @Test
@@ -115,7 +111,7 @@ class OrderBookSnapshotTest {
             book.add(activatedBuy(10_000, 1));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
 
-            assertThatThrownBy(() -> snapshot.bids().put(9_000L, 1L))
+            assertThatThrownBy(() -> snapshot.bids().put(new Price(9_000), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
@@ -126,7 +122,7 @@ class OrderBookSnapshotTest {
             book.add(activatedSell(10_000, 1));
             OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
 
-            assertThatThrownBy(() -> snapshot.asks().put(11_000L, 1L))
+            assertThatThrownBy(() -> snapshot.asks().put(new Price(11_000), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
@@ -156,8 +152,8 @@ class OrderBookSnapshotTest {
             // 스냅샷 이후 OrderBook 변경
             book.add(activatedBuy(12_000, 3));
 
-            assertThat(snapshot.bids()).doesNotContainKey(12_000L);
-            assertThat(snapshot.bids()).containsKey(10_000L);
+            assertThat(snapshot.bids()).doesNotContainKey(new Price(12_000));
+            assertThat(snapshot.bids()).containsKey(new Price(10_000));
         }
 
         @Test
@@ -169,7 +165,7 @@ class OrderBookSnapshotTest {
 
             book.poll(Side.BUY);
 
-            assertThat(snapshot.bids()).containsKey(10_000L);
+            assertThat(snapshot.bids()).containsKey(new Price(10_000));
         }
     }
 }

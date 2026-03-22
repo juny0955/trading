@@ -60,8 +60,8 @@ class SettlementServiceTest {
         @Test
         @DisplayName("updatedOrders를 orderRepository.updateAll()에 위임한다")
         void delegatesToOrderRepository() {
-            Order order = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            order.activate();
+            Order order = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate();
             PlaceResult result = PlaceResult.of(List.of(order), List.of());
 
             sut.settlement(result);
@@ -72,12 +72,10 @@ class SettlementServiceTest {
         @Test
         @DisplayName("trades를 tradeRepository.saveAll()에 위임한다")
         void delegatesToTradeRepository() {
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            buy.activate();
-            sell.activate();
-            buy.fill(new Quantity(3), P_10000);
-            sell.fill(new Quantity(3), P_10000);
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
             Trade trade = Trade.of(buy, sell, new Quantity(3));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -104,8 +102,8 @@ class SettlementServiceTest {
         @Test
         @DisplayName("GTC 주문이 NEW 상태(체결 없음)이면 balanceSettlementPort가 호출되지 않는다")
         void newGtcOrder_noTrade_noBalanceSettlement() {
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            buy.activate(); // → NEW
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate(); // → NEW
             PlaceResult result = PlaceResult.of(List.of(buy), List.of());
 
             sut.settlement(result);
@@ -116,12 +114,10 @@ class SettlementServiceTest {
         @Test
         @DisplayName("PARTIALLY_FILLED(alive) 주문은 trade delta만 적용되고 refund는 발생하지 않는다")
         void partiallyFilledGtcOrder_alive_noRefund() {
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2));
-            buy.activate();
-            sell.activate();
-            buy.fill(new Quantity(2), P_10000);  // → PARTIALLY_FILLED (remaining=3, alive)
-            sell.fill(new Quantity(2), P_10000); // → FILLED
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5))
+                    .activate().fill(new Quantity(2), P_10000);  // → PARTIALLY_FILLED (remaining=3, alive)
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2))
+                    .activate().fill(new Quantity(2), P_10000);  // → FILLED
             Trade trade = Trade.of(buy, sell, new Quantity(2));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -143,12 +139,10 @@ class SettlementServiceTest {
         @Test
         @DisplayName("LIMIT BUY/SELL 완전 체결 — 정가 체결 시 held 차감 및 자산 교환")
         void limitBuyAndSell_fullyFilled_atExactPrice() {
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            buy.activate();
-            sell.activate();
-            buy.fill(new Quantity(3), P_10000);
-            sell.fill(new Quantity(3), P_10000);
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
             Trade trade = Trade.of(buy, sell, new Quantity(3));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -164,12 +158,10 @@ class SettlementServiceTest {
         @DisplayName("LIMIT BUY 가격 개선 — executionPrice < limitPrice 시 초과 hold 환불")
         void limitBuy_priceImprovement_refundsExcessHeld() {
             // A: limitPrice=11000, executionPrice=10000 → originalHold=33000, consumed=30000, refund=3000
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_11000, new Quantity(3));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            buy.activate();
-            sell.activate();
-            buy.fill(new Quantity(3), P_10000);
-            sell.fill(new Quantity(3), P_10000);
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_11000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);
             Trade trade = Trade.of(buy, sell, new Quantity(3));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -185,9 +177,8 @@ class SettlementServiceTest {
         @DisplayName("FOK 취소 — 체결 없이 전액 hold 환불")
         void fokOrder_cancelled_fullRefund() {
             // originalHold=50000, consumed=0, refund=50000
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.FOK, P_10000, new Quantity(5));
-            buy.activate();
-            buy.cancel();
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.FOK, P_10000, new Quantity(5))
+                    .activate().cancel();
             PlaceResult result = PlaceResult.of(List.of(buy), List.of());
 
             sut.settlement(result);
@@ -199,13 +190,10 @@ class SettlementServiceTest {
         @DisplayName("IOC BUY 부분 체결 후 취소 — 미소진 hold 환불")
         void iocBuy_partiallyFilledThenCancelled_refundsRemainingHeld() {
             // originalHold=50000, consumed=20000, refund=30000
-            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.IOC, P_10000, new Quantity(5));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2));
-            buy.activate();
-            sell.activate();
-            buy.fill(new Quantity(2), P_10000);  // → PARTIALLY_FILLED, cumQuoteQty=20000
-            sell.fill(new Quantity(2), P_10000); // → FILLED
-            buy.cancel();                        // → CANCELLED
+            Order buy = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.IOC, P_10000, new Quantity(5))
+                    .activate().fill(new Quantity(2), P_10000).cancel();  // → CANCELLED, cumQuoteQty=20000
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2))
+                    .activate().fill(new Quantity(2), P_10000);           // → FILLED
             Trade trade = Trade.of(buy, sell, new Quantity(2));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -221,13 +209,10 @@ class SettlementServiceTest {
         @DisplayName("MARKET BUY 미사용 예산 환불 — cumQuoteQty < quoteQty 시 차액 반환")
         void marketBuy_unusedBudgetRefunded() {
             // originalHold=quoteQty=50000, consumed=cumQuoteQty=30000, refund=20000
-            Order buy = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_A, Side.BUY, BTC_SYMBOL, new QuoteQty(50_000L));
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            buy.activate();
-            sell.activate();
-            buy.fillQuoteMode(new Quantity(3), P_10000); // cumQuoteQty=30000
-            sell.fill(new Quantity(3), P_10000);         // → FILLED
-            buy.markFilledByMarketBuy();                 // → FILLED
+            Order buy = OrderFixture.createMarketBuyWithQuoteQty(ACCOUNT_A, Side.BUY, BTC_SYMBOL, new QuoteQty(50_000L))
+                    .activate().fillQuoteMode(new Quantity(3), P_10000).markFilledByMarketBuy(); // cumQuoteQty=30000, FILLED
+            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().fill(new Quantity(3), P_10000);           // → FILLED
             Trade trade = Trade.of(buy, sell, new Quantity(3));
             PlaceResult result = PlaceResult.of(List.of(buy, sell), List.of(trade));
 
@@ -243,13 +228,10 @@ class SettlementServiceTest {
         @DisplayName("LIMIT SELL IOC 잔량 취소 — 미체결 BTC hold 환불")
         void limitSellIoc_partiallyFilledThenCancelled_refundsRemainingBtcHeld() {
             // A: originalHold=5(BTC), consumed=cumBaseQty=2, refund=3
-            Order sell = OrderFixture.createLimit(ACCOUNT_A, Side.SELL, BTC_SYMBOL, TimeInForce.IOC, P_10000, new Quantity(5));
-            Order buy = OrderFixture.createLimit(ACCOUNT_B, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2));
-            sell.activate();
-            buy.activate();
-            sell.fill(new Quantity(2), P_10000); // → PARTIALLY_FILLED, cumBaseQty=2
-            buy.fill(new Quantity(2), P_10000);  // → FILLED
-            sell.cancel();                       // → CANCELLED
+            Order sell = OrderFixture.createLimit(ACCOUNT_A, Side.SELL, BTC_SYMBOL, TimeInForce.IOC, P_10000, new Quantity(5))
+                    .activate().fill(new Quantity(2), P_10000).cancel();  // → CANCELLED, cumBaseQty=2
+            Order buy = OrderFixture.createLimit(ACCOUNT_B, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2))
+                    .activate().fill(new Quantity(2), P_10000);           // → FILLED
             Trade trade = Trade.of(sell, buy, new Quantity(2)); // taker=sell, maker=buy
             PlaceResult result = PlaceResult.of(List.of(sell, buy), List.of(trade));
 
@@ -269,9 +251,8 @@ class SettlementServiceTest {
         @Test
         @DisplayName("취소된 주문을 orderRepository.save()에 위임한다")
         void delegatesToOrderRepositorySave() {
-            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            cancelled.activate();
-            cancelled.cancel();
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().cancel();
 
             sut.cancelSettlement(cancelled);
 
@@ -281,9 +262,8 @@ class SettlementServiceTest {
         @Test
         @DisplayName("tradeRepository는 호출하지 않는다")
         void doesNotCallTradeRepository() {
-            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            cancelled.activate();
-            cancelled.cancel();
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().cancel();
 
             sut.cancelSettlement(cancelled);
 
@@ -294,9 +274,8 @@ class SettlementServiceTest {
         @DisplayName("LIMIT BUY NEW → CANCELLED: KRW hold 전액 해제")
         void limitBuyNew_cancelled_fullKrwRefund() {
             // price=10000, qty=3 → hold=30000, refund=30000
-            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3));
-            cancelled.activate();
-            cancelled.cancel();
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(3))
+                    .activate().cancel();
 
             sut.cancelSettlement(cancelled);
 
@@ -307,13 +286,8 @@ class SettlementServiceTest {
         @DisplayName("LIMIT BUY PARTIALLY_FILLED → CANCELLED: 잔여 KRW hold만 해제")
         void limitBuyPartiallyFilled_cancelled_partialKrwRefund() {
             // price=10000, qty=5, filled=2 → originalHold=50000, consumed=20000, refund=30000
-            Order sell = OrderFixture.createLimit(ACCOUNT_B, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(2));
-            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5));
-            cancelled.activate();
-            sell.activate();
-            cancelled.fill(new Quantity(2), P_10000); // → PARTIALLY_FILLED, cumQuoteQty=20000
-            sell.fill(new Quantity(2), P_10000);
-            cancelled.cancel(); // → CANCELLED
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.BUY, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5))
+                    .activate().fill(new Quantity(2), P_10000).cancel(); // → CANCELLED, cumQuoteQty=20000
 
             sut.cancelSettlement(cancelled);
 
@@ -324,9 +298,8 @@ class SettlementServiceTest {
         @DisplayName("LIMIT SELL NEW → CANCELLED: BTC hold 전액 해제")
         void limitSellNew_cancelled_fullBaseRefund() {
             // qty=5(BTC) → hold=5, refund=5
-            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5));
-            cancelled.activate();
-            cancelled.cancel();
+            Order cancelled = OrderFixture.createLimit(ACCOUNT_A, Side.SELL, BTC_SYMBOL, TimeInForce.GTC, P_10000, new Quantity(5))
+                    .activate().cancel();
 
             sut.cancelSettlement(cancelled);
 

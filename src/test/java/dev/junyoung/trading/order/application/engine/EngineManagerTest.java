@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
  * {@link EngineManager} 단위 테스트.
  *
  * <p>{@link TradingProperties}를 mock으로 대체한다.
- * {@link EngineContext}는 내부에서 직접 생성하므로 실제 engine-thread가 기동된다.
+ * {@link EngineRuntime}는 내부에서 직접 생성하므로 실제 engine-thread가 기동된다.
  * 각 테스트는 {@code @AfterEach}에서 {@link EngineManager#stop()}으로 스레드를 정리한다.</p>
  */
 @ExtendWith(MockitoExtension.class)

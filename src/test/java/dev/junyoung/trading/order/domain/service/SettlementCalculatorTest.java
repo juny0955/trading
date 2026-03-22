@@ -99,7 +99,7 @@ class SettlementCalculatorTest {
         @DisplayName("복수 trade는 account-asset 기준으로 누적 집계된다")
         void multipleTrades_areAggregatedByBalanceKey() {
             Order buy = filledLimit(BUYER, Side.BUY, P_10_000, 5, P_9_000, 2);
-            buy.fill(new Quantity(3), P_10_000);
+            buy = buy.fill(new Quantity(3), P_10_000);
 
             Order sell1 = filledLimit(SELLER, Side.SELL, P_9_000, 2, P_9_000, 2);
             Order sell2 = filledLimit(SELLER2, Side.SELL, P_10_000, 3, P_10_000, 3);
@@ -220,15 +220,11 @@ class SettlementCalculatorTest {
     }
 
     private static Order activatedLimit(AccountId accountId, Side side, Price price, long qty) {
-        Order order = OrderFixture.createLimit(accountId, side, BTC, TimeInForce.GTC, price, new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(accountId, side, BTC, TimeInForce.GTC, price, new Quantity(qty)).activate();
     }
 
     private static Order filledLimit(AccountId accountId, Side side, Price orderPrice, long orderQty, Price executedPrice, long executedQty) {
-        Order order = activatedLimit(accountId, side, orderPrice, orderQty);
-        order.fill(new Quantity(executedQty), executedPrice);
-        return order;
+        return activatedLimit(accountId, side, orderPrice, orderQty).fill(new Quantity(executedQty), executedPrice);
     }
 
     private static Order partiallyFilledLimit(AccountId accountId, Side side, Price orderPrice, long orderQty, Price executedPrice, long executedQty) {
@@ -236,32 +232,25 @@ class SettlementCalculatorTest {
     }
 
     private static Order cancelledLimit(AccountId accountId, Side side, Price orderPrice, long orderQty) {
-        Order order = activatedLimit(accountId, side, orderPrice, orderQty);
-        order.cancel();
-        return order;
+        return activatedLimit(accountId, side, orderPrice, orderQty).cancel();
     }
 
     private static Order cancelledLimit(AccountId accountId, Side side, Price orderPrice, long orderQty, Price executedPrice, long executedQty) {
-        Order order = activatedLimit(accountId, side, orderPrice, orderQty);
-        order.fill(new Quantity(executedQty), executedPrice);
-        order.cancel();
-        return order;
+        return activatedLimit(accountId, side, orderPrice, orderQty).fill(new Quantity(executedQty), executedPrice).cancel();
     }
 
     private static Order filledMarketBuy(AccountId accountId, long quoteQty, Price executedPrice, long executedQty) {
-        Order order = OrderFixture.createMarketBuyWithQuoteQty(accountId, Side.BUY, BTC, new QuoteQty(quoteQty));
-        order.activate();
-        order.fillQuoteMode(new Quantity(executedQty), executedPrice);
-        order.markFilledByMarketBuy();
-        return order;
+        return OrderFixture.createMarketBuyWithQuoteQty(accountId, Side.BUY, BTC, new QuoteQty(quoteQty))
+                .activate()
+                .fillQuoteMode(new Quantity(executedQty), executedPrice)
+                .markFilledByMarketBuy();
     }
 
     private static Order cancelledMarketSell(AccountId accountId, long qty, Price executedPrice, long executedQty) {
-        Order order = OrderFixture.createMarketSell(accountId, BTC, new Quantity(qty));
-        order.activate();
-        order.fill(new Quantity(executedQty), executedPrice);
-        order.cancel();
-        return order;
+        return OrderFixture.createMarketSell(accountId, BTC, new Quantity(qty))
+                .activate()
+                .fill(new Quantity(executedQty), executedPrice)
+                .cancel();
     }
 
     private static Trade trade(Order taker, Order maker, long qty) {

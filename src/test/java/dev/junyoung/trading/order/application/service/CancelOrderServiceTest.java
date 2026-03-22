@@ -135,9 +135,8 @@ class CancelOrderServiceTest {
         @DisplayName("이미 종료된 주문은 취소할 수 없다")
         void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
             OrderId orderId = new OrderId(UUID.randomUUID());
-            Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
-            order.activate();
-            order.cancel();
+            Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5))
+                    .activate().cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 

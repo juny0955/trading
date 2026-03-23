@@ -80,6 +80,15 @@ public class JooqOrderRepository implements OrderRepository {
     }
 
     @Override
+    public List<Order> findAcceptedOrdersBySymbol(Symbol symbol) {
+        return dslContext.selectFrom(Tables.ORDERS)
+            .where(Tables.ORDERS.SYMBOL.eq(symbol.value()))
+            .and(Tables.ORDERS.STATUS.eq(OrderStatus.ACCEPTED.name()))
+            .orderBy(Tables.ORDERS.ACCEPTED_SEQ.asc())
+            .fetch(JooqOrderMapper::toDomain);
+    }
+
+    @Override
     public void deleteById(OrderId orderId) {
         dslContext.deleteFrom(Tables.ORDERS)
             .where(Tables.ORDERS.ORDER_ID.eq(orderId.value()))

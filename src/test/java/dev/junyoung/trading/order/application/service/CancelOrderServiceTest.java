@@ -82,8 +82,9 @@ class CancelOrderServiceTest {
         @Test
         @DisplayName("취소 커맨드의 orderId는 입력값과 일치한다")
         void cancelOrder_commandContainsCorrectOrderId() {
-            OrderId orderId = new OrderId(UUID.randomUUID());
-            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
+            Order order = buyOrder("BTC");
+            OrderId orderId = order.getOrderId();
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 

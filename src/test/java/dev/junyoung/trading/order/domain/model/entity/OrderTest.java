@@ -601,6 +601,46 @@ class OrderTest {
         }
     }
 
+    @Nested
+    @DisplayName("cancelOrphan()")
+    class CancelOrphan {
+
+        @Test
+        @DisplayName("ACCEPTED 상태에서 호출하면 CANCELLED를 반환한다")
+        void cancelOrphan_fromAccepted_returnsCancelled() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL); // ACCEPTED 상태
+            Order cancelled = order.cancelOrphan();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getOrderId()).isEqualTo(order.getOrderId());
+        }
+
+        @Test
+        @DisplayName("NEW 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromNew_throws() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate();
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
+        }
+
+        @Test
+        @DisplayName("PARTIALLY_FILLED 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromPartiallyFilled_throws() {
+            // activate() → NEW 후 fill() 호출로 PARTIALLY_FILLED 만들기
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate()
+                .fill(new Quantity(1L), new Price(1000L)); // 일부 체결 → PARTIALLY_FILLED
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
+        }
+
+        @Test
+        @DisplayName("CANCELLED 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromCancelled_throws() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate().cancel();
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
+        }
+    }
+
     // ── 종료 상태 불변성 ──────────────────────────────────────────────────
 
     @Nested

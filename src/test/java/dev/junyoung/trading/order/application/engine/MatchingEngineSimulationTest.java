@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,7 @@ import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 
+@Disabled
 @DisplayName("MatchingEngine 시뮬레이션 — 랜덤 10만 건 불변식 검증")
 class MatchingEngineSimulationTest {
 

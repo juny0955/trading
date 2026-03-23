@@ -74,7 +74,7 @@ public class EngineHandler {
 
 		switch (command) {
 			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
-			case EngineCommand.CancelOrder c -> handleCancelOrder(c.orderId(), c.requesterAccountId());
+			case EngineCommand.CancelOrder c -> handleCancelOrder(c.acceptedSeq(), c.orderId(), c.requesterAccountId());
 			case EngineCommand.Shutdown _ ->
 				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 				log.warn("Shutdown command reached EngineHandler; this should not happen.");
@@ -106,13 +106,13 @@ public class EngineHandler {
 		}
 	}
 
-	private void handleCancelOrder(OrderId orderId, AccountId requesterAccountId) {
+	private void handleCancelOrder(long commandSeq, OrderId orderId, AccountId requesterAccountId) {
 		Order order = orderBook.getIndex().get(orderId);
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		CancelCalculationResult result;
 
 		try {
-			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, orderId, requesterAccountId, order));
+			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, commandSeq, orderId, requesterAccountId, order));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;

@@ -77,7 +77,19 @@ public class EngineRuntime implements EngineRuntimeOwner{
     /** engine-thread를 중단하고 자원을 반납한다. */
     public void stop() { engineLoop.stop(); }
 
-    /** 커맨드를 엔진 큐에 제출한다. */
+    /**
+     * 커맨드를 엔진 큐에 제출한다.
+     *
+     * <p><b>2단 방어 구조:</b>
+     * <ol>
+     *   <li>여기서 {@code state != ACTIVE} 이면 {@link EngineNotActiveException}을 던져 빠르게 거부한다 (1차).</li>
+     *   <li>이 검사와 {@link dev.junyoung.trading.order.application.engine.loop.EngineLoop#submit} 사이에
+     *       engine-thread가 {@link #transitionToRebuilding()}을 호출하면 커맨드가 큐에 삽입될 수 있다.
+     *       이 경우 {@link dev.junyoung.trading.order.application.engine.handler.EngineHandler#handle}
+     *       진입 시점의 {@code state != ACTIVE} 가드가 커맨드를 드롭하며 {@code log.warn}을 남긴다 (2차).</li>
+     * </ol>
+     * 클라이언트가 예외 없이 요청이 드롭될 수 있으나, 정합성은 항상 보장된다.</p>
+     */
     public void submit(EngineCommand engineCommand) {
         if (state != EngineSymbolState.ACTIVE)
             throw new EngineNotActiveException(state);

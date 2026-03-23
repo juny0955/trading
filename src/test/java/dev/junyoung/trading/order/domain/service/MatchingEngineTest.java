@@ -88,10 +88,13 @@ public class MatchingEngineTest {
 		return engine.calculatePlace(new PlaceCalculationInput(view(), order));
 	}
 
+	private static final long CANCEL_CMD_SEQ = 99L;
+
 	private CancelCalculationResult cancel(Order target) {
 		return engine.calculateCancel(new CancelCalculationInput(
 			view(),
 			target.getSymbol(),
+			CANCEL_CMD_SEQ,
 			target.getOrderId(),
 			target.getAccountId(),
 			target
@@ -905,14 +908,14 @@ public class MatchingEngineTest {
 		}
 
 		@Test
-		@DisplayName("Cancelled 결과의 symbol과 acceptedSeq는 원본 주문과 동일하다")
+		@DisplayName("Cancelled 결과의 symbol은 원본 주문과 동일하고, acceptedSeq는 커맨드 시퀀스를 따른다")
 		void cancelledResult_symbolAndAcceptedSeq_matchOriginal() {
 			Order maker = addMakerSell(10_000, 5);
 			CancelCalculationResult.Cancelled result =
 				(CancelCalculationResult.Cancelled) cancel(maker);
 
 			assertThat(result.symbol()).isEqualTo(maker.getSymbol());
-			assertThat(result.acceptedSeq()).isEqualTo(maker.getAcceptedSeq());
+			assertThat(result.acceptedSeq()).isEqualTo(CANCEL_CMD_SEQ);
 		}
 
 		@Test
@@ -923,6 +926,7 @@ public class MatchingEngineTest {
 			CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(
 				view(),
 				maker.getSymbol(),
+				CANCEL_CMD_SEQ,
 				maker.getOrderId(),
 				AccountId.newId(),
 				maker
@@ -941,6 +945,7 @@ public class MatchingEngineTest {
 			CancelCalculationResult result = engine.calculateCancel(new CancelCalculationInput(
 				view(),
 				new Symbol("ETH"),
+				CANCEL_CMD_SEQ,
 				maker.getOrderId(),
 				maker.getAccountId(),
 				maker

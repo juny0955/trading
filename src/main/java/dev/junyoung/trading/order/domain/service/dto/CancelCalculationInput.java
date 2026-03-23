@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 public record CancelCalculationInput(
 	OrderBookView view,
 	Symbol symbol,
+	long commandSeq,
 	OrderId orderId,
 	AccountId requestingAccountId,
 	Order target

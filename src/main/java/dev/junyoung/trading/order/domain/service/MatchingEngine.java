@@ -52,26 +52,26 @@ public final class MatchingEngine {
 
 	public CancelCalculationResult calculateCancel(CancelCalculationInput input) {
 		if (input.target() == null)
-			return new CancelCalculationResult.Rejected(input.symbol(), null, CancelResultCode.ORDER_NOT_FOUND);
+			return new CancelCalculationResult.Rejected(input.symbol(), input.commandSeq(), CancelResultCode.ORDER_NOT_FOUND);
 
 		Order target = input.target();
 		OrderBookView view = input.view();
 
 		if (!target.getSymbol().equals(input.symbol()))
-			return new CancelCalculationResult.Rejected(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.SYMBOL_MISMATCH);
+			return new CancelCalculationResult.Rejected(target.getSymbol(), input.commandSeq(), CancelResultCode.SYMBOL_MISMATCH);
 		if (!target.getOrderId().equals(input.orderId()))
-			return new CancelCalculationResult.Rejected(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.ORDER_NOT_FOUND);
+			return new CancelCalculationResult.Rejected(target.getSymbol(), input.commandSeq(), CancelResultCode.ORDER_NOT_FOUND);
 		if (!target.getAccountId().equals(input.requestingAccountId()))
-			return new CancelCalculationResult.Rejected(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.OWNER_MISMATCH);
+			return new CancelCalculationResult.Rejected(target.getSymbol(), input.commandSeq(), CancelResultCode.OWNER_MISMATCH);
 		if (target.isFinal())
-			return new CancelCalculationResult.Skipped(target.getSymbol(), target.getAcceptedSeq(), CancelResultCode.ORDER_ALREADY_FINAL);
+			return new CancelCalculationResult.Skipped(target.getSymbol(), input.commandSeq(), CancelResultCode.ORDER_ALREADY_FINAL);
 
 		Order cancelled = target.cancel();
 		view.removeInIndex(target.getOrderId());
 
 		return new CancelCalculationResult.Cancelled(
 			cancelled.getSymbol(),
-			cancelled.getAcceptedSeq(),
+			input.commandSeq(),
 			List.of(cancelled),
 			List.of(new BookOperation.Remove(cancelled.getOrderId()))
 		);

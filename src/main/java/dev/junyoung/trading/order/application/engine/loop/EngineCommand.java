@@ -30,9 +30,10 @@ public sealed interface EngineCommand
 
 	/**
 	 * 주문 취소 커맨드.
+	 * {@code acceptedSeq}는 이 취소 커맨드 자체의 고유 시퀀스로, 취소 이벤트 식별 및 replay/추적에 사용된다.
 	 * {@code requesterAccountId}는 계산 단계에서 owner mismatch를 결과 타입으로 드러내기 위한 요청 메타다.
 	 */
-	record CancelOrder(OrderId orderId, AccountId requesterAccountId) implements EngineCommand { }
+	record CancelOrder(long acceptedSeq, OrderId orderId, AccountId requesterAccountId) implements EngineCommand { }
 
 	/**
 	 * 이벤트 루프 종료를 알리는 Poison Pill 커맨드.

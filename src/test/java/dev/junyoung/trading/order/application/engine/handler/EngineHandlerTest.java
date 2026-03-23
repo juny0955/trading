@@ -293,7 +293,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, dev.junyoung.trading.order.application.engine.dto.CancelResultCode.ORDER_NOT_FOUND));
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID)));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 		}
@@ -307,7 +307,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			verify(orderBookStateApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
@@ -320,7 +320,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Skipped(SYMBOL, null, CancelResultCode.ORDER_ALREADY_FINAL));
 
-			handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
@@ -334,7 +334,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
 
-			handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
@@ -350,7 +350,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
@@ -364,7 +364,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
 
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());

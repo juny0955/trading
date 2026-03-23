@@ -13,7 +13,9 @@ import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CancelOrderService implements CancelOrderUseCase {
@@ -33,8 +35,10 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isMarket())
             throw new OrderNotCancellableException(orderId);
 
-        if (order.isFinal())
+        if (order.isFinal()) {
+            log.info("Cancel request ignored — order already final (idempotent): orderId={}, status={}", orderId, order.getStatus());
             return;
+        }
 
         long acceptedSeq = acceptedSeqGenerator.next();
         engineCommandGateway.submit(order.getSymbol(), new EngineCommand.CancelOrder(acceptedSeq, order.getOrderId(), order.getAccountId()));

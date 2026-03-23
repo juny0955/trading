@@ -1,6 +1,7 @@
 package dev.junyoung.trading.order.application.engine.runtime;
 
 import dev.junyoung.trading.order.application.engine.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
@@ -24,6 +25,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -132,6 +136,19 @@ class EngineRuntimeTest {
             runtime.attemptRebuild();
 
             assertThat(runtime.state()).isEqualTo(EngineSymbolState.DIRTY);
+        }
+
+        @Test
+        @DisplayName("rebuild 성공 시 캐시가 갱신된다")
+        void attemptRebuild_success_updatesCache() {
+            when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime.start();
+            runtime.transitionToRebuilding();
+
+            runtime.attemptRebuild();
+
+            verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBook.class));
         }
     }
 }

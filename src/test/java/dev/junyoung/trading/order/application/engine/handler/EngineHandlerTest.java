@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.order.application.engine.dto.CancelResultCode;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceRejectCode;
 import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
@@ -249,6 +250,33 @@ class EngineHandlerTest {
 
 			verify(engineResultPersistenceService, never()).persistPlaceResult(any());
 		}
+
+		@Test
+		@DisplayName("Rejected 결과이면 apply와 cache가 호출되지 않는다")
+		void handle_placeOrder_rejected_doesNotApplyOrUpdateCache() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any()))
+				.thenReturn(new PlaceCalculationResult.Rejected(SYMBOL, 1L, PlaceRejectCode.INVALID_TIF));
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verify(orderBookStateApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
+		}
+
+		@Test
+		@DisplayName("Accepted 결과의 호출 순서: persistPlaceResult → apply → cache.update")
+		void handle_placeOrder_accepted_callOrder_persistThenApplyThenCache() {
+			Order order = buyOrder(10_000, 5);
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
+			inOrder.verify(engineResultPersistenceService).persistPlaceResult(any());
+			inOrder.verify(orderBookStateApplier).apply(any(), any());
+			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+		}
 	}
 
 	// ── CancelOrder ─────────────────────────────────────────────────────────
@@ -283,6 +311,34 @@ class EngineHandlerTest {
 
 			verify(orderBookStateApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
+		}
+
+		@Test
+		@DisplayName("Skipped 결과이면 persist, apply, cache가 모두 호출되지 않는다")
+		void handle_cancelOrder_skipped_doesNotPersistApplyOrUpdateCache() {
+			OrderId orderId = OrderId.newId();
+			when(engine.calculateCancel(any()))
+				.thenReturn(new CancelCalculationResult.Skipped(SYMBOL, null, CancelResultCode.ORDER_ALREADY_FINAL));
+
+			handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID));
+
+			verify(engineResultPersistenceService, never()).persistCancelResult(any());
+			verify(orderBookStateApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
+		}
+
+		@Test
+		@DisplayName("Rejected 결과이면 persist, apply, cache가 모두 호출되지 않는다")
+		void handle_cancelOrder_rejected_doesNotPersistApplyOrUpdateCache() {
+			OrderId orderId = OrderId.newId();
+			when(engine.calculateCancel(any()))
+				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
+
+			handler.handle(new EngineCommand.CancelOrder(orderId, ACCOUNT_ID));
+
+			verify(engineResultPersistenceService, never()).persistCancelResult(any());
+			verify(orderBookStateApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
 		}
 
 		@Test
@@ -438,6 +494,29 @@ class EngineHandlerTest {
 			handler.handle(new EngineCommand.PlaceOrder(order));
 
 			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+		}
+
+		@Test
+		@DisplayName("DIRTY 상태에서 커맨드 수신 시 engine/persist/cache를 호출하지 않는다")
+		void dirtyState_commandDropped_noInteractions() {
+			Order order = buyOrder(10_000, 5);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolState.DIRTY);
+
+			handler.handle(new EngineCommand.PlaceOrder(order));
+
+			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+		}
+
+		@Test
+		@DisplayName("calculate() 시스템 실패 시 apply와 cache가 호출되지 않는다")
+		void calculateFails_applyAndCacheNeverCalled() {
+			Order order = buyOrder(10_000, 5);
+			doThrow(new RuntimeException("engine bug")).when(engine).calculatePlace(any());
+
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+
+			verify(orderBookStateApplier, never()).apply(any(), any());
+			verify(orderBookCachePort, never()).update(any(), any());
 		}
 	}
 }

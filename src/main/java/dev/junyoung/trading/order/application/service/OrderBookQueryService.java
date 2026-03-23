@@ -1,7 +1,7 @@
 package dev.junyoung.trading.order.application.service;
 
-import dev.junyoung.trading.order.application.engine.OrderBookCache;
-import dev.junyoung.trading.order.application.engine.OrderBookSnapshot;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
 import dev.junyoung.trading.order.application.port.in.GetOrderBookUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
 import dev.junyoung.trading.order.domain.model.value.Symbol;

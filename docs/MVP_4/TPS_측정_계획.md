@@ -121,7 +121,7 @@ Phase 4는 단순 엔진 로직이 아니라 다음 비용이 추가되는 구�
 * `queue_wait_latency`
   - 주문이 queue에 들어간 시각 ~ engine thread가 꺼낸 시각
 * `engine_processing_latency`
-  - engine 처리 시작 ~ `PlaceResult` 생성 완료
+  - engine 처리 시작 ~ `PlaceCalculationResult` 생성 완료
 * `order_accept_tx_latency`
   - hold reserve / order insert / idempotency insert / commit까지의 시간
 * `engine_result_tx_latency`

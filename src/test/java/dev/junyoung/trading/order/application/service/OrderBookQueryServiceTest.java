@@ -1,13 +1,13 @@
 package dev.junyoung.trading.order.application.service;
 
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import dev.junyoung.trading.order.application.engine.OrderBookCache;
-import dev.junyoung.trading.order.application.engine.OrderBookSnapshot;
+import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -39,15 +39,11 @@ class OrderBookQueryServiceTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private Order activatedBuy(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.BUY, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     private Order activatedSell(long price, long qty) {
-        Order order = OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty));
-        order.activate();
-        return order;
+        return OrderFixture.createLimit(Side.SELL, BTC, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
     }
 
     // ── getOrderBookCache() ───────────────────────────────────────────────
@@ -68,8 +64,8 @@ class OrderBookQueryServiceTest {
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
-            assertThat(result.bids()).hasSize(2).containsEntry(10_000L, 5L).containsEntry(9_000L, 3L);
-            assertThat(result.asks()).hasSize(1).containsEntry(11_000L, 2L);
+            assertThat(result.bids()).hasSize(2).containsEntry(new Price(10_000), new Quantity(5)).containsEntry(new Price(9_000), new Quantity(3));
+            assertThat(result.asks()).hasSize(1).containsEntry(new Price(11_000), new Quantity(2));
         }
 
         @Test
@@ -97,8 +93,8 @@ class OrderBookQueryServiceTest {
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
 
-            assertThat(result.bids().firstKey()).isEqualTo(10_000L);
-            assertThat(result.asks().firstKey()).isEqualTo(11_000L);
+            assertThat(result.bids().firstKey()).isEqualTo(new Price(10_000));
+            assertThat(result.asks().firstKey()).isEqualTo(new Price(11_000));
         }
     }
 }

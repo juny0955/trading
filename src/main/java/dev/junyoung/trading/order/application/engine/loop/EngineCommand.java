@@ -1,8 +1,9 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.loop;
 
 import java.util.concurrent.BlockingQueue;
 
-import dev.junyoung.trading.common.exception.ConflictException;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -23,16 +24,16 @@ public sealed interface EngineCommand
 	/**
 	 * 주문 등록 커맨드 (LIMIT / MARKET 공통).
 	 * {@code order}는 {@link OrderStatus#ACCEPTED} 상태여야 하며,
-	 * {@code order.orderType()}에 따라 engine-thread에서
-	 * {@link MatchingEngine#placeLimitOrder} 또는 {@link MatchingEngine#placeMarketOrder}로 분기된다.
+	 * engine-thread에서 {@link MatchingEngine#calculatePlace}의 입력으로 전달된다.
 	 */
 	record PlaceOrder(Order order) implements EngineCommand { }
 
 	/**
 	 * 주문 취소 커맨드.
-	 * {@code orderId}에 해당하는 주문이 호가창에 없으면 {@link ConflictException}이 발생한다.
+	 * {@code acceptedSeq}는 이 취소 커맨드 자체의 고유 시퀀스로, 취소 이벤트 식별 및 replay/추적에 사용된다.
+	 * {@code requesterAccountId}는 계산 단계에서 owner mismatch를 결과 타입으로 드러내기 위한 요청 메타다.
 	 */
-	record CancelOrder(OrderId orderId) implements EngineCommand { }
+	record CancelOrder(long acceptedSeq, OrderId orderId, AccountId requesterAccountId) implements EngineCommand { }
 
 	/**
 	 * 이벤트 루프 종료를 알리는 Poison Pill 커맨드.

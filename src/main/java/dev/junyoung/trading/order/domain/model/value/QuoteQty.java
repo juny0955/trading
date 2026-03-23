@@ -15,6 +15,10 @@ public record QuoteQty(
 		return new QuoteQty(Math.multiplyExact(price.value(), quantity.value()));
 	}
 
+    public static QuoteQty zero() {
+		return new QuoteQty(0);
+    }
+
 	public QuoteQty add(long executeQuoteQty) {
 		return new QuoteQty(Math.addExact(value, executeQuoteQty));
 	}

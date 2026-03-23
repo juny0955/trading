@@ -19,13 +19,13 @@ public sealed interface CancelCalculationResult
 
 	record Skipped(
 		Symbol symbol,
-		Long acceptedSeq,
+		long acceptedSeq,
 		CancelResultCode reasonCode
 	) implements CancelCalculationResult {}
 
 	record Rejected(
 		Symbol symbol,
-		Long acceptedSeq,
+		long acceptedSeq,
 		CancelResultCode reasonCode
 	) implements CancelCalculationResult {}
 }

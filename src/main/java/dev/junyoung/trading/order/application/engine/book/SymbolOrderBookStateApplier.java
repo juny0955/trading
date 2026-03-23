@@ -1,8 +1,9 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.book;
 
 import java.util.List;
 
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -16,7 +17,7 @@ import dev.junyoung.trading.order.domain.model.value.Symbol;
  *
  * <p>외부 진입점은 {@link #apply(Symbol, List)}이며, 항상 engine-thread에서 호출된다.</p>
  */
-class SymbolOrderBookStateApplier implements OrderBookStateApplier {
+public class SymbolOrderBookStateApplier implements OrderBookStateApplier {
 
 	// -------------------------------------------------------------------------
 	// 생성자
@@ -25,7 +26,7 @@ class SymbolOrderBookStateApplier implements OrderBookStateApplier {
 	private final OrderBook orderBook;
 	private final OrderBookProjectionApplier delegate;
 
-	SymbolOrderBookStateApplier(OrderBook orderBook, OrderBookProjectionApplier delegate) {
+	public SymbolOrderBookStateApplier(OrderBook orderBook, OrderBookProjectionApplier delegate) {
 		this.orderBook = orderBook;
 		this.delegate = delegate;
 	}

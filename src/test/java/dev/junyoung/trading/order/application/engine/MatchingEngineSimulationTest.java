@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.engine;
 
+import dev.junyoung.trading.order.application.engine.book.OrderBookViewFactory;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;

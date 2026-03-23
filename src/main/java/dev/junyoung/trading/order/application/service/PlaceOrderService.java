@@ -2,7 +2,7 @@ package dev.junyoung.trading.order.application.service;
 
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.EngineCommand;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;

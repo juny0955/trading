@@ -3,7 +3,7 @@ package dev.junyoung.trading.order.application.service;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import org.springframework.stereotype.Service;
 
-import dev.junyoung.trading.order.application.engine.EngineCommand;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.exception.order.OrderAlreadyFinalizedException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;

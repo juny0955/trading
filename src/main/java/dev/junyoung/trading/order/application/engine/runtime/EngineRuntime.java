@@ -1,5 +1,14 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.runtime;
 
+import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.engine.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
+import dev.junyoung.trading.order.application.engine.book.SymbolOrderBookStateApplier;
+import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
+import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
+import dev.junyoung.trading.order.application.engine.loop.EngineLoop;
+import dev.junyoung.trading.order.application.engine.loop.EngineThread;
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
@@ -39,7 +48,7 @@ public class EngineRuntime implements EngineRuntimeOwner{
     private final OrderBookRebuilder orderBookRebuilder;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
-    protected EngineRuntime(
+    public EngineRuntime(
         Symbol symbol,
         OrderBookCachePort orderBookCachePort,
         OrderBookProjectionApplier orderBookProjectionApplier,
@@ -63,13 +72,13 @@ public class EngineRuntime implements EngineRuntimeOwner{
     // -------------------------------------------------------------------------
 
     /** engine-thread를 시작한다. */
-    protected void start() { engineLoop.start(); }
+    public void start() { engineLoop.start(); }
 
     /** engine-thread를 중단하고 자원을 반납한다. */
-    protected void stop() { engineLoop.stop(); }
+    public void stop() { engineLoop.stop(); }
 
     /** 커맨드를 엔진 큐에 제출한다. */
-    protected void submit(EngineCommand engineCommand) {
+    public void submit(EngineCommand engineCommand) {
         if (state != EngineSymbolState.ACTIVE)
             throw new EngineNotActiveException(state);
         engineLoop.submit(engineCommand);

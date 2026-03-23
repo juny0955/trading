@@ -9,7 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import dev.junyoung.trading.order.application.engine.OrderBookViewFactory;
+import dev.junyoung.trading.order.application.engine.book.OrderBookViewFactory;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.CancelResultCode;

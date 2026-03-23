@@ -1,5 +1,9 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.loop;
 
+import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
+import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.order.application.engine.runtime.EngineSymbolState;
 import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +51,8 @@ public class EngineLoop implements Runnable {
 	// 진입점
 	// -------------------------------------------------------------------------
 
-	/** engine-thread를 시작한다. {@link EngineRuntime}의 생성자에서 호출된다. */
-	protected void start() {
+	/** engine-thread를 시작한다. {@link dev.junyoung.trading.order.application.engine.runtime.EngineRuntime}의 생성자에서 호출된다. */
+	public void start() {
 		engineThread.start(this);
 	}
 
@@ -79,7 +83,7 @@ public class EngineLoop implements Runnable {
 	 *
 	 * @throws IllegalStateException 엔진이 종료 중이거나 큐가 가득 찬 경우 (용량: {@code ArrayBlockingQueue(10_000)})
 	 */
-	protected void submit(EngineCommand command) {
+	public void submit(EngineCommand command) {
 		submitLock.lock();
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");

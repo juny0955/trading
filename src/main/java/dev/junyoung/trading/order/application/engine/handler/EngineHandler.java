@@ -1,10 +1,15 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.handler;
 
 import java.util.List;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
+import dev.junyoung.trading.order.application.engine.book.OrderBookViewFactory;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
+import dev.junyoung.trading.order.application.engine.loop.EngineLoop;
+import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.order.application.engine.runtime.EngineSymbolState;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
@@ -61,7 +66,7 @@ public class EngineHandler {
 	 *   <li>{@link EngineCommand.CancelOrder}: 호가창에서 주문을 제거하고 상태를 CANCELLED로 전이 후 명시적 save.</li>
 	 * </ul>
 	 */
-	protected void handle(EngineCommand command) {
+	public void handle(EngineCommand command) {
 		if (runtimeOwner.state() != EngineSymbolState.ACTIVE) {
 			log.warn("Command dropped: engine not ACTIVE: state={}, symbol={}", runtimeOwner.state(), symbol);
 			return;

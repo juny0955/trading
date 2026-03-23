@@ -12,6 +12,10 @@ public record Quantity(
             throw new BusinessRuleException("QUANTITY_NEGATIVE", "value must be positive");
     }
 
+    public static Quantity zero() {
+        return new Quantity(0);
+    }
+
     /** 체결 수량을 차감한 새 Quantity를 반환한다. */
     public Quantity sub(Quantity executeQty) {
         return new Quantity(value - executeQty.value());

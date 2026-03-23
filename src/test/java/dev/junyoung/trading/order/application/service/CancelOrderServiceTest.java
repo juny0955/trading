@@ -4,9 +4,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.EngineCommand;
-import dev.junyoung.trading.order.application.engine.EngineManager;
-import dev.junyoung.trading.order.application.exception.order.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,7 +47,10 @@ class CancelOrderServiceTest {
     private static final String OTHER_ACCOUNT_ID = "22222222-2222-2222-2222-222222222222";
 
     @Mock
-    private EngineManager engineManager;
+    private AcceptedSeqGenerator acceptedSeqGenerator;
+
+    @Mock
+    private OrderCommandGateway engineCommandGateway;
 
     @Mock
     private OrderRepository orderRepository;
@@ -71,7 +75,7 @@ class CancelOrderServiceTest {
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
             assertThat(captor.getValue()).isInstanceOf(EngineCommand.CancelOrder.class);
         }
 
@@ -84,10 +88,25 @@ class CancelOrderServiceTest {
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
             ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineManager).submit(any(Symbol.class), captor.capture());
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
 
             EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
             assertThat(cmd.orderId()).isEqualTo(orderId);
+        }
+
+        @Test
+        @DisplayName("취소 커맨드에 요청 accountId가 포함된다")
+        void cancelOrder_commandContainsRequesterAccountId() {
+            OrderId orderId = new OrderId(UUID.randomUUID());
+            when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
+
+            sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
+
+            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
+            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
+
+            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
+            assertThat(cmd.requesterAccountId()).isEqualTo(ACCOUNT_ID);
         }
 
         @Test
@@ -106,7 +125,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
             assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(OTHER_ACCOUNT_ID, orderId.toString()));
-            verify(engineManager, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submit(any(), any());
         }
 
         @Test
@@ -128,21 +147,20 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineManager, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submit(any(), any());
         }
 
         @Test
-        @DisplayName("이미 종료된 주문은 취소할 수 없다")
-        void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
+        @DisplayName("이미 종료된 주문은 엔진 커맨드 없이 no-op으로 성공 반환한다 (idempotent cancel)")
+        void cancelAlreadyFinalized_noOpSuccessReturn() {
             OrderId orderId = new OrderId(UUID.randomUUID());
-            Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5));
-            order.activate();
-            order.cancel();
+            Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5))
+                    .activate().cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineManager, never()).submit(any(), any());
+            assertDoesNotThrow(() -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
+            verify(engineCommandGateway, never()).submit(any(), any());
         }
     }
 }

@@ -1,5 +1,6 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.adapter.out.cache;
 
+import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.springframework.stereotype.Component;
@@ -26,14 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ul>
  */
 @Component
-public class OrderBookCache {
+public class OrderBookCache implements OrderBookCachePort {
 
     private final ConcurrentHashMap<Symbol, OrderBookSnapshot> cache = new ConcurrentHashMap<>();
 
     /**
      * engine-thread에서만 호출. {@link OrderBook}으로부터 새 스냅샷을 생성해 해당 심볼 캐시를 교체한다.
      */
-    protected void update(Symbol symbol, OrderBook orderBook) {
+    public void update(Symbol symbol, OrderBook orderBook) {
         cache.put(symbol, OrderBookSnapshot.from(orderBook));
     }
 

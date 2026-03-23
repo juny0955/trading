@@ -1,5 +1,9 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.loop;
 
+import dev.junyoung.trading.order.application.engine.EngineManager;
+import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
+import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.order.application.engine.runtime.EngineSymbolState;
 import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,13 +34,13 @@ public class EngineLoop implements Runnable {
 	private final BlockingQueue<EngineCommand> engineQueue;
 	private final EngineHandler engineHandler;
 	private final EngineThread engineThread;
+	private final EngineRuntimeOwner runtimeOwner;
 
 	/**
 	 * 루프 종료 플래그.
 	 * {@link #submitLock}을 보유한 상태에서만 읽고 쓰므로 {@code volatile} 불필요.
 	 */
 	private boolean running = true;
-
 	/**
 	 * {@link #submit}의 check-then-act(running 확인 → 큐 삽입)와
 	 * {@link #stop}의 running 변경을 원자적으로 묶어 TOCTOU를 방지한다.
@@ -47,8 +51,8 @@ public class EngineLoop implements Runnable {
 	// 진입점
 	// -------------------------------------------------------------------------
 
-	/** engine-thread를 시작한다. {@link EngineContext}의 생성자에서 호출된다. */
-	protected void start() {
+	/** engine-thread를 시작한다. {@link dev.junyoung.trading.order.application.engine.runtime.EngineRuntime}의 생성자에서 호출된다. */
+	public void start() {
 		engineThread.start(this);
 	}
 
@@ -79,7 +83,7 @@ public class EngineLoop implements Runnable {
 	 *
 	 * @throws IllegalStateException 엔진이 종료 중이거나 큐가 가득 찬 경우 (용량: {@code ArrayBlockingQueue(10_000)})
 	 */
-	protected void submit(EngineCommand command) {
+	public void submit(EngineCommand command) {
 		submitLock.lock();
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");
@@ -114,6 +118,8 @@ public class EngineLoop implements Runnable {
 			} catch (Exception e) {
 				// 특정 커맨드 처리 실패가 전체 엔진을 멈추지 않도록 예외를 격리
 				log.error("Engine Command Failed", e);
+				if (runtimeOwner.state() == EngineSymbolState.REBUILDING)
+					runtimeOwner.attemptRebuild();
 			}
 		}
 	}

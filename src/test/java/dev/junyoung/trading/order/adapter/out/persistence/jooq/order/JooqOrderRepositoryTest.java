@@ -77,7 +77,7 @@ class JooqOrderRepositoryTest {
             Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, PRICE, QUANTITY);
             repository.save(order);
 
-            order.activate();
+            order = order.activate();
             repository.save(order);
 
             Order updated = repository.findById(order.getOrderId()).orElseThrow();
@@ -90,9 +90,9 @@ class JooqOrderRepositoryTest {
             Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, PRICE, QUANTITY);
             repository.save(order);
 
-            order.activate();
+            order = order.activate();
             Quantity fillQty = new Quantity(3L);
-            order.fill(fillQty, PRICE);
+            order = order.fill(fillQty, PRICE);
             repository.save(order);
 
             Order updated = repository.findById(order.getOrderId()).orElseThrow();

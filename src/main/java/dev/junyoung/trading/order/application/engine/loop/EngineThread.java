@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.application.engine;
+package dev.junyoung.trading.order.application.engine.loop;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,7 +25,7 @@ public class EngineThread {
 	/**
 	 * @param symbolName 스레드명에 포함될 심볼 이름. 스레드 덤프 식별용.
 	 */
-	protected EngineThread(String symbolName) {
+	public EngineThread(String symbolName) {
 		this.executorService = Executors.newSingleThreadExecutor(r -> {
 			Thread thread = new Thread(r);
 			thread.setName("engine-thread-" + symbolName);

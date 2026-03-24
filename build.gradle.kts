@@ -95,5 +95,13 @@ tasks.named("compileJava") {
 
 
 tasks.withType<Test> {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("slow")
+    }
+}
+
+tasks.register<Test>("slowTest") {
+    useJUnitPlatform {
+        includeTags("slow")
+    }
 }

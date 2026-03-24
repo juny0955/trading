@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult;
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.BalanceSettlementPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.application.port.out.TradeRepository;
@@ -51,6 +52,9 @@ class EngineResultPersistenceServiceTest {
 	@Mock
 	private BalanceSettlementPort balanceSettlementPort;
 
+	@Mock
+	private EngineMetrics engineMetrics;
+
 	private EngineResultPersistenceService service;
 
 	private static final Symbol BTC = new Symbol("BTC");
@@ -59,7 +63,7 @@ class EngineResultPersistenceServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new EngineResultPersistenceService(orderRepository, tradeRepository, balanceSettlementPort);
+		service = new EngineResultPersistenceService(orderRepository, tradeRepository, balanceSettlementPort, engineMetrics);
 	}
 
 	private Order activatedBuyLimit(long price, long qty) {

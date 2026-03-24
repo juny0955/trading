@@ -107,10 +107,13 @@ public class EngineResultPersistenceService {
 	}
 
 	private boolean isDeadlock(Throwable e) {
-		// H2 deadlock detection (dev environment)
-		if (e.getMessage() != null && e.getMessage().toLowerCase().contains("deadlock")) return true;
-		if (e.getCause() != null && e.getCause().getMessage() != null
-				&& e.getCause().getMessage().toLowerCase().contains("deadlock")) return true;
+		// cause 체인 전체를 순회해 데드락 메시지를 탐색한다.
+		// 에러 경로에서만 실행되므로 성능 영향 없다.
+		Throwable current = e;
+		while (current != null) {
+			if (current.getMessage() != null && current.getMessage().toLowerCase().contains("deadlock")) return true;
+			current = current.getCause();
+		}
 		return false;
 	}
 

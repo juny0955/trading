@@ -5,6 +5,8 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 .omc
+.claude
+.gradle-home
 
 ### STS ###
 .apt_generated

@@ -101,6 +101,13 @@ class InvariantIntegrationTest {
                 .sum();
     }
 
+    private void seedStandardBalances(long held, long held1) {
+        balanceRepository.save(BUYER, Balance.of(KRW, 0L, held));
+        balanceRepository.save(BUYER, Balance.of(BTC, 0L, 0L));
+        balanceRepository.save(SELLER, Balance.of(BTC, 0L, held1));
+        balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+    }
+
     // ── 잔고 불변식 ──────────────────────────────────────────────────────────
 
     @Nested
@@ -110,10 +117,7 @@ class InvariantIntegrationTest {
         @Test
         @DisplayName("전량 체결 후 buyer + seller 양측 KRW·BTC total이 보존된다")
         void balanceTotal_preserved_afterFullFill() {
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 50_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 5L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(50_000L, 5L);
 
             long krwBefore = total(BUYER, KRW) + total(SELLER, KRW);
             long btcBefore = total(BUYER, BTC)  + total(SELLER, BTC);
@@ -151,10 +155,7 @@ class InvariantIntegrationTest {
         @Test
         @DisplayName("부분체결 후 취소 시 buyer + seller 양측 KRW·BTC total이 보존된다")
         void balanceTotal_preserved_afterPartialFillThenCancel() {
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 50_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 5L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(50_000L, 5L);
 
             long krwBefore = total(BUYER, KRW) + total(SELLER, KRW);
             long btcBefore = total(BUYER, BTC)  + total(SELLER, BTC);
@@ -188,10 +189,7 @@ class InvariantIntegrationTest {
         @Test
         @DisplayName("BUY 전량 체결 후 buyer.KRW.held == 0")
         void hold_isZero_afterFullFill_buyOrder() {
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 50_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 5L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(50_000L, 5L);
 
             Order buy  = savedActiveOrder(BUYER,  "buy-1",  1L, Side.BUY,  10_000L, 5L);
             Order sell = savedActiveOrder(SELLER, "sell-1", 2L, Side.SELL, 10_000L, 5L);
@@ -210,10 +208,7 @@ class InvariantIntegrationTest {
         @Test
         @DisplayName("SELL 전량 체결 후 seller.BTC.held == 0")
         void hold_isZero_afterFullFill_sellOrder() {
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 50_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 5L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(50_000L, 5L);
 
             Order buy  = savedActiveOrder(BUYER,  "buy-1",  1L, Side.BUY,  10_000L, 5L);
             Order sell = savedActiveOrder(SELLER, "sell-1", 2L, Side.SELL, 10_000L, 5L);
@@ -248,10 +243,7 @@ class InvariantIntegrationTest {
         @Test
         @DisplayName("부분체결 후 취소 시 buyer.KRW.held == 0 (소비분 + 잔여분 모두 정리)")
         void hold_fullyReleased_afterPartialFillAndCancel() {
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 50_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 5L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(50_000L, 5L);
 
             Order buy  = savedActiveOrder(BUYER,  "buy-1",  1L, Side.BUY,  10_000L, 5L);
             Order sell = savedActiveOrder(SELLER, "sell-1", 2L, Side.SELL, 10_000L, 5L);
@@ -305,10 +297,7 @@ class InvariantIntegrationTest {
         @DisplayName("정산 트랜잭션 후에도 open order held 합계 == balances.held가 유지된다")
         void replayHeldSum_matchesBalance_afterSettlementRoundtrip() {
             // buyer: BUY qty=10, price=10_000 → hold=100_000 KRW
-            balanceRepository.save(BUYER,  Balance.of(KRW, 0L, 100_000L));
-            balanceRepository.save(BUYER,  Balance.of(BTC, 0L, 0L));
-            balanceRepository.save(SELLER, Balance.of(BTC, 0L, 3L));
-            balanceRepository.save(SELLER, Balance.of(KRW, 0L, 0L));
+            seedStandardBalances(100_000L, 3L);
 
             Order buy  = savedActiveOrder(BUYER,  "buy-1",  1L, Side.BUY,  10_000L, 10L);
             Order sell = savedActiveOrder(SELLER, "sell-1", 2L, Side.SELL, 10_000L, 3L);

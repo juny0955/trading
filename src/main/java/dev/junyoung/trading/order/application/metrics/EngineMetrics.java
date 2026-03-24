@@ -30,6 +30,9 @@ public class EngineMetrics {
     // Counters
     private final Counter cancelCompletedCounter;
     private final Counter cancelRejectedCounter;
+    private final Counter rejectedOrderTpsCounter;
+    private final Counter tradesPerSecCounter;
+    private final Counter matchedOrdersPerSecCounter;
     private final Counter engineBackpressureCounter;
     private final Counter balanceLockContentionCounter;
     private final Counter dbDeadlockCounter;
@@ -59,6 +62,18 @@ public class EngineMetrics {
 
         this.cancelRejectedCounter = Counter.builder("cancel_rejected_tps")
             .description("Number of cancellations rejected by engine")
+            .register(meterRegistry);
+
+        this.rejectedOrderTpsCounter = Counter.builder("rejected_order_tps")
+            .description("Number of place orders rejected by the matching engine")
+            .register(meterRegistry);
+
+        this.tradesPerSecCounter = Counter.builder("trades_per_sec")
+            .description("Number of trades produced by the matching engine")
+            .register(meterRegistry);
+
+        this.matchedOrdersPerSecCounter = Counter.builder("matched_orders_per_sec")
+            .description("Number of orders involved in a match (taker + makers)")
             .register(meterRegistry);
 
         this.engineBackpressureCounter = Counter.builder("engine_backpressure_count")
@@ -135,6 +150,21 @@ public class EngineMetrics {
     /** 취소 거부 횟수를 증가시킨다. */
     public void incrementCancelRejected() {
         cancelRejectedCounter.increment();
+    }
+
+    /** 엔진에 의해 거부된 주문 횟수를 증가시킨다. */
+    public void incrementRejectedOrderTps() {
+        rejectedOrderTpsCounter.increment();
+    }
+
+    /** 체결 건수를 증가시킨다. */
+    public void addTradesPerSec(int count) {
+        tradesPerSecCounter.increment(count);
+    }
+
+    /** 체결에 참여한 주문 수를 증가시킨다. */
+    public void addMatchedOrdersPerSec(int count) {
+        matchedOrdersPerSecCounter.increment(count);
     }
 
     /** 엔진 큐 풀(backpressure) 발생 횟수를 증가시킨다. */

@@ -106,13 +106,19 @@ public class EngineHandler {
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
 				persistPlace(a);
+				if (!a.trades().isEmpty()) {
+					engineMetrics.addTradesPerSec(a.trades().size());
+					engineMetrics.addMatchedOrdersPerSec(a.updatedOrders().size());
+				}
 				if (command.serviceEnteredAt() != null)
 					engineMetrics.recordEndToEndOrderLatency(Duration.between(command.serviceEnteredAt(), Instant.now()));
 				applyToOrderBook(a.bookOps());
 				updateCache();
 			}
-			case PlaceCalculationResult.Rejected r ->
+			case PlaceCalculationResult.Rejected r -> {
+				engineMetrics.incrementRejectedOrderTps();
 				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+			}
 		}
 	}
 

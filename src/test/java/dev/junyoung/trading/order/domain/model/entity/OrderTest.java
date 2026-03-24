@@ -689,4 +689,42 @@ class OrderTest {
             assertThrows(ConflictException.class, order::activate);
         }
     }
+
+    // ── 상태 불변식 ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("상태 불변식")
+    class StateInvariants {
+
+        @Test
+        @DisplayName("FILLED 주문은 remaining == 0")
+        void filled_remaining_isZero() {
+            Order filled = newBuyOrder(10_000, 5).fill(new Quantity(5), new Price(10_000));
+
+            assertThat(filled.getStatus()).isEqualTo(OrderStatus.FILLED);
+            assertThat(filled.getRemaining().value()).isEqualTo(0L);
+        }
+
+        @Test
+        @DisplayName("체결 없는 취소(cumBaseQty == 0)는 remaining == quantity")
+        void cancelledWithNoFill_remaining_equalsOriginalQuantity() {
+            Order cancelled = newBuyOrder(10_000, 5).cancel();
+
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getCumBaseQty().value()).isEqualTo(0L);
+            assertThat(cancelled.getRemaining().value()).isEqualTo(cancelled.getQuantity().value());
+        }
+
+        @Test
+        @DisplayName("부분체결 후 취소는 0 < remaining < quantity")
+        void cancelledAfterPartialFill_remaining_isStrictlyBetweenZeroAndQuantity() {
+            Order cancelled = newBuyOrder(10_000, 5)
+                    .fill(new Quantity(2), new Price(10_000))
+                    .cancel();
+
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getRemaining().value()).isGreaterThan(0L);
+            assertThat(cancelled.getRemaining().value()).isLessThan(cancelled.getQuantity().value());
+        }
+    }
 }

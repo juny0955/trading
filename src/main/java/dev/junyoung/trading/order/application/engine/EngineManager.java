@@ -64,9 +64,10 @@ public class EngineManager implements OrderCommandGateway {
             Symbol symbol = new Symbol(sym);
             Instant symStart = Instant.now();
             engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
-            replayMetrics.recordReplayDurationBySymbol(sym, Duration.between(symStart, Instant.now()));
 
             EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
+            replayMetrics.recordReplayDurationBySymbol(sym, Duration.between(symStart, Instant.now()));
+
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());

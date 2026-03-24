@@ -9,6 +9,7 @@ import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -54,6 +55,9 @@ class CancelOrderServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private OrderMetrics orderMetrics;
 
     @InjectMocks
     private CancelOrderService sut;

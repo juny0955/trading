@@ -36,6 +36,9 @@ public class EngineMetrics {
     private final Counter dbCommitFailureCounter;
     private final Counter dbRollbackCounter;
     private final Counter errorRateCounter;
+    private final Counter rejectedOrderTpsCounter;
+    private final Counter tradesPerSecCounter;
+    private final Counter matchedOrdersPerSecCounter;
 
     // Timers
     private final Timer queueWaitLatencyTimer;
@@ -83,6 +86,18 @@ public class EngineMetrics {
 
         this.errorRateCounter = Counter.builder("error_rate")
             .description("Total application errors")
+            .register(meterRegistry);
+
+        this.rejectedOrderTpsCounter = Counter.builder("rejected_order_tps")
+            .description("Number of place orders rejected by engine calculation")
+            .register(meterRegistry);
+
+        this.tradesPerSecCounter = Counter.builder("trades_per_sec")
+            .description("Number of trades persisted to DB")
+            .register(meterRegistry);
+
+        this.matchedOrdersPerSecCounter = Counter.builder("matched_orders_per_sec")
+            .description("Number of orders (taker + makers) involved in at least one trade")
             .register(meterRegistry);
 
         // Timers initialization
@@ -165,6 +180,21 @@ public class EngineMetrics {
     /** 애플리케이션 에러 횟수를 증가시킨다. */
     public void incrementErrorRate() {
         errorRateCounter.increment();
+    }
+
+    /** 엔진 계산 단계에서 주문 거절 횟수를 증가시킨다. */
+    public void incrementRejectedOrderTps() {
+        rejectedOrderTpsCounter.increment();
+    }
+
+    /** DB에 영속화된 체결(trade) 개수를 증가시킨다. */
+    public void incrementTradesPerSec(int count) {
+        tradesPerSecCounter.increment(count);
+    }
+
+    /** 체결에 참여한 주문(taker + makers) 개수를 증가시킨다. */
+    public void incrementMatchedOrdersPerSec(int count) {
+        matchedOrdersPerSecCounter.increment(count);
     }
 
     // -------------------------------------------------------------------------

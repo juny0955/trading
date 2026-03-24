@@ -76,6 +76,8 @@ public class EngineResultPersistenceService {
 
 	private void saveTrades(List<Trade> trades) {
 		tradeRepository.saveAll(trades);
+		if (!trades.isEmpty())
+			engineMetrics.incrementTradesPerSec(trades.size());
 	}
 
 	private void saveCancelledOrder(CancelCalculationResult.Cancelled cancelled) {
@@ -107,11 +109,9 @@ public class EngineResultPersistenceService {
 	}
 
 	private boolean isDeadlock(Throwable e) {
-		// H2 deadlock detection (dev environment)
 		if (e.getMessage() != null && e.getMessage().toLowerCase().contains("deadlock")) return true;
-		if (e.getCause() != null && e.getCause().getMessage() != null
-				&& e.getCause().getMessage().toLowerCase().contains("deadlock")) return true;
-		return false;
+		return e.getCause() != null && e.getCause().getMessage() != null
+			&& e.getCause().getMessage().toLowerCase().contains("deadlock");
 	}
 
 	private boolean isCommitFailure(Throwable e) {

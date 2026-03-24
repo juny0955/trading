@@ -84,6 +84,9 @@ public class EngineHandler {
 					// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
 					log.warn("Shutdown command reached EngineHandler; this should not happen.");
 			}
+		} catch (Exception e) {
+			engineMetrics.incrementErrorRate();
+			throw e;
 		} finally {
 			engineMetrics.recordEngineProcessingLatency(Duration.between(handleStart, Instant.now()));
 		}
@@ -108,11 +111,17 @@ public class EngineHandler {
 				persistPlace(a);
 				if (command.serviceEnteredAt() != null)
 					engineMetrics.recordEndToEndOrderLatency(Duration.between(command.serviceEnteredAt(), Instant.now()));
+				if (!a.trades().isEmpty())
+					engineMetrics.incrementMatchedOrdersPerSec(a.updatedOrders().size());
 				applyToOrderBook(a.bookOps());
 				updateCache();
 			}
-			case PlaceCalculationResult.Rejected r ->
+			case PlaceCalculationResult.Rejected r -> {
+				engineMetrics.incrementRejectedOrderTps();
+				if (command.serviceEnteredAt() != null)
+					engineMetrics.recordEndToEndOrderLatency(Duration.between(command.serviceEnteredAt(), Instant.now()));
 				log.warn("Order rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+			}
 		}
 	}
 

@@ -101,8 +101,7 @@ Phase 4는 단순 엔진 로직이 아니라 다음 비용이 추가되는 구�
 
 필수 지표:
 
-* `http_place_order_latency`
-* `http_cancel_order_latency`
+* `http.server.requests` (Spring Boot Actuator 자동 계측)
 * `end_to_end_cancel_latency`
 * `queue_wait_latency`
 * `engine_processing_latency`
@@ -118,6 +117,16 @@ Phase 4는 단순 엔진 로직이 아니라 다음 비용이 추가되는 구�
 
 정의:
 
+* `http.server.requests`
+  - Spring Boot Actuator가 자동 계측하는 HTTP 서버 요청 지연
+  - place order: `method=POST, uri=/accounts/{accountId}/orders`
+  - cancel order: `method=POST, uri=/accounts/{accountId}/orders/{orderId}/cancel`
+  - uri 태그는 Spring MVC 템플릿 기준으로 집계됨 (실제 값 아님)
+  - PromQL 예시:
+    ```
+    histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{method="POST",uri="/accounts/{accountId}/orders"}[1m])) by (le))
+    ```
+  - 커스텀 메트릭(`http_place_order_latency`, `http_cancel_order_latency`)은 별도 구현하지 않는다
 * `queue_wait_latency`
   - 주문이 queue에 들어간 시각 ~ engine thread가 꺼낸 시각
 * `engine_processing_latency`
@@ -140,7 +149,7 @@ Phase 4는 단순 엔진 로직이 아니라 다음 비용이 추가되는 구�
   - 측정 방법: orderId 또는 request key 기준으로 단계별 timestamp를 기록한다.
 * `end_to_end_cancel_latency`
   - 취소 요청 수신 시점부터 취소 결과(`CANCELLED`)가 DB에 반영될 때까지의 시간
-  - `http_cancel_order_latency`와 분리해서 본다
+  - `http.server.requests` (cancel endpoint)와 분리해서 본다
   - 측정 방법: `cancel_received_at -> cancel_db_committed_at`
   - 최종 상태 검증은 `GET /accounts/{accountId}/orders/{orderId}` 조회 API 기준으로 확인한다
 
@@ -510,8 +519,7 @@ Phase 4 권장 처리:
 
 최소 계측 위치:
 
-* `OrderController.placeOrder()`
-* `OrderController.cancelOrder()`
+* HTTP 레이어: Spring Boot Actuator `http.server.requests` 자동 계측 (커스텀 계측 불필요)
 * `OrderCommandService.placeOrder()`
 * queue submit 직전 / 직후
 * `EngineLoop` dequeue 시점

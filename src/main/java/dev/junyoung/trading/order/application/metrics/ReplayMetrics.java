@@ -108,6 +108,11 @@ public class ReplayMetrics {
      * 심볼별 정합성 검사 값을 업데이트한다.
      * 처음 호출될 때 해당 심볼에 대한 AtomicInteger 게이지가 동적으로 생성되어 등록된다.
      *
+     * <p>
+     * 같은 symbol에 대한 동시 호출은 순서가 보장되지 않으며, 마지막으로 set된 값이 저장된다.
+     * 현재 사용처(startup recovery)에서는 symbol별로 순차 호출되므로 문제없다.
+     * </p>
+     *
      * @param symbol 심볼
      * @param value 1=정상/고아없음, 0=고아있음
      */

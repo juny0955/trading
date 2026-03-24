@@ -213,7 +213,7 @@ public class EngineMetrics {
      * @param queue 큐
      */
     public void registerQueueDepthGauge(String symbol, BlockingQueue<?> queue) {
-        Gauge.builder("engine_queue_depth", queue::size)
+        Gauge.builder("engine_queue_depth", queue, BlockingQueue::size)
             .description("Engine queue depth")
             .tag("symbol", symbol)
             .register(meterRegistry);

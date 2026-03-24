@@ -33,7 +33,7 @@ import java.util.concurrent.BlockingQueue;
 @Slf4j
 public class EngineRuntime implements EngineRuntimeOwner{
 
-    private volatile EngineSymbolState state = EngineSymbolState.ACTIVE;
+    private volatile EngineSymbolState state = EngineSymbolState.REBUILDING;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -59,6 +59,7 @@ public class EngineRuntime implements EngineRuntimeOwner{
         this.orderBook = new OrderBook();
         this.orderBookCachePort = orderBookCachePort;
         this.orderBookRebuilder = orderBookRebuilder;
+        attemptRebuild();
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();

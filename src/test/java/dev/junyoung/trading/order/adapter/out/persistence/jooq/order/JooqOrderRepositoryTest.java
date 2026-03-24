@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.adapter.out.persistence.jooq.order;
 import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -122,6 +124,47 @@ class JooqOrderRepositoryTest {
             OrderId unknownId = new OrderId(UUID.randomUUID());
 
             Optional<Order> result = repository.findById(unknownId);
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("findAcceptedOrdersBySymbol()")
+    class FindAcceptedOrdersBySymbol {
+
+        @Test
+        @DisplayName("ACCEPTED 주문만 반환한다 (NEW 제외)")
+        void returnsOnlyAcceptedOrders() {
+            repository.save(OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, PRICE, QUANTITY));
+
+            Order activatedOrder = Order.create(
+                    OrderId.newId(),
+                    OrderFixture.DEFAULT_ACCOUNT_ID,
+                    "test-client-order-id-2",
+                    2L,
+                    SYMBOL,
+                    Side.BUY,
+                    OrderType.LIMIT,
+                    TimeInForce.GTC,
+                    PRICE,
+                    null,
+                    QUANTITY
+            ).activate();
+            repository.save(activatedOrder);
+
+            List<Order> result = repository.findAcceptedOrdersBySymbol(SYMBOL);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+        }
+
+        @Test
+        @DisplayName("다른 심볼의 ACCEPTED 주문은 포함하지 않는다")
+        void excludesOtherSymbol() {
+            repository.save(OrderFixture.createLimit(Side.BUY, new Symbol("ETHKRW"), TimeInForce.GTC, PRICE, QUANTITY));
+
+            List<Order> result = repository.findAcceptedOrdersBySymbol(SYMBOL);
 
             assertThat(result).isEmpty();
         }

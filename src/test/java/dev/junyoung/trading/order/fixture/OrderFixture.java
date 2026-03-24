@@ -41,6 +41,11 @@ public class OrderFixture {
         return Order.create(OrderId.newId(), accountId, DEFAULT_CLIENT_ORDER_ID, 1L, symbol, Side.SELL, OrderType.MARKET, null, null, null, quantity);
     }
 
+    /** LIMIT BUY 주문 생성 (기본 심볼/가격/수량) */
+    public static Order createLimitBuy(Symbol symbol) {
+        return createLimit(Side.BUY, symbol, TimeInForce.GTC, new Price(10_000), new Quantity(10));
+    }
+
     /** quoteQty 기반 MARKET BUY 주문 생성 */
     public static Order createMarketBuyWithQuoteQty(Side side, Symbol symbol, QuoteQty quoteQty) {
         return createMarketBuyWithQuoteQty(DEFAULT_ACCOUNT_ID, side, symbol, quoteQty);

@@ -15,6 +15,7 @@ public interface OrderRepository {
     Optional<Long> findMaxAcceptedSeq();
 
     List<Order> findOpenOrdersBySymbol(Symbol symbol);
+    List<Order> findAcceptedOrdersBySymbol(Symbol symbol);
 
     void deleteById(OrderId orderId);
 }

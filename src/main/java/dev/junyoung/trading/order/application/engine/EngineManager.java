@@ -1,10 +1,5 @@
 package dev.junyoung.trading.order.application.engine;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.springframework.stereotype.Component;
-
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.order.application.engine.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
@@ -14,11 +9,16 @@ import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
+import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 심볼별 {@link EngineRuntime}를 생성·관리하고 커맨드를 올바른 엔진으로 라우팅하는 오케스트레이터.
@@ -37,6 +37,7 @@ public class EngineManager implements OrderCommandGateway {
     // -------------------------------------------------------------------------
 
     private final TradingProperties tradingProperties;
+    private final EngineStartupRecoveryService engineStartupRecoveryService;
     private final OrderBookCachePort orderBookCachePort;
     private final EngineResultPersistenceService engineResultPersistenceService;
     private final OrderBookProjectionApplier orderBookProjectionApplier;
@@ -53,6 +54,7 @@ public class EngineManager implements OrderCommandGateway {
     public void start() {
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
+            engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
             EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
             contexts.put(symbol, ctx);
             ctx.start();

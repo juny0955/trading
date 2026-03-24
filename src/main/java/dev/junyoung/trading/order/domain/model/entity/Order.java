@@ -409,6 +409,15 @@ public class Order {
             .build();
     }
 
+    public Order cancelOrphan() {
+        if (status != OrderStatus.ACCEPTED)
+            throw new ConflictException("ORDER_INVALID_STATE", "cancelOrphan() can only be called on ACCEPTED orders, current: " + status);
+
+        return this.toBuilder()
+            .status(OrderStatus.CANCELLED)
+            .build();
+    }
+
     // -------------------------------------------------------------------------
     // 내부 헬퍼
     // -------------------------------------------------------------------------

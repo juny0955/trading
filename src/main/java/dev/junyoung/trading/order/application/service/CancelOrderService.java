@@ -41,6 +41,6 @@ public class CancelOrderService implements CancelOrderUseCase {
         }
 
         long acceptedSeq = acceptedSeqGenerator.next();
-        engineCommandGateway.submit(order.getSymbol(), new EngineCommand.CancelOrder(acceptedSeq, order.getOrderId(), order.getAccountId()));
+        engineCommandGateway.submit(order.getSymbol(), new EngineCommand.CancelOrder(acceptedSeq, order.getOrderId(), order.getAccountId(), null, null));
     }
 }

@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -68,7 +69,8 @@ class EngineRuntimeTest {
 
     private EngineCommand.PlaceOrder placeOrder() {
         return new EngineCommand.PlaceOrder(
-            OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5))
+            OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5)),
+            Instant.now(), Instant.now()
         );
     }
 

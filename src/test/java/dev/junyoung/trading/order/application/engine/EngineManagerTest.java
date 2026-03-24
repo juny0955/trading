@@ -21,6 +21,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -65,7 +66,7 @@ class EngineManagerTest {
     private EngineCommand.PlaceOrder placeOrder(String symbol) {
         Symbol sym = new Symbol(symbol);
         Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-        return new EngineCommand.PlaceOrder(order);
+        return new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now());
     }
 
     @Nested

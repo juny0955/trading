@@ -18,6 +18,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -75,7 +76,7 @@ class EngineLoopTest {
 
 	private EngineCommand.PlaceOrder placeOrderCommand() {
 		Order order = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-		return new EngineCommand.PlaceOrder(order);
+		return new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now());
 	}
 
 	// ── submit() ────────────────────────────────────────────────────────────

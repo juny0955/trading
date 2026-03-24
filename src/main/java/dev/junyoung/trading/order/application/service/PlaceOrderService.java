@@ -68,7 +68,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             @Override
             public void afterCommit() {
                 try {
-                    engineCommandGateway.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order));
+                    engineCommandGateway.submit(order.getSymbol(), new EngineCommand.PlaceOrder(order, null, null));
                 } catch (Exception e) {
                     try {
                         orderCompensationService.compensate(order);

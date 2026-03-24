@@ -14,6 +14,7 @@ import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -63,11 +64,13 @@ class EngineIndependenceTest {
 
     private static EngineCommand.PlaceOrder btcPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)),
+            Instant.now(), Instant.now());
     }
 
     private static EngineCommand.PlaceOrder ethPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            OrderFixture.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)),
+            Instant.now(), Instant.now());
     }
 }

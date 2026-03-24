@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -130,7 +131,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 		}
@@ -141,7 +142,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 		}
 
 		@Test
@@ -153,7 +154,7 @@ class EngineHandlerTest {
 			var accepted = new PlaceCalculationResult.Accepted(SYMBOL, 1L, List.of(order, activated), List.of(), List.of());
 			when(engine.calculatePlace(any())).thenReturn(accepted);
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 		}
 
 		@Test
@@ -162,7 +163,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 			assertThat(order.getStatus().name()).isEqualTo("ACCEPTED");
@@ -174,7 +175,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
@@ -185,7 +186,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			InOrder inOrder = inOrder(engine, orderBookCachePort);
 			inOrder.verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
@@ -198,7 +199,7 @@ class EngineHandlerTest {
 			Order order = marketSellOrder(5);
 			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 		}
@@ -209,7 +210,7 @@ class EngineHandlerTest {
 			Order order = marketSellOrder(5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
@@ -223,7 +224,7 @@ class EngineHandlerTest {
 			var accepted = new PlaceCalculationResult.Accepted(SYMBOL, 1L, List.of(activated, order), List.of(), List.of());
 			when(engine.calculatePlace(any())).thenReturn(accepted);
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engineResultPersistenceService).persistPlaceResult(accepted);
 		}
@@ -234,7 +235,7 @@ class EngineHandlerTest {
 			Order order = marketBuyQuoteQtyOrder(50_000);
 			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
 		}
@@ -246,7 +247,7 @@ class EngineHandlerTest {
 			when(engine.calculatePlace(any()))
 				.thenReturn(new PlaceCalculationResult.Rejected(SYMBOL, 1L, PlaceRejectCode.INVALID_TIF));
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(engineResultPersistenceService, never()).persistPlaceResult(any());
 		}
@@ -258,7 +259,7 @@ class EngineHandlerTest {
 			when(engine.calculatePlace(any()))
 				.thenReturn(new PlaceCalculationResult.Rejected(SYMBOL, 1L, PlaceRejectCode.INVALID_TIF));
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());
@@ -270,7 +271,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistPlaceResult(any());
@@ -293,7 +294,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, dev.junyoung.trading.order.application.engine.dto.CancelResultCode.ORDER_NOT_FOUND));
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now())));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 		}
@@ -307,7 +308,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
 
 			verify(orderBookStateApplier).apply(any(), any());
 			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
@@ -320,7 +321,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Skipped(SYMBOL, null, CancelResultCode.ORDER_ALREADY_FINAL));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now()));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
@@ -334,7 +335,7 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now()));
 
 			verify(engineResultPersistenceService, never()).persistCancelResult(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
@@ -350,7 +351,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
 
 			verify(orderBookCachePort).update(SYMBOL, orderBook);
 		}
@@ -364,7 +365,7 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
 
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
@@ -407,7 +408,7 @@ class EngineHandlerTest {
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 			doThrow(new RuntimeException("unexpected error")).when(orderBookStateApplier).apply(any(), any());
 
-			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner).transitionToRebuilding();
 			verify(runtimeOwner, never()).transitionToDirty();
@@ -422,7 +423,7 @@ class EngineHandlerTest {
 				.when(orderBookStateApplier).apply(any(), any());
 
 			assertThrows(OrderBookInvariantViolationException.class,
-				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+				() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner).transitionToRebuilding();
 			verify(runtimeOwner, never()).transitionToDirty();
@@ -435,7 +436,7 @@ class EngineHandlerTest {
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 			doThrow(new RuntimeException("cache error")).when(orderBookCachePort).update(any(), any());
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner, never()).transitionToRebuilding();
 			verify(runtimeOwner, never()).transitionToDirty();
@@ -447,7 +448,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			doThrow(new RuntimeException("engine bug")).when(engine).calculatePlace(any());
 
-			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner).transitionToDirty();
 			verify(runtimeOwner, never()).transitionToRebuilding();
@@ -461,7 +462,7 @@ class EngineHandlerTest {
 			doThrow(new RetryablePersistenceException("retry", new RuntimeException("db timeout")))
 				.when(engineResultPersistenceService).persistPlaceResult(any());
 
-			assertThrows(RetryablePersistenceException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertThrows(RetryablePersistenceException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner, never()).transitionToDirty();
 			verify(runtimeOwner, never()).transitionToRebuilding();
@@ -478,7 +479,7 @@ class EngineHandlerTest {
 				.when(engineResultPersistenceService).persistPlaceResult(any());
 
 			assertThrows(PersistenceInvariantViolationException.class,
-				() -> handler.handle(new EngineCommand.PlaceOrder(order)));
+				() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(runtimeOwner).transitionToDirty();
 			verify(orderBookStateApplier, never()).apply(any(), any());
@@ -491,7 +492,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(runtimeOwner.state()).thenReturn(EngineSymbolState.REBUILDING);
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
 		}
@@ -502,7 +503,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(runtimeOwner.state()).thenReturn(EngineSymbolState.DIRTY);
 
-			handler.handle(new EngineCommand.PlaceOrder(order));
+			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
 		}
@@ -513,7 +514,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			doThrow(new RuntimeException("engine bug")).when(engine).calculatePlace(any());
 
-			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order)));
+			assertThrows(RuntimeException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
 			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());

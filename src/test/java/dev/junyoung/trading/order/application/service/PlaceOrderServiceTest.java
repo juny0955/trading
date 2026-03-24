@@ -25,7 +25,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
+import io.micrometer.core.instrument.Timer;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
@@ -79,6 +81,12 @@ class PlaceOrderServiceTest {
     @Mock
     private OrderMetrics orderMetrics;
 
+    @Mock
+    private EngineMetrics engineMetrics;
+
+    @Mock
+    private Timer orderAcceptTxTimer;
+
     @InjectMocks
     private PlaceOrderService sut;
 
@@ -86,6 +94,7 @@ class PlaceOrderServiceTest {
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
         lenient().when(accountQueryPort.existsById(any())).thenReturn(true);
+        lenient().when(orderMetrics.orderAcceptTxTimer()).thenReturn(orderAcceptTxTimer);
     }
 
     @AfterEach

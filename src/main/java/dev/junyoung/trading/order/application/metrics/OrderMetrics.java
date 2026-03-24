@@ -2,6 +2,7 @@ package dev.junyoung.trading.order.application.metrics;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,6 +21,10 @@ public class OrderMetrics {
 
     private final Counter idempotencyConflictCounter;
     private final Counter queueFullRollbackCounter;
+    private final Counter placeOrderTpsCounter;
+    private final Counter acceptedOrderTpsCounter;
+    private final Counter cancelOrderTpsCounter;
+    private final Timer orderAcceptTxLatencyTimer;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -31,6 +36,20 @@ public class OrderMetrics {
             .register(meterRegistry);
         this.queueFullRollbackCounter = Counter.builder("queue_full_rollback_count")
             .description("Number of successful compensating rollbacks after engine queue submit failure")
+            .register(meterRegistry);
+        this.placeOrderTpsCounter = Counter.builder("place_order_tps")
+            .description("Number of place order requests received")
+            .register(meterRegistry);
+        this.acceptedOrderTpsCounter = Counter.builder("accepted_order_tps")
+            .description("Number of orders accepted and queued to engine")
+            .register(meterRegistry);
+        this.cancelOrderTpsCounter = Counter.builder("cancel_order_tps")
+            .description("Number of cancel order requests received")
+            .register(meterRegistry);
+        this.orderAcceptTxLatencyTimer = Timer.builder("order_accept_tx_latency")
+            .description("Duration of order acceptance transaction (hold reserve + order save)")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .publishPercentileHistogram()
             .register(meterRegistry);
     }
 
@@ -46,5 +65,25 @@ public class OrderMetrics {
     /** 엔진 큐 submit 실패 후 보상 롤백 성공 횟수를 증가시킨다. */
     public void incrementQueueFullRollback() {
         queueFullRollbackCounter.increment();
+    }
+
+    /** 주문 등록 요청을 받은 횟수를 증가시킨다. */
+    public void incrementPlaceOrderTps() {
+        placeOrderTpsCounter.increment();
+    }
+
+    /** 주문이 승인되어 엔진 큐에 들어간 횟수를 증가시킨다. */
+    public void incrementAcceptedOrderTps() {
+        acceptedOrderTpsCounter.increment();
+    }
+
+    /** 주문 취소 요청을 받은 횟수를 증가시킨다. */
+    public void incrementCancelOrderTps() {
+        cancelOrderTpsCounter.increment();
+    }
+
+    /** 주문 승인 트랜잭션 지연 시간 측정을 위한 타이머를 반환한다. */
+    public Timer orderAcceptTxTimer() {
+        return orderAcceptTxLatencyTimer;
     }
 }

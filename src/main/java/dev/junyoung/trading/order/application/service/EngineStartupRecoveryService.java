@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.service;
 
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
@@ -21,10 +22,13 @@ public class EngineStartupRecoveryService {
     private final OrderRepository orderRepository;
     private final HoldReservationPort holdReservationPort;
     private final IdempotencyKeyRepository idempotencyKeyRepository;
+    private final ReplayMetrics replayMetrics;
 
     @Transactional
     public void cleanupOrphanAccepted(Symbol symbol) {
         List<Order> orphans = orderRepository.findAcceptedOrdersBySymbol(symbol);
+        replayMetrics.incrementReplayOpenOrderCount(orphans.size());
+
         for (Order orphan : orphans) {
             Order cancelled = orphan.cancelOrphan();
             BalanceHoldPolicy.HoldSpec holdSpec = BalanceHoldPolicy.holdSpecFor(orphan);
@@ -36,5 +40,7 @@ public class EngineStartupRecoveryService {
             log.warn("[StartupRecovery] Orphan ACCEPTED order cancelled: orderId={}, accountId={}, symbol={}, clientOrderId={}",
                 orphan.getOrderId(), orphan.getAccountId(), symbol.value(), orphan.getClientOrderId());
         }
+
+        replayMetrics.updateConsistencyCheck(symbol.value(), 1);
     }
 }

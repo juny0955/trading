@@ -2,7 +2,6 @@ package dev.junyoung.trading.order.application.engine.handler;
 
 import java.util.List;
 
-import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
 import dev.junyoung.trading.order.application.engine.book.OrderBookViewFactory;
 import dev.junyoung.trading.order.application.engine.dto.BookOperation;
@@ -14,11 +13,11 @@ import dev.junyoung.trading.order.application.engine.dto.CancelCalculationResult
 import dev.junyoung.trading.order.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.exception.engine.PersistenceInvariantViolationException;
 import dev.junyoung.trading.order.application.exception.engine.RetryablePersistenceException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.service.dto.CancelCalculationInput;
@@ -26,6 +25,9 @@ import dev.junyoung.trading.order.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.order.domain.service.state.OrderBookView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.Duration;
+import java.time.Instant;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -52,6 +54,7 @@ public class EngineHandler {
 	private final OrderBookCachePort orderBookCachePort;
 	private final EngineResultPersistenceService engineResultPersistenceService;
 	private final EngineRuntimeOwner runtimeOwner;
+	private final EngineMetrics engineMetrics;
 
 	// -------------------------------------------------------------------------
 	// 진입점
@@ -72,12 +75,17 @@ public class EngineHandler {
 			return;
 		}
 
-		switch (command) {
-			case EngineCommand.PlaceOrder c -> handlePlaceOrder(c.order());
-			case EngineCommand.CancelOrder c -> handleCancelOrder(c.acceptedSeq(), c.orderId(), c.requesterAccountId());
-			case EngineCommand.Shutdown _ ->
-				// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
-				log.warn("Shutdown command reached EngineHandler; this should not happen.");
+		Instant handleStart = Instant.now();
+		try {
+			switch (command) {
+				case EngineCommand.PlaceOrder c -> handlePlaceOrder(c);
+				case EngineCommand.CancelOrder c -> handleCancelOrder(c);
+				case EngineCommand.Shutdown _ ->
+					// EngineLoop.run()이 직접 처리하므로 여기까지 오면 로직 오류
+					log.warn("Shutdown command reached EngineHandler; this should not happen.");
+			}
+		} finally {
+			engineMetrics.recordEngineProcessingLatency(Duration.between(handleStart, Instant.now()));
 		}
 	}
 
@@ -85,11 +93,11 @@ public class EngineHandler {
 	// 내부 헬퍼
 	// -------------------------------------------------------------------------
 
-	private void handlePlaceOrder(Order order) {
+	private void handlePlaceOrder(EngineCommand.PlaceOrder command) {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		PlaceCalculationResult result;
 		try {
-			result = engine.calculatePlace(new PlaceCalculationInput(view, order));
+			result = engine.calculatePlace(new PlaceCalculationInput(view, command.order()));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -98,6 +106,8 @@ public class EngineHandler {
 		switch (result) {
 			case PlaceCalculationResult.Accepted a -> {
 				persistPlace(a);
+				if (command.serviceEnteredAt() != null)
+					engineMetrics.recordEndToEndOrderLatency(Duration.between(command.serviceEnteredAt(), Instant.now()));
 				applyToOrderBook(a.bookOps());
 				updateCache();
 			}
@@ -106,13 +116,13 @@ public class EngineHandler {
 		}
 	}
 
-	private void handleCancelOrder(long commandSeq, OrderId orderId, AccountId requesterAccountId) {
-		Order order = orderBook.getIndex().get(orderId);
+	private void handleCancelOrder(EngineCommand.CancelOrder command) {
+		Order order = orderBook.getIndex().get(command.orderId());
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		CancelCalculationResult result;
 
 		try {
-			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, commandSeq, orderId, requesterAccountId, order));
+			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, command.acceptedSeq(), command.orderId(), command.requesterAccountId(), order));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -121,13 +131,18 @@ public class EngineHandler {
 		switch (result) {
 			case CancelCalculationResult.Cancelled c -> {
 				persistCancel(c);
+				engineMetrics.incrementCancelCompleted();
+				if (command.serviceEnteredAt() != null)
+					engineMetrics.recordEndToEndCancelLatency(Duration.between(command.serviceEnteredAt(), Instant.now()));
 				applyToOrderBook(c.bookOps());
 				updateCache();
 			}
 			case CancelCalculationResult.Skipped s ->
 				log.warn("Cancel skipped - order already final: symbol={}, seq={}", s.symbol(), s.acceptedSeq());
-			case CancelCalculationResult.Rejected r ->
+			case CancelCalculationResult.Rejected r -> {
+				engineMetrics.incrementCancelRejected();
 				log.warn("Cancel rejected: symbol={}, seq={}, reason={}", r.symbol(), r.acceptedSeq(), r.reasonCode());
+			}
 		}
 	}
 

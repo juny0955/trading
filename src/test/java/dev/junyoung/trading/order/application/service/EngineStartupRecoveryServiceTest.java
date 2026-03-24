@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
@@ -43,6 +44,9 @@ class EngineStartupRecoveryServiceTest {
 
     @Mock
     private IdempotencyKeyRepository idempotencyKeyRepository;
+
+    @Mock
+    private ReplayMetrics replayMetrics;
 
     @InjectMocks
     private EngineStartupRecoveryService sut;

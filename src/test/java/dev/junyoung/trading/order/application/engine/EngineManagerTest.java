@@ -6,6 +6,8 @@ import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -21,6 +23,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +58,12 @@ class EngineManagerTest {
     @Mock
     private EngineStartupRecoveryService engineStartupRecoveryService;
 
+    @Mock
+    private EngineMetrics engineMetrics;
+
+    @Mock
+    private ReplayMetrics replayMetrics;
+
     private EngineManager engineManager;
 
     @AfterEach
@@ -65,7 +74,7 @@ class EngineManagerTest {
     private EngineCommand.PlaceOrder placeOrder(String symbol) {
         Symbol sym = new Symbol(symbol);
         Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-        return new EngineCommand.PlaceOrder(order);
+        return new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now());
     }
 
     @Nested
@@ -82,7 +91,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
 
             assertThatCode(() -> engineManager.start()).doesNotThrowAnyException();
@@ -99,7 +110,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
 
             engineManager.start();
@@ -127,7 +140,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -145,7 +160,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -172,7 +189,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
         }
@@ -250,7 +269,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -267,7 +288,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -284,7 +307,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -301,7 +326,9 @@ class EngineManagerTest {
                 orderBookCachePort,
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
-                orderBookRebuilder
+                orderBookRebuilder,
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 

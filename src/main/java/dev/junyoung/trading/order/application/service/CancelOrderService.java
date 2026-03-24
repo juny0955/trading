@@ -8,12 +8,15 @@ import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.Instant;
 
 @Slf4j
 @Service
@@ -23,9 +26,12 @@ public class CancelOrderService implements CancelOrderUseCase {
     private final AcceptedSeqGenerator acceptedSeqGenerator;
     private final OrderCommandGateway engineCommandGateway;
     private final OrderRepository orderRepository;
+    private final OrderMetrics orderMetrics;
 
     @Override
     public void cancelOrder(String accountId, String orderId) {
+        Instant serviceEnteredAt = Instant.now();
+
         Order order = orderRepository.findById(OrderId.from(orderId))
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
@@ -41,6 +47,8 @@ public class CancelOrderService implements CancelOrderUseCase {
         }
 
         long acceptedSeq = acceptedSeqGenerator.next();
-        engineCommandGateway.submit(order.getSymbol(), new EngineCommand.CancelOrder(acceptedSeq, order.getOrderId(), order.getAccountId()));
+        orderMetrics.incrementCancelOrderTps();
+        engineCommandGateway.submit(order.getSymbol(),
+            new EngineCommand.CancelOrder(acceptedSeq, order.getOrderId(), order.getAccountId(), serviceEnteredAt, null));
     }
 }

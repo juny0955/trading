@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.engine.book.OrderBookProjectionApp
 import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
@@ -75,6 +76,9 @@ class EngineRestartIntegrationTest {
     @Autowired
     private OrderBookRebuilder orderBookRebuilder;
 
+    @Autowired
+    private EngineMetrics engineMetrics;
+
     private EngineRuntime runtime;
 
     @AfterEach
@@ -106,7 +110,8 @@ class EngineRestartIntegrationTest {
             orderBookCachePort,
             orderBookProjectionApplier,
             engineResultPersistenceService,
-            orderBookRebuilder
+            orderBookRebuilder,
+            engineMetrics
         );
 
         OrderBookSnapshot snapshot = orderBookCachePort.getSnapshot(SYMBOL);

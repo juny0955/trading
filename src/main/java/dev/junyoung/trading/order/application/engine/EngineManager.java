@@ -7,6 +7,8 @@ import dev.junyoung.trading.order.application.engine.handler.EngineResultPersist
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
@@ -17,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,6 +46,8 @@ public class EngineManager implements OrderCommandGateway {
     private final EngineResultPersistenceService engineResultPersistenceService;
     private final OrderBookProjectionApplier orderBookProjectionApplier;
     private final OrderBookRebuilder orderBookRebuilder;
+    private final EngineMetrics engineMetrics;
+    private final ReplayMetrics replayMetrics;
 
     private final Map<Symbol, EngineRuntime> contexts = new HashMap<>();
 
@@ -52,14 +58,22 @@ public class EngineManager implements OrderCommandGateway {
     /** trading.symbols에 정의된 각 심볼의 EngineContext를 생성하고 엔진 스레드를 시작한다. */
     @PostConstruct
     public void start() {
+        Instant totalStart = Instant.now();
+
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
+            Instant symStart = Instant.now();
             engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
-            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+
+            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
+            replayMetrics.recordReplayDurationBySymbol(sym, Duration.between(symStart, Instant.now()));
+
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());
         }
+
+        replayMetrics.recordTotalReplayDuration(Duration.between(totalStart, Instant.now()));
     }
 
     /** 모든 심볼의 엔진을 순차적으로 중단한다. 개별 엔진 종료 실패는 로그 후 계속 진행한다. */

@@ -10,6 +10,7 @@ import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.engine.loop.EngineLoop;
 import dev.junyoung.trading.order.application.engine.loop.EngineThread;
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
 import dev.junyoung.trading.order.domain.model.OrderBook;
@@ -53,7 +54,8 @@ public class EngineRuntime implements EngineRuntimeOwner{
         OrderBookCachePort orderBookCachePort,
         OrderBookProjectionApplier orderBookProjectionApplier,
         EngineResultPersistenceService engineResultPersistenceService,
-        OrderBookRebuilder orderBookRebuilder
+        OrderBookRebuilder orderBookRebuilder,
+        EngineMetrics engineMetrics
     ) {
         this.symbol = symbol;
         this.orderBook = new OrderBook();
@@ -61,11 +63,12 @@ public class EngineRuntime implements EngineRuntimeOwner{
         this.orderBookRebuilder = orderBookRebuilder;
         attemptRebuild();
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
+        engineMetrics.registerQueueDepthGauge(symbol.value(), queue);
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();
         OrderBookStateApplier orderBookStateApplier = new SymbolOrderBookStateApplier(orderBook, orderBookProjectionApplier);
-        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, this);
-        this.engineLoop = new EngineLoop(queue, engineHandler, engineThread, this);
+        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, this, engineMetrics);
+        this.engineLoop = new EngineLoop(queue, engineHandler, engineThread, this, engineMetrics);
     }
 
     // -------------------------------------------------------------------------

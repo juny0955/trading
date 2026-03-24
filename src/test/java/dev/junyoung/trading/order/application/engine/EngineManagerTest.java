@@ -7,6 +7,7 @@ import dev.junyoung.trading.order.application.engine.handler.EngineResultPersist
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.metrics.EngineMetrics;
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -60,6 +61,9 @@ class EngineManagerTest {
     @Mock
     private EngineMetrics engineMetrics;
 
+    @Mock
+    private ReplayMetrics replayMetrics;
+
     private EngineManager engineManager;
 
     @AfterEach
@@ -88,7 +92,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
 
             assertThatCode(() -> engineManager.start()).doesNotThrowAnyException();
@@ -106,7 +111,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
 
             engineManager.start();
@@ -135,7 +141,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -154,7 +161,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -182,7 +190,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
         }
@@ -261,7 +270,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -279,7 +289,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -297,7 +308,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 
@@ -315,7 +327,8 @@ class EngineManagerTest {
                 engineResultPersistenceService,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
-                engineMetrics
+                engineMetrics,
+                replayMetrics
             );
             engineManager.start();
 

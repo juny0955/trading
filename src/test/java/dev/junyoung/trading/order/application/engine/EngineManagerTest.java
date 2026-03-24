@@ -15,18 +15,20 @@ import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
@@ -151,6 +153,162 @@ class EngineManagerTest {
                 UnsupportedSymbolException.class,
                 () -> engineManager.submit(new Symbol("XRP"), placeOrder("XRP"))
             );
+        }
+    }
+
+
+    // ── ThreadConcurrency ────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("스레드 동시성")
+    class ThreadConcurrency {
+
+        @BeforeEach
+        void setUp() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
+        }
+
+        @Test
+        @DisplayName("N개 스레드가 동시에 submit해도 모든 주문이 정상 수신된다")
+        void concurrentSubmit_allOrdersAccepted() throws InterruptedException {
+            int threadCount = 20;
+            CountDownLatch startGate = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            for (int i = 0; i < threadCount; i++) {
+                new Thread(() -> {
+                    try {
+                        startGate.await();
+                        engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) {
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                }).start();
+            }
+
+            startGate.countDown();
+            assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(successCount.get()).isEqualTo(threadCount);
+        }
+
+        @Test
+        @DisplayName("BTC·ETH 양쪽에 동시 submit해도 모든 주문이 정상 수신된다")
+        void concurrentSubmit_multipleSymbols_allAccepted() throws InterruptedException {
+            int perSymbol = 10;
+            CountDownLatch startGate = new CountDownLatch(1);
+            CountDownLatch doneLatch = new CountDownLatch(perSymbol * 2);
+            AtomicInteger successCount = new AtomicInteger(0);
+
+            for (int i = 0; i < perSymbol; i++) {
+                new Thread(() -> {
+                    try {
+                        startGate.await();
+                        engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) { } finally { doneLatch.countDown(); }
+                }).start();
+                new Thread(() -> {
+                    try {
+                        startGate.await();
+                        engineManager.submit(new Symbol("ETH"), placeOrder("ETH"));
+                        successCount.incrementAndGet();
+                    } catch (Exception ignored) { } finally { doneLatch.countDown(); }
+                }).start();
+            }
+
+            startGate.countDown();
+            assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(successCount.get()).isEqualTo(perSymbol * 2);
+        }
+    }
+
+    // ── stop() ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("stop()")
+    class Stop {
+
+        @Test
+        @DisplayName("심볼 없이 시작한 뒤 stop()은 예외 없이 완료된다")
+        void stop_noSymbols_doesNotThrow() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of());
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
+
+            assertDoesNotThrow(() -> engineManager.stop());
+        }
+
+        @Test
+        @DisplayName("단일 심볼 엔진을 정상 종료한다")
+        void stop_singleSymbol_terminatesGracefully() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
+
+            assertDoesNotThrow(() -> engineManager.stop());
+        }
+
+        @Test
+        @DisplayName("복수 심볼의 모든 엔진을 정상 종료한다")
+        void stop_multipleSymbols_allTerminateGracefully() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH", "SOL"));
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
+
+            assertDoesNotThrow(() -> engineManager.stop());
+        }
+
+        @Test
+        @DisplayName("stop()을 여러 번 호출해도 예외가 발생하지 않는다")
+        void stop_calledMultipleTimes_doesNotThrow() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
+
+            assertDoesNotThrow(() -> {
+                engineManager.stop();
+                engineManager.stop();
+            });
         }
     }
 }

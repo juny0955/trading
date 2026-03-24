@@ -5,9 +5,12 @@ import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
 import dev.junyoung.trading.order.application.engine.runtime.EngineSymbolState;
 import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -35,6 +38,7 @@ public class EngineLoop implements Runnable {
 	private final EngineHandler engineHandler;
 	private final EngineThread engineThread;
 	private final EngineRuntimeOwner runtimeOwner;
+	private final EngineMetrics engineMetrics;
 
 	/**
 	 * 루프 종료 플래그.
@@ -87,6 +91,7 @@ public class EngineLoop implements Runnable {
 		submitLock.lock();
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");
+			command = stampEnqueuedAt(command);
 			if (!engineQueue.offer(command)) throw new EngineQueueFullException();
 		} finally {
 			submitLock.unlock();
@@ -110,6 +115,12 @@ public class EngineLoop implements Runnable {
 				if (command instanceof EngineCommand.Shutdown)
 					break;
 
+				Instant dequeuedAt = Instant.now();
+				if (command instanceof EngineCommand.PlaceOrder p && p.enqueuedAt() != null)
+					engineMetrics.recordQueueWaitLatency(Duration.between(p.enqueuedAt(), dequeuedAt));
+				else if (command instanceof EngineCommand.CancelOrder c && c.enqueuedAt() != null)
+					engineMetrics.recordQueueWaitLatency(Duration.between(c.enqueuedAt(), dequeuedAt));
+
 				engineHandler.handle(command);
 			} catch (InterruptedException e) {
 				// stop()에서 interrupt()를 호출했을 때 발생 → 루프 정상 종료
@@ -122,5 +133,14 @@ public class EngineLoop implements Runnable {
 					runtimeOwner.attemptRebuild();
 			}
 		}
+	}
+
+	private EngineCommand stampEnqueuedAt(EngineCommand command) {
+		Instant now = Instant.now();
+		return switch (command) {
+			case EngineCommand.PlaceOrder p -> new EngineCommand.PlaceOrder(p.order(), p.serviceEnteredAt(), now);
+			case EngineCommand.CancelOrder c -> new EngineCommand.CancelOrder(c.acceptedSeq(), c.orderId(), c.requesterAccountId(), c.serviceEnteredAt(), now);
+			default -> command;
+		};
 	}
 }

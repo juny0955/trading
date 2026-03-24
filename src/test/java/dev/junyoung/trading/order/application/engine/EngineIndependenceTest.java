@@ -5,6 +5,7 @@ import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.engine.loop.EngineLoop;
 import dev.junyoung.trading.order.application.engine.loop.EngineThread;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.mock;
 @DisplayName("엔진 독립성 — BTC 블로킹 중 ETH 독립 처리")
 class EngineIndependenceTest {
 
+    private EngineMetrics engineMetrics = mock(EngineMetrics.class);
+
     @Test
     @DisplayName("BTC 엔진이 블로킹 중에도 ETH 엔진은 독립적으로 처리된다")
     void ethEngine_processesIndependently_whileBtcIsBlocked() throws InterruptedException {
@@ -45,8 +48,8 @@ class EngineIndependenceTest {
         BlockingQueue<EngineCommand> btcQueue = new ArrayBlockingQueue<>(100);
         BlockingQueue<EngineCommand> ethQueue = new ArrayBlockingQueue<>(100);
         EngineRuntimeOwner runtimeOwner = mock(EngineRuntimeOwner.class);
-        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"), runtimeOwner);
-        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"), runtimeOwner);
+        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"), runtimeOwner, engineMetrics);
+        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"), runtimeOwner, engineMetrics);
 
         btcLoop.start();
         ethLoop.start();

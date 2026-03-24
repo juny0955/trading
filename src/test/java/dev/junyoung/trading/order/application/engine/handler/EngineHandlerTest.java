@@ -79,6 +79,9 @@ class EngineHandlerTest {
 	@Mock
 	private EngineRuntimeOwner runtimeOwner;
 
+	@Mock
+	private dev.junyoung.trading.order.application.metrics.EngineMetrics engineMetrics;
+
 	private EngineHandler handler;
 
 	private static final Symbol SYMBOL = new Symbol("BTC");
@@ -92,7 +95,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
 		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner, engineMetrics);
 	}
 
 	private Order buyOrder(long price, long qty) {

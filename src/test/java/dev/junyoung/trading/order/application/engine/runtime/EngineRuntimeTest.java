@@ -6,6 +6,7 @@ import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.exception.engine.EngineNotActiveException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -60,6 +61,9 @@ class EngineRuntimeTest {
     @Mock
     private OrderBookRebuilder orderBookRebuilder;
 
+    @Mock
+    private EngineMetrics engineMetrics;
+
     private EngineRuntime runtime;
 
     @AfterEach
@@ -82,7 +86,7 @@ class EngineRuntimeTest {
         @DisplayName("ACTIVE 상태에서는 submit()이 허용된다")
         void submit_active_succeeds() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
 
             assertThat(runtime.state()).isEqualTo(EngineSymbolState.ACTIVE);
@@ -93,7 +97,7 @@ class EngineRuntimeTest {
         @DisplayName("REBUILDING 상태에서는 submit()이 EngineNotActiveException을 던진다")
         void submit_rebuilding_throwsEngineNotActiveException() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
             runtime.transitionToRebuilding();
 
@@ -104,7 +108,7 @@ class EngineRuntimeTest {
         @DisplayName("DIRTY 상태에서는 submit()이 EngineNotActiveException을 던진다")
         void submit_dirty_throwsEngineNotActiveException() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
             runtime.transitionToDirty();
 
@@ -123,7 +127,7 @@ class EngineRuntimeTest {
             Order bestAsk = activeLimitOrder("ask-1", 2L, Side.SELL, 10_200L, 4L);
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of(bestBid, bestAsk));
 
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
             verify(orderBookCachePort).update(eq(SYMBOL), argThat(book -> {
                 assertThat(book.bestBid()).contains(new Price(10_100L));
@@ -139,7 +143,7 @@ class EngineRuntimeTest {
             Order second = activeLimitOrder("bid-2", 20L, Side.BUY, 10_100L, 5L);
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of(first, second));
 
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
             ArgumentCaptor<OrderBook> captor = ArgumentCaptor.forClass(OrderBook.class);
             verify(orderBookCachePort).update(eq(SYMBOL), captor.capture());
@@ -153,7 +157,7 @@ class EngineRuntimeTest {
         @DisplayName("rebuild 성공 시 ACTIVE 상태로 전환된다")
         void attemptRebuild_success_transitionsToActive() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
             runtime.transitionToRebuilding();
             assertThat(runtime.state()).isEqualTo(EngineSymbolState.REBUILDING);
@@ -167,7 +171,7 @@ class EngineRuntimeTest {
         @DisplayName("loadOpenOrders 실패 시 DIRTY 상태로 전환된다")
         void attemptRebuild_loadFails_transitionsToDirty() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenThrow(new RuntimeException("DB error"));
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
             runtime.transitionToRebuilding();
 
@@ -180,7 +184,7 @@ class EngineRuntimeTest {
         @DisplayName("rebuild 성공 시 캐시가 갱신된다")
         void attemptRebuild_success_updatesCache() {
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of());
-            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             runtime.start();
             runtime.transitionToRebuilding();
             clearInvocations(orderBookCachePort);

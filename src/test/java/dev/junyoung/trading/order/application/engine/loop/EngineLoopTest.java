@@ -4,6 +4,7 @@ import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
 import dev.junyoung.trading.order.application.engine.runtime.EngineSymbolState;
 import dev.junyoung.trading.order.application.exception.engine.EngineQueueFullException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +55,7 @@ class EngineLoopTest {
 	private EngineHandler handler;
 	private EngineThread engineThread;
 	private EngineRuntimeOwner runtimeOwner;
+	private EngineMetrics engineMetrics;
 	private EngineLoop loop;
 
 	@BeforeEach
@@ -62,8 +64,9 @@ class EngineLoopTest {
 		handler = mock(EngineHandler.class);
 		engineThread = new EngineThread("BTC");
 		runtimeOwner = mock(EngineRuntimeOwner.class);
+		engineMetrics = mock(EngineMetrics.class);
 		when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
-		loop = new EngineLoop(queue, handler, engineThread, runtimeOwner);
+		loop = new EngineLoop(queue, handler, engineThread, runtimeOwner, engineMetrics);
 	}
 
 	@AfterEach
@@ -92,7 +95,7 @@ class EngineLoopTest {
 
 			loop.submit(command);
 
-			assertThat(queue).containsExactly(command);
+			assertThat(queue).hasSize(1);
 		}
 
 		@Test
@@ -124,13 +127,13 @@ class EngineLoopTest {
 		void run_processesCommandViaHandler() throws InterruptedException {
 			CountDownLatch latch = new CountDownLatch(1);
 			EngineCommand command = placeOrderCommand();
-			doAnswer(_ -> { latch.countDown(); return null; }).when(handler).handle(command);
+			doAnswer(_ -> { latch.countDown(); return null; }).when(handler).handle(any());
 
 			loop.start();
 			loop.submit(command);
 
 			assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
-			verify(handler).handle(command);
+			verify(handler).handle(any(EngineCommand.PlaceOrder.class));
 		}
 
 		@Test

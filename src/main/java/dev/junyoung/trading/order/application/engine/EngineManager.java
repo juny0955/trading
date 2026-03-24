@@ -7,6 +7,7 @@ import dev.junyoung.trading.order.application.engine.handler.EngineResultPersist
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
 import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
@@ -42,6 +43,7 @@ public class EngineManager implements OrderCommandGateway {
     private final EngineResultPersistenceService engineResultPersistenceService;
     private final OrderBookProjectionApplier orderBookProjectionApplier;
     private final OrderBookRebuilder orderBookRebuilder;
+    private final EngineMetrics engineMetrics;
 
     private final Map<Symbol, EngineRuntime> contexts = new HashMap<>();
 
@@ -55,7 +57,7 @@ public class EngineManager implements OrderCommandGateway {
         for (String sym : tradingProperties.getSymbols()) {
             Symbol symbol = new Symbol(sym);
             engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
-            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder);
+            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
             contexts.put(symbol, ctx);
             ctx.start();
             log.info("Engine started for symbol: {}", symbol.value());

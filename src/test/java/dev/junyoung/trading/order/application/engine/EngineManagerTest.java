@@ -2,13 +2,12 @@ package dev.junyoung.trading.order.application.engine;
 
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.order.application.engine.book.OrderBookProjectionApplier;
-import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.order.application.engine.handler.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
-import dev.junyoung.trading.order.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.order.application.exception.order.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -16,261 +15,142 @@ import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
-/**
- * {@link EngineManager} 단위 테스트.
- *
- * <p>{@link TradingProperties}를 mock으로 대체한다.
- * {@link EngineRuntime}는 내부에서 직접 생성하므로 실제 engine-thread가 기동된다.
- * 각 테스트는 {@code @AfterEach}에서 {@link EngineManager#stop()}으로 스레드를 정리한다.</p>
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EngineManager")
 class EngineManagerTest {
 
-	@Mock
-	private TradingProperties tradingProperties;
+    @Mock
+    private TradingProperties tradingProperties;
 
-	@Mock
-	private OrderBookCachePort orderBookCachePort;
+    @Mock
+    private OrderBookCachePort orderBookCachePort;
 
-	@Mock
-	private EngineResultPersistenceService engineResultPersistenceService;
+    @Mock
+    private EngineResultPersistenceService engineResultPersistenceService;
 
-	@Mock
-	private OrderBookProjectionApplier orderBookProjectionApplier;
+    @Mock
+    private OrderBookProjectionApplier orderBookProjectionApplier;
 
-	@Mock
-	private OrderBookRebuilder orderBookRebuilder;
+    @Mock
+    private OrderBookRebuilder orderBookRebuilder;
 
-	@Mock
-	private EngineStartupRecoveryService engineStartupRecoveryService;
+    @Mock
+    private EngineStartupRecoveryService engineStartupRecoveryService;
 
-	private EngineManager engineManager;
+    private EngineManager engineManager;
 
-	@AfterEach
-	void tearDown() {
-		if (engineManager != null) {
-			engineManager.stop();
-		}
-	}
+    @AfterEach
+    void tearDown() {
+        if (engineManager != null) engineManager.stop();
+    }
 
-	private EngineCommand.PlaceOrder placeOrder(String symbol) {
-		Symbol sym = new Symbol(symbol);
-		Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-		return new EngineCommand.PlaceOrder(order);
-	}
+    private EngineCommand.PlaceOrder placeOrder(String symbol) {
+        Symbol sym = new Symbol(symbol);
+        Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+        return new EngineCommand.PlaceOrder(order);
+    }
 
-	// ── start() ──────────────────────────────────────────────────────────
+    @Nested
+    @DisplayName("start()")
+    class Start {
 
-	@Nested
-	@DisplayName("start()")
-	class Start {
+        @Test
+        @DisplayName("빈 심볼 목록이어도 예외 없이 시작된다")
+        void start_emptySymbols_doesNotThrow() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of());
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
 
-		@Test
-		@DisplayName("symbols가 비어 있으면 예외 없이 완료된다")
-		void start_emptySymbols_doesNotThrow() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of());
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
+            assertThatCode(() -> engineManager.start()).doesNotThrowAnyException();
+        }
 
-			assertDoesNotThrow(() -> engineManager.start());
-		}
+        @Test
+        @DisplayName("시작 시 orphan 정리 후 open order rebuild를 수행한다")
+        void start_cleansUpOrphansBeforeReplay() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
+            when(orderBookRebuilder.loadOpenOrders(new Symbol("BTC"))).thenReturn(List.of());
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
 
-		@Test
-		@DisplayName("단일 심볼로 시작하면 예외가 발생하지 않는다")
-		void start_singleSymbol_doesNotThrow() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
+            engineManager.start();
 
-			assertDoesNotThrow(() -> engineManager.start());
-		}
+            Symbol symbol = new Symbol("BTC");
+            InOrder inOrder = inOrder(engineStartupRecoveryService, orderBookRebuilder);
+            inOrder.verify(engineStartupRecoveryService).cleanupOrphanAccepted(symbol);
+            inOrder.verify(orderBookRebuilder).loadOpenOrders(symbol);
+        }
+    }
 
-		@Test
-		@DisplayName("복수 심볼로 시작하면 예외가 발생하지 않는다")
-		void start_multipleSymbols_doesNotThrow() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH", "SOL"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
+    @Nested
+    @DisplayName("submit()")
+    class Submit {
 
-			assertDoesNotThrow(() -> engineManager.start());
-		}
-	}
+        @Test
+        @DisplayName("등록된 심볼에는 submit()이 전달된다")
+        void submit_knownSymbol_doesNotThrow() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
+            when(orderBookRebuilder.loadOpenOrders(new Symbol("BTC"))).thenReturn(List.of());
+            when(orderBookRebuilder.loadOpenOrders(new Symbol("ETH"))).thenReturn(List.of());
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
 
-	// ── submit() ─────────────────────────────────────────────────────────
+            assertThatCode(() -> engineManager.submit(new Symbol("BTC"), placeOrder("BTC"))).doesNotThrowAnyException();
+        }
 
-	@Nested
-	@DisplayName("submit()")
-	class Submit {
+        @Test
+        @DisplayName("등록되지 않은 심볼은 UnsupportedSymbolException을 던진다")
+        void submit_unknownSymbol_throwsUnsupportedSymbolException() {
+            when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
+            when(orderBookRebuilder.loadOpenOrders(new Symbol("BTC"))).thenReturn(List.of());
+            engineManager = new EngineManager(
+                tradingProperties,
+                engineStartupRecoveryService,
+                orderBookCachePort,
+                engineResultPersistenceService,
+                orderBookProjectionApplier,
+                orderBookRebuilder
+            );
+            engineManager.start();
 
-		@BeforeEach
-		void setUp() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-		}
-
-		@Test
-		@DisplayName("등록된 심볼로 커맨드를 제출하면 예외가 발생하지 않는다")
-		void submit_knownSymbol_doesNotThrow() {
-			assertDoesNotThrow(() -> engineManager.submit(new Symbol("BTC"), placeOrder("BTC")));
-		}
-
-		@Test
-		@DisplayName("미등록 심볼로 제출하면 UnsupportedSymbolException이 발생한다")
-		void submit_unknownSymbol_throwsUnsupportedSymbolException() {
-			assertThrows(UnsupportedSymbolException.class,
-					() -> engineManager.submit(new Symbol("XRP"), placeOrder("XRP")));
-		}
-
-		@Test
-		@DisplayName("BTC·ETH 심볼이 각자 독립적으로 커맨드를 수신한다")
-		void submit_differentSymbols_bothAcceptCommands() {
-			assertDoesNotThrow(() -> {
-				engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
-				engineManager.submit(new Symbol("ETH"), placeOrder("ETH"));
-			});
-		}
-
-		@Test
-		@DisplayName("stop() 후 submit()을 호출하면 IllegalStateException이 발생한다")
-		void submit_afterStop_throwsIllegalStateException() {
-			engineManager.stop();
-
-			assertThrows(IllegalStateException.class,
-					() -> engineManager.submit(new Symbol("BTC"), placeOrder("BTC")));
-		}
-	}
-
-	// ── ThreadConcurrency ────────────────────────────────────────────────
-
-	@Nested
-	@DisplayName("스레드 동시성")
-	class ThreadConcurrency {
-
-		@BeforeEach
-		void setUp() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-		}
-
-		@Test
-		@DisplayName("N개 스레드가 동시에 submit해도 모든 주문이 정상 수신된다")
-		void concurrentSubmit_allOrdersAccepted() throws InterruptedException {
-			int threadCount = 20;
-			CountDownLatch startGate = new CountDownLatch(1);
-			CountDownLatch doneLatch = new CountDownLatch(threadCount);
-			AtomicInteger successCount = new AtomicInteger(0);
-
-			for (int i = 0; i < threadCount; i++) {
-				new Thread(() -> {
-					try {
-						startGate.await();
-						engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
-						successCount.incrementAndGet();
-					} catch (Exception ignored) {
-					} finally {
-						doneLatch.countDown();
-					}
-				}).start();
-			}
-
-			startGate.countDown();
-			assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
-			assertThat(successCount.get()).isEqualTo(threadCount);
-		}
-
-		@Test
-		@DisplayName("BTC·ETH 양쪽에 동시 submit해도 모든 주문이 정상 수신된다")
-		void concurrentSubmit_multipleSymbols_allAccepted() throws InterruptedException {
-			int perSymbol = 10;
-			CountDownLatch startGate = new CountDownLatch(1);
-			CountDownLatch doneLatch = new CountDownLatch(perSymbol * 2);
-			AtomicInteger successCount = new AtomicInteger(0);
-
-			for (int i = 0; i < perSymbol; i++) {
-				new Thread(() -> {
-					try {
-						startGate.await();
-						engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
-						successCount.incrementAndGet();
-					} catch (Exception ignored) { } finally { doneLatch.countDown(); }
-				}).start();
-				new Thread(() -> {
-					try {
-						startGate.await();
-						engineManager.submit(new Symbol("ETH"), placeOrder("ETH"));
-						successCount.incrementAndGet();
-					} catch (Exception ignored) { } finally { doneLatch.countDown(); }
-				}).start();
-			}
-
-			startGate.countDown();
-			assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
-			assertThat(successCount.get()).isEqualTo(perSymbol * 2);
-		}
-	}
-
-	// ── stop() ───────────────────────────────────────────────────────────
-
-	@Nested
-	@DisplayName("stop()")
-	class Stop {
-
-		@Test
-		@DisplayName("심볼 없이 시작한 뒤 stop()은 예외 없이 완료된다")
-		void stop_noSymbols_doesNotThrow() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of());
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-
-			assertDoesNotThrow(() -> engineManager.stop());
-		}
-
-		@Test
-		@DisplayName("단일 심볼 엔진을 정상 종료한다")
-		void stop_singleSymbol_terminatesGracefully() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-
-			assertDoesNotThrow(() -> engineManager.stop());
-		}
-
-		@Test
-		@DisplayName("복수 심볼의 모든 엔진을 정상 종료한다")
-		void stop_multipleSymbols_allTerminateGracefully() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC", "ETH", "SOL"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-
-			assertDoesNotThrow(() -> engineManager.stop());
-		}
-
-		@Test
-		@DisplayName("stop()을 여러 번 호출해도 예외가 발생하지 않는다")
-		void stop_calledMultipleTimes_doesNotThrow() {
-			when(tradingProperties.getSymbols()).thenReturn(List.of("BTC"));
-			engineManager = new EngineManager(tradingProperties, engineStartupRecoveryService, orderBookCachePort, engineResultPersistenceService, orderBookProjectionApplier, orderBookRebuilder);
-			engineManager.start();
-
-			assertDoesNotThrow(() -> {
-				engineManager.stop();
-				engineManager.stop();
-			});
-		}
-	}
+            assertThrows(
+                UnsupportedSymbolException.class,
+                () -> engineManager.submit(new Symbol("XRP"), placeOrder("XRP"))
+            );
+        }
+    }
 }

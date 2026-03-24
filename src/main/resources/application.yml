@@ -22,3 +22,28 @@ trading:
 logging:
   pattern:
     console: "%d{HH:mm:ss} [%X{traceId}] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        queue_wait_latency: true
+        engine_processing_latency: true
+        order_accept_tx_latency: true
+        engine_result_tx_latency: true
+        end_to_end_order_latency: true
+        end_to_end_cancel_latency: true
+        db_lock_wait_time: true
+        replay_duration_on_startup: true
+      percentiles:
+        "[queue_wait_latency]": 0.5,0.95,0.99
+        "[engine_processing_latency]": 0.5,0.95,0.99
+        "[order_accept_tx_latency]": 0.5,0.95,0.99
+        "[engine_result_tx_latency]": 0.5,0.95,0.99
+        "[end_to_end_order_latency]": 0.5,0.95,0.99
+        "[end_to_end_cancel_latency]": 0.5,0.95,0.99
+        "[db_lock_wait_time]": 0.5,0.95,0.99

@@ -5,9 +5,9 @@ const DEFAULT_ACCOUNT_IDS = [
   "44444444-4444-4444-4444-444444444444",
 ];
 
-function parseAccountIds(rawValue) {
+function parseCsv(rawValue, defaultValues) {
   if (!rawValue) {
-    return DEFAULT_ACCOUNT_IDS;
+    return defaultValues;
   }
 
   return rawValue
@@ -16,9 +16,14 @@ function parseAccountIds(rawValue) {
     .filter((value) => value.length > 0);
 }
 
+function parseAccountIds(rawValue) {
+  return parseCsv(rawValue, DEFAULT_ACCOUNT_IDS);
+}
+
 export const config = {
   baseUrl: __ENV.BASE_URL || "http://localhost:8080",
   symbol: __ENV.SYMBOL || "BTC",
+  symbols: parseCsv(__ENV.SYMBOLS, [__ENV.SYMBOL || "BTC"]),
   accountIds: parseAccountIds(__ENV.ACCOUNT_IDS),
   minPrice: Number(__ENV.MIN_PRICE || 99000000),
   maxPrice: Number(__ENV.MAX_PRICE || 101000000),

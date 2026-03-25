@@ -12,16 +12,20 @@ function nextQuantity(minQty, maxQty) {
   return randomIntBetween(minQty, maxQty);
 }
 
-export function buildLimitOrderPayload(config, vu, iteration) {
+function nextClientOrderId(vu, iteration) {
+  return `k6-${__ENV.SCENARIO_NAME || "default"}-${vu}-${iteration}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+export function buildLimitOrderPayload(config, vu, iteration, symbolOverride) {
   const side = nextSide();
 
   return {
-    symbol: config.symbol,
+    symbol: symbolOverride || config.symbol,
     side,
     orderType: "LIMIT",
     tif: "GTC",
     price: nextPrice(config.minPrice, config.maxPrice),
     quantity: nextQuantity(config.minQty, config.maxQty),
-    clientOrderId: `k6-${__ENV.SCENARIO_NAME || "default"}-${vu}-${iteration}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+    clientOrderId: nextClientOrderId(vu, iteration),
   };
 }

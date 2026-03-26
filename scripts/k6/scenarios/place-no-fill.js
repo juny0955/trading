@@ -1,6 +1,6 @@
-// 시나리오 4.4: 체결 적고 주문만 많은 경우
-// 매수는 극단 저가, 매도는 극단 고가로 고정해 체결을 최소화한다.
-// order insert + hold reserve 비용만 측정할 수 있다.
+// 시나리오 4.4: 체결을 최소화하고 주문 insert 비중을 높게 보는 경우
+// 매수는 낮은 가격대, 매도는 높은 가격대로 강제해 체결 가능성을 낮춘다.
+// 일부 체결은 발생할 수 있으므로 trades_per_sec와 함께 해석해야 한다.
 import { check, sleep } from "k6";
 import { config } from "../lib/config.js";
 import { pickAccount, requireAccounts } from "../lib/accounts.js";
@@ -18,6 +18,7 @@ export const options = buildPhasedOptions({
   },
 });
 const reporter = buildPhaseReporter(options._phaseDurations);
+const noFillPriceGap = Number(__ENV.NO_FILL_PRICE_GAP || 1);
 
 export function setup() {
   requireAccounts(config.accountIds);
@@ -29,10 +30,11 @@ export default function (data) {
   const accountId = pickAccount(data.accountIds, __VU, __ITER);
   const payload = buildLimitOrderPayload(config, __VU, __ITER);
 
-  // 체결이 발생하지 않도록 가격을 극단으로 고정한다.
-  // BUY: 오더북 ask 최저가보다 훨씬 낮은 가격
-  // SELL: 오더북 bid 최고가보다 훨씬 높은 가격
-  payload.price = payload.side === "BUY" ? config.minPrice : config.maxPrice;
+  // BUY와 SELL 가격대를 분리해 self-cross와 즉시 체결 가능성을 낮춘다.
+  // MIN/MAX가 같은 값이어도 SELL 가격이 BUY 가격보다 항상 높도록 gap을 강제한다.
+  const buyPrice = config.minPrice;
+  const sellPrice = Math.max(config.maxPrice, config.minPrice + noFillPriceGap);
+  payload.price = payload.side === "BUY" ? buyPrice : sellPrice;
 
   const response = placeOrder(config.baseUrl, accountId, payload);
 

@@ -53,7 +53,7 @@ k6 run -e VUS=20 -e WARMUP_DURATION=30s -e MEASURE_DURATION=2m -e COOLDOWN_DURAT
 ### 4.2 단일 심볼 / 다수 account
 
 ```bash
-k6.exe run -e SYMBOL=BTC -e VUS=2 -e SLEEP_SECONDS=0.001 -e SCENARIO_NAME=place-single-symbol scripts/k6/scenarios/place-single-symbol.js
+k6 run -e SYMBOL=BTC -e VUS=1 -e SLEEP_SECONDS=0.002 -e SCENARIO_NAME=place-single-symbol scripts/k6/scenarios/place-single-symbol.js
 ```
 
 ### 4.1 단일 심볼 / 단일 account (ACCOUNT_IDS를 1개만 지정)
@@ -71,10 +71,11 @@ k6 run -e SYMBOLS=BTC,ETH,TEST -e VUS=2 -e SLEEP_SECONDS=0.001 -e SCENARIO_NAME=
   scripts/k6/scenarios/place-multi-symbol.js
 ```
 
-### 4.4 체결 적고 주문만 많음
+### 4.4 체결 최소화 / 주문 비중 높음
 
 ```bash
-k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=1 -e VUS=5 -e SLEEP_SECONDS=0 \
+k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=999999999999 -e NO_FILL_PRICE_GAP=1000000 \
+  -e VUS=5 -e SLEEP_SECONDS=0 \
   -e SCENARIO_NAME=place-no-fill \
   scripts/k6/scenarios/place-no-fill.js
 ```
@@ -85,6 +86,18 @@ k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=1 -e VUS=5 -e SLEEP_SECONDS=0 \
 k6 run -e SYMBOL=BTC -e MIN_QTY=1 -e MAX_QTY=1 -e VUS=5 -e SLEEP_SECONDS=0 \
   -e SCENARIO_NAME=place-market-order \
   scripts/k6/scenarios/place-market-order.js
+```
+
+### 오더북 적재용 seed
+
+MARKET 체결 시나리오 전에 반대편 오더북 depth를 두껍게 쌓고 싶을 때 사용한다.
+
+```bash
+k6 run -e SYMBOL=BTC -e BOOK_SEED_MID_PRICE=100000000 -e BOOK_SEED_TICK_SIZE=1000 \
+  -e BOOK_SEED_SPREAD_TICKS=5 -e BOOK_SEED_LEVELS=200 -e BOOK_SEED_QTY=50 -e BOOK_SEED_QTY_STEP=5 \
+  -e VUS=10 -e SLEEP_SECONDS=0.01 -e WARMUP_DURATION=0s -e MEASURE_DURATION=60s -e COOLDOWN_DURATION=0s \
+  -e SCENARIO_NAME=book-seed \
+  scripts/k6/scenarios/book-seed.js
 ```
 
 ### 4.6 취소 비율 높음
@@ -147,6 +160,15 @@ k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-c
 | `GRACEFUL_RAMP_DOWN` | `5s` | cooldown 종료 후 in-flight 요청 완료 대기 시간 |
 | `SLEEP_SECONDS` | `0` | 주문 간 대기 시간 (TPS 조절용) |
 | `MIN_PRICE` / `MAX_PRICE` | `99000000` / `101000000` | 지정가 가격 범위 |
+| `BOOK_SEED_MID_PRICE` | `(MIN_PRICE + MAX_PRICE) / 2` | `book-seed.js` 기준 가격 |
+| `BOOK_SEED_TICK_SIZE` | `1000` | `book-seed.js` 가격 tick 크기 |
+| `BOOK_SEED_SPREAD_TICKS` | `5` | `book-seed.js` 기준 가격에서 첫 호가까지의 거리 |
+| `BOOK_SEED_PRICE_STEP_TICKS` | `1` | `book-seed.js` 레벨 간 tick 간격 |
+| `BOOK_SEED_LEVELS` | `100` | `book-seed.js`가 순환하며 쌓을 호가 레벨 수 |
+| `BOOK_SEED_QTY` | `MAX_QTY` | `book-seed.js` 시작 수량 |
+| `BOOK_SEED_QTY_STEP` | `0` | `book-seed.js` 레벨별 추가 수량 |
+| `BOOK_SEED_SIDE_MODE` | `BOTH` | `book-seed.js` 적재 방향: `BOTH`, `BUY`, `SELL` |
+| `NO_FILL_PRICE_GAP` | `1` | `place-no-fill.js`에서 SELL 가격을 BUY 가격보다 추가로 벌리는 최소 gap |
 | `MIN_QTY` / `MAX_QTY` | `1` / `3` | 주문 수량 범위 |
 | `MIN_QUOTE_QTY` / `MAX_QUOTE_QTY` | `100000` / `5000000` | MARKET BUY quoteQty 범위 |
 | `ORDER_TYPE` | `MIXED` | FOK/IOC 시나리오용: `FOK`, `IOC`, `MIXED` |
@@ -237,6 +259,8 @@ JSON 파일의 `phases.measure.start` / `phases.measure.end` 값으로 시간 �
 ## 주의
 
 - 모든 시나리오는 account와 잔고가 미리 준비되어 있다고 가정한다.
-- `place-no-fill.js`는 `MIN_PRICE`를 극단 저가로 설정해야 체결이 없다. 오더북 상황에 따라 실제로 체결될 수 있으므로 Grafana에서 `trades_per_sec ≈ 0`을 확인한다.
+- `place-no-fill.js`는 체결 0 보장 시나리오가 아니라 체결 최소화 시나리오다. `MIN_PRICE`는 낮게, `MAX_PRICE`는 높게, 필요하면 `NO_FILL_PRICE_GAP`도 크게 잡아 BUY/SELL 가격대를 분리한다.
+- `place-no-fill.js` 결과는 `trades_per_sec`가 기본 단일 심볼 시나리오보다 충분히 낮은지 함께 확인해야 한다.
+- `book-seed.js`는 MARKET 시나리오 전에 반대편 오더북 depth를 두껍게 쌓기 위한 용도다. 체결을 유도하려면 `BOOK_SEED_MID_PRICE`, `SPREAD`, `QTY`를 실제 원하는 체결 가격대에 맞춰 조정한다.
 - `fok-ioc-heavy.js`는 오더북 depth가 충분해야 FOK/IOC 충족 가능성이 높아진다. 얕은 오더북에서는 FOK 실패율이 높아진다.
 - `idempotency-concurrent.js` 종료 후 반드시 DB 쿼리로 중복 주문 수를 확인한다.

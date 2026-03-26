@@ -11,13 +11,13 @@ WITH generated_accounts AS (
     FROM generate_series(1, 100) AS gs
 ),
 seed_assets AS (
-    SELECT 'KRW'::varchar(32) AS asset, 1000000000000::bigint AS available, 0::bigint AS held
+    SELECT 'KRW'::varchar(32) AS asset, 100000000000000000::bigint AS available, 0::bigint AS held
     UNION ALL
-    SELECT 'BTC'::varchar(32), 1000000::bigint, 0::bigint
+    SELECT 'BTC'::varchar(32), 100000000000::bigint, 0::bigint
     UNION ALL
-    SELECT 'ETH'::varchar(32), 10000000::bigint, 0::bigint
+    SELECT 'ETH'::varchar(32), 100000000000::bigint, 0::bigint
     UNION ALL
-    SELECT 'TEST'::varchar(32), 1000000000::bigint, 0::bigint
+    SELECT 'TEST'::varchar(32), 100000000000::bigint, 0::bigint
 )
 INSERT INTO balances (account_id, asset, available, held, created_at, updated_at)
 SELECT

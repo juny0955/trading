@@ -43,7 +43,7 @@ test("buildPhasedOptions uses explicit warmup, measure, cooldown, and gracefulRa
   });
 });
 
-test("buildPhasedOptions keeps backward compatibility with DURATION and zero-length warmup/cooldown", () => {
+test("buildPhasedOptions keeps backward compatibility with DURATION; warmup/cooldown use default 1m", () => {
   const options = buildPhasedOptions({
     env: {
       VUS: "7",
@@ -57,9 +57,9 @@ test("buildPhasedOptions keeps backward compatibility with DURATION and zero-len
   });
 
   assert.deepEqual(options.scenarios.default.stages, [
-    { duration: "0s", target: 7 },
+    { duration: "1m", target: 7 },
     { duration: "45s", target: 7 },
-    { duration: "0s", target: 0 },
+    { duration: "1m", target: 0 },
   ]);
   assert.equal(options.scenarios.default.executor, "ramping-vus");
   assert.equal(options.scenarios.default.startVUs, 0);

@@ -35,12 +35,12 @@ export function buildPhasedOptions({
   thresholds,
 }) {
   const vus = parsePositiveInt(env.VUS, defaultVus);
-  const warmupDuration = parseDuration(env.WARMUP_DURATION, "0s");
+  const warmupDuration = parseDuration(env.WARMUP_DURATION, "1m");
   const measureDuration = parseDuration(
     env.MEASURE_DURATION || env.DURATION,
     defaultMeasureDuration
   );
-  const cooldownDuration = parseDuration(env.COOLDOWN_DURATION, "0s");
+  const cooldownDuration = parseDuration(env.COOLDOWN_DURATION, "1m");
   const gracefulRampDown = parseDuration(env.GRACEFUL_RAMP_DOWN, "5s");
 
   const result = {

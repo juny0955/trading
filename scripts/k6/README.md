@@ -140,10 +140,10 @@ k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-c
 | `SYMBOLS` | `BTC` | 다중 심볼, 쉼표 구분 |
 | `ACCOUNT_IDS` | 더미 4개 | 쉼표 구분 account UUID 목록 |
 | `VUS` | 시나리오별 상이 | 동시 가상 사용자 수 |
-| `WARMUP_DURATION` | `0s` | 워밍업 구간 시간 |
-| `MEASURE_DURATION` | `DURATION` 또는 `1m` | 측정 구간 시간 |
-| `COOLDOWN_DURATION` | `0s` | 쿨다운 구간 시간 |
-| `DURATION` | `1m` | 하위 호환용 측정 구간 시간 |
+| `WARMUP_DURATION` | `1m` | 워밍업 구간 시간 |
+| `MEASURE_DURATION` | `DURATION` 또는 `5m` | 측정 구간 시간 |
+| `COOLDOWN_DURATION` | `1m` | 쿨다운 구간 시간 |
+| `DURATION` | `5m` | 하위 호환용 측정 구간 시간 |
 | `GRACEFUL_RAMP_DOWN` | `5s` | cooldown 종료 후 in-flight 요청 완료 대기 시간 |
 | `SLEEP_SECONDS` | `0` | 주문 간 대기 시간 (TPS 조절용) |
 | `MIN_PRICE` / `MAX_PRICE` | `99000000` / `101000000` | 지정가 가격 범위 |

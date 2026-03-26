@@ -14,7 +14,7 @@ const ORDER_TYPE = __ENV.ORDER_TYPE || "MIXED";
 
 export const options = buildPhasedOptions({
   defaultVus: 10,
-  defaultMeasureDuration: "1m",
+  defaultMeasureDuration: "5m",
   thresholds: {
     http_req_failed: ["rate<0.05"],
     http_req_duration: ["p(95)<2000"],

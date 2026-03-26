@@ -29,3 +29,49 @@ export function buildLimitOrderPayload(config, vu, iteration, symbolOverride) {
     clientOrderId: nextClientOrderId(vu, iteration),
   };
 }
+
+export function buildMarketOrderPayload(config, vu, iteration, symbolOverride) {
+  return {
+    symbol: symbolOverride || config.symbol,
+    side: nextSide(),
+    orderType: "MARKET",
+    quantity: nextQuantity(config.minQty, config.maxQty),
+    clientOrderId: nextClientOrderId(vu, iteration),
+  };
+}
+
+export function buildIocOrderPayload(config, vu, iteration, symbolOverride) {
+  return {
+    symbol: symbolOverride || config.symbol,
+    side: nextSide(),
+    orderType: "LIMIT",
+    tif: "IOC",
+    price: nextPrice(config.minPrice, config.maxPrice),
+    quantity: nextQuantity(config.minQty, config.maxQty),
+    clientOrderId: nextClientOrderId(vu, iteration),
+  };
+}
+
+export function buildFokOrderPayload(config, vu, iteration, symbolOverride) {
+  return {
+    symbol: symbolOverride || config.symbol,
+    side: nextSide(),
+    orderType: "LIMIT",
+    tif: "FOK",
+    price: nextPrice(config.minPrice, config.maxPrice),
+    quantity: nextQuantity(config.minQty, config.maxQty),
+    clientOrderId: nextClientOrderId(vu, iteration),
+  };
+}
+
+export function buildMarketBuyQuoteQtyPayload(config, vu, iteration, symbolOverride) {
+  const quoteQty = randomIntBetween(config.minQuoteQty, config.maxQuoteQty);
+
+  return {
+    symbol: symbolOverride || config.symbol,
+    side: "BUY",
+    orderType: "MARKET",
+    quoteQty,
+    clientOrderId: nextClientOrderId(vu, iteration),
+  };
+}

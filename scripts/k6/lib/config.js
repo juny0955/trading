@@ -31,4 +31,6 @@ export const config = {
   maxQty: Number(__ENV.MAX_QTY || 3),
   cancelDelayMinMs: Number(__ENV.CANCEL_DELAY_MIN_MS || 100),
   cancelDelayMaxMs: Number(__ENV.CANCEL_DELAY_MAX_MS || 1000),
+  minQuoteQty: Number(__ENV.MIN_QUOTE_QTY || 100000),
+  maxQuoteQty: Number(__ENV.MAX_QUOTE_QTY || 5000000),
 };

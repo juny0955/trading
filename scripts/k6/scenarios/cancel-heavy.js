@@ -1,4 +1,4 @@
-import { sleep } from "k6";
+import { check, sleep } from "k6";
 import { randomIntBetween } from "https://jslib.k6.io/k6-utils/1.4.0/index.js";
 import { config } from "../lib/config.js";
 import { pickAccount, requireAccounts } from "../lib/accounts.js";
@@ -32,5 +32,11 @@ export default function (data) {
   const delayMs = randomIntBetween(config.cancelDelayMinMs, config.cancelDelayMaxMs);
   sleep(delayMs / 1000);
 
-  cancelOrder(config.baseUrl, accountId, orderId);
+  const cancelResponse = cancelOrder(config.baseUrl, accountId, orderId);
+
+  check(cancelResponse, {
+    "취소 응답이 성공이다": (r) => r.status === 200 || r.status === 202,
+  });
+
+  sleep(Number(__ENV.SLEEP_SECONDS || 0));
 }

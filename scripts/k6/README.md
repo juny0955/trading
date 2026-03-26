@@ -23,117 +23,83 @@ TPS 측정 계획(docs/MVP_4/TPS_측정_계획.md) 기준 시나리오 목록이
 
 ## 실행 예시
 
+> `ACCOUNT_IDS` 기본값은 seed 데이터 100개 계정(`00000000-0000-0000-0000-000000000001` ~ `000000000100`)이므로 생략 가능하다.
+> 모든 명령은 `-e` 플래그를 사용하므로 Windows / macOS / Linux에서 동일하게 동작한다.
+
 ### 4.2 단일 심볼 / 다수 account
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-VUS=2 \
-SLEEP_SECONDS=0.001 \
-SCENARIO_NAME=place-single-symbol \
-k6 run scripts/k6/scenarios/place-single-symbol.js
+k6.exe run -e SYMBOL=BTC -e VUS=2 -e SLEEP_SECONDS=0.001 -e SCENARIO_NAME=place-single-symbol scripts/k6/scenarios/place-single-symbol.js
 ```
 
 ### 4.1 단일 심볼 / 단일 account (ACCOUNT_IDS를 1개만 지정)
 
 ```bash
-ACCOUNT_IDS="00000000-0000-0000-0000-000000000001" \
-SYMBOL=BTC \
-VUS=1 \
-SLEEP_SECONDS=0.002 \
-SCENARIO_NAME=place-single-symbol \
-k6 run scripts/k6/scenarios/place-single-symbol.js
+k6 run -e SYMBOL=BTC -e VUS=1 -e SLEEP_SECONDS=0.002 -e SCENARIO_NAME=place-single-symbol \
+  -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001 \
+  scripts/k6/scenarios/place-single-symbol.js
 ```
 
 ### 4.3 다중 심볼 / 다수 account
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOLS=BTC,ETH,TEST \
-VUS=2 \
-SLEEP_SECONDS=0.001 \
-SCENARIO_NAME=place-multi-symbol \
-k6 run scripts/k6/scenarios/place-multi-symbol.js
+k6 run -e SYMBOLS=BTC,ETH,TEST -e VUS=2 -e SLEEP_SECONDS=0.001 -e SCENARIO_NAME=place-multi-symbol \
+  scripts/k6/scenarios/place-multi-symbol.js
 ```
 
 ### 4.4 체결 적고 주문만 많음
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-MIN_PRICE=1 \
-MAX_PRICE=1 \
-VUS=5 \
-SLEEP_SECONDS=0 \
-SCENARIO_NAME=place-no-fill \
-k6 run scripts/k6/scenarios/place-no-fill.js
+k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=1 -e VUS=5 -e SLEEP_SECONDS=0 \
+  -e SCENARIO_NAME=place-no-fill \
+  scripts/k6/scenarios/place-no-fill.js
 ```
 
 ### 4.5 체결 매우 많음 (MARKET 주문)
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-MIN_QTY=1 \
-MAX_QTY=1 \
-VUS=5 \
-SLEEP_SECONDS=0 \
-SCENARIO_NAME=place-market-order \
-k6 run scripts/k6/scenarios/place-market-order.js
+k6 run -e SYMBOL=BTC -e MIN_QTY=1 -e MAX_QTY=1 -e VUS=5 -e SLEEP_SECONDS=0 \
+  -e SCENARIO_NAME=place-market-order \
+  scripts/k6/scenarios/place-market-order.js
 ```
 
 ### 4.6 취소 비율 높음
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-MIN_PRICE=1 \
-MAX_PRICE=999999999999 \
-CANCEL_DELAY_MIN_MS=100 \
-CANCEL_DELAY_MAX_MS=500 \
-VUS=10 \
-SCENARIO_NAME=cancel-heavy \
-k6 run scripts/k6/scenarios/cancel-heavy.js
+k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=999999999999 \
+  -e CANCEL_DELAY_MIN_MS=100 -e CANCEL_DELAY_MAX_MS=500 -e VUS=10 \
+  -e SCENARIO_NAME=cancel-heavy \
+  scripts/k6/scenarios/cancel-heavy.js
 ```
 
 ### 4.7 FOK / IOC 집중
 
 ```bash
 # MIXED (기본): FOK 50% + IOC 50%
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-ORDER_TYPE=MIXED \
-VUS=5 \
-SLEEP_SECONDS=0 \
-SCENARIO_NAME=fok-ioc-heavy \
-k6 run scripts/k6/scenarios/fok-ioc-heavy.js
+k6 run -e SYMBOL=BTC -e ORDER_TYPE=MIXED -e VUS=5 -e SLEEP_SECONDS=0 \
+  -e SCENARIO_NAME=fok-ioc-heavy \
+  scripts/k6/scenarios/fok-ioc-heavy.js
 
 # FOK 전용
-ORDER_TYPE=FOK k6 run scripts/k6/scenarios/fok-ioc-heavy.js
+k6 run -e SYMBOL=BTC -e ORDER_TYPE=FOK -e VUS=5 -e SLEEP_SECONDS=0 \
+  scripts/k6/scenarios/fok-ioc-heavy.js
 ```
 
 ### 4.8 MARKET BUY quoteQty
 
 ```bash
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..100} | sed 's/,$//')" \
-SYMBOL=BTC \
-MIN_QUOTE_QTY=100000 \
-MAX_QUOTE_QTY=5000000 \
-VUS=5 \
-SLEEP_SECONDS=0 \
-SCENARIO_NAME=market-buy-quote-qty \
-k6 run scripts/k6/scenarios/market-buy-quote-qty.js
+k6 run -e SYMBOL=BTC -e MIN_QUOTE_QTY=100000 -e MAX_QUOTE_QTY=5000000 \
+  -e VUS=5 -e SLEEP_SECONDS=0 -e SCENARIO_NAME=market-buy-quote-qty \
+  scripts/k6/scenarios/market-buy-quote-qty.js
 ```
 
 ### 4.10 멱등성 동시 요청
 
 ```bash
 # account 10개, account당 50개 동시 요청 → 총 500 VU
-ACCOUNT_IDS="$(printf '00000000-0000-0000-0000-%012d,' {1..10} | sed 's/,$//')" \
-SYMBOL=BTC \
-CONCURRENT_PER_ACCOUNT=50 \
-SCENARIO_NAME=idempotency-concurrent \
-k6 run scripts/k6/scenarios/idempotency-concurrent.js
+k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-concurrent \
+  -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003,00000000-0000-0000-0000-000000000004,00000000-0000-0000-0000-000000000005,00000000-0000-0000-0000-000000000006,00000000-0000-0000-0000-000000000007,00000000-0000-0000-0000-000000000008,00000000-0000-0000-0000-000000000009,00000000-0000-0000-0000-000000000010 \
+  scripts/k6/scenarios/idempotency-concurrent.js
 
 # 종료 후 DB에서 중복 주문 없음 확인:
 # SELECT account_id, client_order_id, COUNT(*) FROM orders GROUP BY account_id, client_order_id HAVING COUNT(*) > 1;

@@ -1,9 +1,6 @@
-const DEFAULT_ACCOUNT_IDS = [
-  "11111111-1111-1111-1111-111111111111",
-  "22222222-2222-2222-2222-222222222222",
-  "33333333-3333-3333-3333-333333333333",
-  "44444444-4444-4444-4444-444444444444",
-];
+const DEFAULT_ACCOUNT_IDS = Array.from({ length: 100 }, (_, i) =>
+  `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`
+);
 
 function parseCsv(rawValue, defaultValues) {
   if (!rawValue) {

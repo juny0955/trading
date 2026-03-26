@@ -26,6 +26,30 @@ TPS 측정 계획(docs/MVP_4/TPS_측정_계획.md) 기준 시나리오 목록이
 > `ACCOUNT_IDS` 기본값은 seed 데이터 100개 계정(`00000000-0000-0000-0000-000000000001` ~ `000000000100`)이므로 생략 가능하다.
 > 모든 명령은 `-e` 플래그를 사용하므로 Windows / macOS / Linux에서 동일하게 동작한다.
 
+### 공통 실행 phase
+
+duration 기반 시나리오는 기본적으로 `warmup -> measure -> cooldown` 구조를 지원한다.
+
+- `WARMUP_DURATION`: 워밍업 구간. 기본값 `0s`
+- `MEASURE_DURATION`: 측정 구간. 미지정 시 `DURATION` 값을 사용하고, 둘 다 없으면 시나리오 기본값 `1m`
+- `COOLDOWN_DURATION`: 쿨다운 구간. 기본값 `0s`
+- `DURATION`: 하위 호환용 측정 구간 길이
+- `GRACEFUL_RAMP_DOWN`: cooldown 종료 후 in-flight 요청 완료 대기 시간. 기본값 `5s`
+
+> **threshold 주의**: k6 threshold는 warmup + measure + cooldown 전체 구간에 걸쳐 집계된다.
+> warmup 중 시스템이 아직 안정화되지 않은 상태의 latency가 p(95) 등의 지표에 포함된다.
+> 정밀한 측정이 필요한 경우 `WARMUP_DURATION=0s`로 설정하거나 threshold 기준값에 여유를 두도록 한다.
+
+> **SLEEP_SECONDS 주의**: `SLEEP_SECONDS`는 warmup · measure · cooldown 모든 구간에 동일하게 적용된다.
+> sleep이 설정된 경우 warmup 단계의 실제 ramp 속도가 `WARMUP_DURATION`만으로 예측한 것보다 느려질 수 있다.
+
+예시:
+
+```bash
+k6 run -e VUS=20 -e WARMUP_DURATION=30s -e MEASURE_DURATION=2m -e COOLDOWN_DURATION=10s \
+  scripts/k6/scenarios/place-single-symbol.js
+```
+
 ### 4.2 단일 심볼 / 다수 account
 
 ```bash
@@ -116,7 +140,11 @@ k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-c
 | `SYMBOLS` | `BTC` | 다중 심볼, 쉼표 구분 |
 | `ACCOUNT_IDS` | 더미 4개 | 쉼표 구분 account UUID 목록 |
 | `VUS` | 시나리오별 상이 | 동시 가상 사용자 수 |
-| `DURATION` | `1m` | 실행 시간 |
+| `WARMUP_DURATION` | `0s` | 워밍업 구간 시간 |
+| `MEASURE_DURATION` | `DURATION` 또는 `1m` | 측정 구간 시간 |
+| `COOLDOWN_DURATION` | `0s` | 쿨다운 구간 시간 |
+| `DURATION` | `1m` | 하위 호환용 측정 구간 시간 |
+| `GRACEFUL_RAMP_DOWN` | `5s` | cooldown 종료 후 in-flight 요청 완료 대기 시간 |
 | `SLEEP_SECONDS` | `0` | 주문 간 대기 시간 (TPS 조절용) |
 | `MIN_PRICE` / `MAX_PRICE` | `99000000` / `101000000` | 지정가 가격 범위 |
 | `MIN_QTY` / `MAX_QTY` | `1` / `3` | 주문 수량 범위 |
@@ -125,6 +153,9 @@ k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-c
 | `CANCEL_DELAY_MIN_MS` / `MAX_MS` | `100` / `1000` | 주문 후 취소까지 대기 시간 |
 | `CONCURRENT_PER_ACCOUNT` | `50` | 멱등성 시나리오: account당 동시 요청 수 |
 | `SCENARIO_NAME` | `default` | clientOrderId prefix (구분용) |
+| `GRAFANA_URL` | `http://localhost:3000` | Grafana 주소 (phase annotation 전송용) |
+| `GRAFANA_USER` | `admin` | Grafana 사용자 이름 |
+| `GRAFANA_PASSWORD` | `admin` | Grafana 비밀번호 |
 
 ---
 
@@ -171,6 +202,35 @@ k6 run scripts/k6/scenarios/place-single-symbol.js
 종료 후 확인:
 - `db_deadlock_count = 0`
 - `balance_lock_contention_count` (경합 수, 데드락 아님)
+
+---
+
+## Phase Report
+
+duration 기반 시나리오는 실행 종료 후 두 가지 출력물을 생성한다.
+
+**1. JSON 파일** (`phase-report-{SCENARIO_NAME}-{timestamp}.json`)
+
+```json
+{
+  "scenario": "place-single-symbol",
+  "phases": {
+    "warmup":  { "start": "2025-03-26T10:00:00.000Z", "end": "2025-03-26T10:00:30.000Z", "durationMs": 30000 },
+    "measure": { "start": "2025-03-26T10:00:30.000Z", "end": "2025-03-26T10:02:30.000Z", "durationMs": 120000 },
+    "cooldown":{ "start": "2025-03-26T10:02:30.000Z", "end": "2025-03-26T10:02:40.000Z", "durationMs": 10000 }
+  }
+}
+```
+
+**2. Grafana annotation** — measure 구간 region annotation 1개 자동 등록
+
+Grafana 대시보드에서 measure 구간의 시간 범위를 annotation으로 확인하거나,
+JSON 파일의 `phases.measure.start` / `phases.measure.end` 값으로 시간 범위 피커를 설정한다.
+
+콘솔에도 measure 구간이 출력된다:
+```
+[phase-reporter] measure 구간: 2025-03-26T10:00:30.000Z ~ 2025-03-26T10:02:30.000Z
+```
 
 ---
 

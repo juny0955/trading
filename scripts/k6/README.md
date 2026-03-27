@@ -24,15 +24,15 @@ TPS 측정 계획(docs/MVP_4/TPS_측정_계획.md) 기준 시나리오 목록이
 ## 실행 예시
 
 > `ACCOUNT_IDS` 기본값은 seed 데이터 100개 계정(`00000000-0000-0000-0000-000000000001` ~ `000000000100`)이므로 생략 가능하다.
-> 모든 명령은 `-e` 플래그를 사용하므로 Windows / macOS / Linux에서 동일하게 동작한다.
+> 아래 예시는 bash와 Windows PowerShell 둘 다 제공한다. PowerShell에서는 bash 스타일 줄바꿈(`\`)이나 `VUS=50 k6 run ...` 같은 인라인 환경변수 문법이 동작하지 않으므로 PowerShell 예시를 사용한다.
 
 ### 공통 실행 phase
 
 duration 기반 시나리오는 기본적으로 `warmup -> measure -> cooldown` 구조를 지원한다.
 
-- `WARMUP_DURATION`: 워밍업 구간. 기본값 `0s`
-- `MEASURE_DURATION`: 측정 구간. 미지정 시 `DURATION` 값을 사용하고, 둘 다 없으면 시나리오 기본값 `1m`
-- `COOLDOWN_DURATION`: 쿨다운 구간. 기본값 `0s`
+- `WARMUP_DURATION`: 워밍업 구간. 기본값 `1m`
+- `MEASURE_DURATION`: 측정 구간. 미지정 시 `DURATION` 값을 사용하고, 둘 다 없으면 시나리오 기본값 `5m`
+- `COOLDOWN_DURATION`: 쿨다운 구간. 기본값 `1m`
 - `DURATION`: 하위 호환용 측정 구간 길이
 - `GRACEFUL_RAMP_DOWN`: cooldown 종료 후 in-flight 요청 완료 대기 시간. 기본값 `5s`
 
@@ -50,9 +50,22 @@ k6 run -e VUS=20 -e WARMUP_DURATION=30s -e MEASURE_DURATION=2m -e COOLDOWN_DURAT
   scripts/k6/scenarios/place-single-symbol.js
 ```
 
+```powershell
+k6 run `
+  -e VUS=20 `
+  -e WARMUP_DURATION=30s `
+  -e MEASURE_DURATION=2m `
+  -e COOLDOWN_DURATION=10s `
+  scripts/k6/scenarios/place-single-symbol.js
+```
+
 ### 4.2 단일 심볼 / 다수 account
 
 ```bash
+k6 run -e SYMBOL=BTC -e VUS=1 -e SLEEP_SECONDS=0.002 -e SCENARIO_NAME=place-single-symbol scripts/k6/scenarios/place-single-symbol.js
+```
+
+```powershell
 k6 run -e SYMBOL=BTC -e VUS=1 -e SLEEP_SECONDS=0.002 -e SCENARIO_NAME=place-single-symbol scripts/k6/scenarios/place-single-symbol.js
 ```
 
@@ -64,10 +77,29 @@ k6 run -e SYMBOL=BTC -e VUS=1 -e SLEEP_SECONDS=0.002 -e SCENARIO_NAME=place-sing
   scripts/k6/scenarios/place-single-symbol.js
 ```
 
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e VUS=1 `
+  -e SLEEP_SECONDS=0.002 `
+  -e SCENARIO_NAME=place-single-symbol `
+  -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001 `
+  scripts/k6/scenarios/place-single-symbol.js
+```
+
 ### 4.3 다중 심볼 / 다수 account
 
 ```bash
 k6 run -e SYMBOLS=BTC,ETH,TEST -e VUS=2 -e SLEEP_SECONDS=0.001 -e SCENARIO_NAME=place-multi-symbol \
+  scripts/k6/scenarios/place-multi-symbol.js
+```
+
+```powershell
+k6 run `
+  -e SYMBOLS=BTC,ETH,TEST `
+  -e VUS=2 `
+  -e SLEEP_SECONDS=0.001 `
+  -e SCENARIO_NAME=place-multi-symbol `
   scripts/k6/scenarios/place-multi-symbol.js
 ```
 
@@ -80,11 +112,34 @@ k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=999999999999 -e NO_FILL_PRICE_G
   scripts/k6/scenarios/place-no-fill.js
 ```
 
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e MIN_PRICE=1 `
+  -e MAX_PRICE=999999999999 `
+  -e NO_FILL_PRICE_GAP=1000000 `
+  -e VUS=5 `
+  -e SLEEP_SECONDS=0 `
+  -e SCENARIO_NAME=place-no-fill `
+  scripts/k6/scenarios/place-no-fill.js
+```
+
 ### 4.5 체결 매우 많음 (MARKET 주문)
 
 ```bash
 k6 run -e SYMBOL=BTC -e MIN_QTY=1 -e MAX_QTY=1 -e VUS=5 -e SLEEP_SECONDS=0 \
   -e SCENARIO_NAME=place-market-order \
+  scripts/k6/scenarios/place-market-order.js
+```
+
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e MIN_QTY=1 `
+  -e MAX_QTY=1 `
+  -e VUS=5 `
+  -e SLEEP_SECONDS=0 `
+  -e SCENARIO_NAME=place-market-order `
   scripts/k6/scenarios/place-market-order.js
 ```
 
@@ -100,12 +155,42 @@ k6 run -e SYMBOL=BTC -e BOOK_SEED_MID_PRICE=100000000 -e BOOK_SEED_TICK_SIZE=100
   scripts/k6/scenarios/book-seed.js
 ```
 
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e BOOK_SEED_MID_PRICE=100000000 `
+  -e BOOK_SEED_TICK_SIZE=1000 `
+  -e BOOK_SEED_SPREAD_TICKS=5 `
+  -e BOOK_SEED_LEVELS=200 `
+  -e BOOK_SEED_QTY=50 `
+  -e BOOK_SEED_QTY_STEP=5 `
+  -e VUS=10 `
+  -e SLEEP_SECONDS=0.01 `
+  -e WARMUP_DURATION=0s `
+  -e MEASURE_DURATION=60s `
+  -e COOLDOWN_DURATION=0s `
+  -e SCENARIO_NAME=book-seed `
+  scripts/k6/scenarios/book-seed.js
+```
+
 ### 4.6 취소 비율 높음
 
 ```bash
 k6 run -e SYMBOL=BTC -e MIN_PRICE=1 -e MAX_PRICE=999999999999 \
   -e CANCEL_DELAY_MIN_MS=100 -e CANCEL_DELAY_MAX_MS=500 -e VUS=10 \
   -e SCENARIO_NAME=cancel-heavy \
+  scripts/k6/scenarios/cancel-heavy.js
+```
+
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e MIN_PRICE=1 `
+  -e MAX_PRICE=999999999999 `
+  -e CANCEL_DELAY_MIN_MS=100 `
+  -e CANCEL_DELAY_MAX_MS=500 `
+  -e VUS=10 `
+  -e SCENARIO_NAME=cancel-heavy `
   scripts/k6/scenarios/cancel-heavy.js
 ```
 
@@ -122,11 +207,41 @@ k6 run -e SYMBOL=BTC -e ORDER_TYPE=FOK -e VUS=5 -e SLEEP_SECONDS=0 \
   scripts/k6/scenarios/fok-ioc-heavy.js
 ```
 
+```powershell
+# MIXED (기본): FOK 50% + IOC 50%
+k6 run `
+  -e SYMBOL=BTC `
+  -e ORDER_TYPE=MIXED `
+  -e VUS=5 `
+  -e SLEEP_SECONDS=0 `
+  -e SCENARIO_NAME=fok-ioc-heavy `
+  scripts/k6/scenarios/fok-ioc-heavy.js
+
+# FOK 전용
+k6 run `
+  -e SYMBOL=BTC `
+  -e ORDER_TYPE=FOK `
+  -e VUS=5 `
+  -e SLEEP_SECONDS=0 `
+  scripts/k6/scenarios/fok-ioc-heavy.js
+```
+
 ### 4.8 MARKET BUY quoteQty
 
 ```bash
 k6 run -e SYMBOL=BTC -e MIN_QUOTE_QTY=100000 -e MAX_QUOTE_QTY=5000000 \
   -e VUS=5 -e SLEEP_SECONDS=0 -e SCENARIO_NAME=market-buy-quote-qty \
+  scripts/k6/scenarios/market-buy-quote-qty.js
+```
+
+```powershell
+k6 run `
+  -e SYMBOL=BTC `
+  -e MIN_QUOTE_QTY=100000 `
+  -e MAX_QUOTE_QTY=5000000 `
+  -e VUS=5 `
+  -e SLEEP_SECONDS=0 `
+  -e SCENARIO_NAME=market-buy-quote-qty `
   scripts/k6/scenarios/market-buy-quote-qty.js
 ```
 
@@ -136,6 +251,19 @@ k6 run -e SYMBOL=BTC -e MIN_QUOTE_QTY=100000 -e MAX_QUOTE_QTY=5000000 \
 # account 10개, account당 50개 동시 요청 → 총 500 VU
 k6 run -e SYMBOL=BTC -e CONCURRENT_PER_ACCOUNT=50 -e SCENARIO_NAME=idempotency-concurrent \
   -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003,00000000-0000-0000-0000-000000000004,00000000-0000-0000-0000-000000000005,00000000-0000-0000-0000-000000000006,00000000-0000-0000-0000-000000000007,00000000-0000-0000-0000-000000000008,00000000-0000-0000-0000-000000000009,00000000-0000-0000-0000-000000000010 \
+  scripts/k6/scenarios/idempotency-concurrent.js
+
+# 종료 후 DB에서 중복 주문 없음 확인:
+# SELECT account_id, client_order_id, COUNT(*) FROM orders GROUP BY account_id, client_order_id HAVING COUNT(*) > 1;
+```
+
+```powershell
+# account 10개, account당 50개 동시 요청 → 총 500 VU
+k6 run `
+  -e SYMBOL=BTC `
+  -e CONCURRENT_PER_ACCOUNT=50 `
+  -e SCENARIO_NAME=idempotency-concurrent `
+  -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003,00000000-0000-0000-0000-000000000004,00000000-0000-0000-0000-000000000005,00000000-0000-0000-0000-000000000006,00000000-0000-0000-0000-000000000007,00000000-0000-0000-0000-000000000008,00000000-0000-0000-0000-000000000009,00000000-0000-0000-0000-000000000010 `
   scripts/k6/scenarios/idempotency-concurrent.js
 
 # 종료 후 DB에서 중복 주문 없음 확인:
@@ -201,7 +329,12 @@ SELECT COUNT(*) FROM orders WHERE status = 'ACCEPTED';
 
 ```bash
 # application.yml 또는 환경변수: engine.queue.capacity=10
-VUS=50 SLEEP_SECONDS=0 k6 run scripts/k6/scenarios/place-single-symbol.js
+k6 run -e VUS=50 -e SLEEP_SECONDS=0 scripts/k6/scenarios/place-single-symbol.js
+```
+
+```powershell
+# application.yml 또는 환경변수: engine.queue.capacity=10
+k6 run -e VUS=50 -e SLEEP_SECONDS=0 scripts/k6/scenarios/place-single-symbol.js
 ```
 
 종료 후 확인:
@@ -219,6 +352,15 @@ SYMBOL=BTC \
 VUS=2 \
 SLEEP_SECONDS=0 \
 k6 run scripts/k6/scenarios/place-single-symbol.js
+```
+
+```powershell
+k6 run `
+  -e ACCOUNT_IDS=00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002 `
+  -e SYMBOL=BTC `
+  -e VUS=2 `
+  -e SLEEP_SECONDS=0 `
+  scripts/k6/scenarios/place-single-symbol.js
 ```
 
 종료 후 확인:

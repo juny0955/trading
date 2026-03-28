@@ -117,13 +117,15 @@ public class OrderBookView {
      */
     public Quantity totalAvailableQty(Side makerSide, Price limitPrice) {
         NavigableMap<Price, Deque<OrderId>> book = bookOf(makerSide);
+        // bids는 reversed comparator이므로 headMap(limitPrice, true) = price ≥ limitPrice,
+        // asks는 오름차순이므로 headMap(limitPrice, true) = price ≤ limitPrice — 양쪽 모두 올바름.
         return new Quantity(
             book.headMap(limitPrice, true).entrySet().stream()
                 .flatMap(entry -> entry.getValue().stream()
-                    .map(id -> Map.entry(entry.getKey(), index.get(id))))
-                .filter(entry -> Objects.nonNull(entry.getValue()))
-                .peek(entry -> validateQueueOrderInvariant(entry.getValue(), makerSide, entry.getKey()))
-                .mapToLong(entry -> entry.getValue().getRemaining().value())
+                    .map(index::get)
+                    .filter(Objects::nonNull)
+                    .peek(order -> validateQueueOrderInvariant(order, makerSide, entry.getKey())))
+                .mapToLong(order -> order.getRemaining().value())
                 .sum()
         );
     }

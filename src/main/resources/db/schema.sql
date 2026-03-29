@@ -1,3 +1,10 @@
+CREATE TABLE assets (
+    asset_code VARCHAR(32) PRIMARY KEY,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 CREATE TABLE accounts (
     account_id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
@@ -15,13 +22,6 @@ CREATE TABLE balances (
         FOREIGN KEY (account_id) REFERENCES accounts (account_id),
     CONSTRAINT fk_balances_asset
         FOREIGN KEY (asset) REFERENCES assets (asset_code)
-);
-
-CREATE TABLE assets (
-    asset_code VARCHAR(32) PRIMARY KEY,
-    status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE symbols (

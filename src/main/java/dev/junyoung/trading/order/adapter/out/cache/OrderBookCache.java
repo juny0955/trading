@@ -1,7 +1,7 @@
 package dev.junyoung.trading.order.adapter.out.cache;
 
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.springframework.stereotype.Component;
 

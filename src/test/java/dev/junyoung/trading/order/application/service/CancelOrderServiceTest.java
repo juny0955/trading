@@ -4,11 +4,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
-import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
-import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -34,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,7 +51,7 @@ class CancelOrderServiceTest {
     private AcceptedSeqGenerator acceptedSeqGenerator;
 
     @Mock
-    private OrderCommandGateway engineCommandGateway;
+    private EngineCommandPort engineCommandGateway;
 
     @Mock
     private OrderRepository orderRepository;
@@ -78,9 +78,7 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-            assertThat(captor.getValue()).isInstanceOf(EngineCommand.CancelOrder.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), any(OrderId.class), any(AccountId.class), any());
         }
 
         @Test
@@ -92,11 +90,9 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-
-            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
-            assertThat(cmd.orderId()).isEqualTo(orderId);
+            ArgumentCaptor<OrderId> captor = forClass(OrderId.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), captor.capture(), any(AccountId.class), any());
+            assertThat(captor.getValue()).isEqualTo(orderId);
         }
 
         @Test
@@ -107,11 +103,9 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-
-            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
-            assertThat(cmd.requesterAccountId()).isEqualTo(ACCOUNT_ID);
+            ArgumentCaptor<AccountId> captor = forClass(AccountId.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), any(OrderId.class), captor.capture(), any());
+            assertThat(captor.getValue()).isEqualTo(ACCOUNT_ID);
         }
 
         @Test
@@ -130,7 +124,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
             assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(OTHER_ACCOUNT_ID, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
 
         @Test
@@ -152,7 +146,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
 
         @Test
@@ -165,7 +159,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
             assertDoesNotThrow(() -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
     }
 }

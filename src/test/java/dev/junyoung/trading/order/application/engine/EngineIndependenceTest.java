@@ -1,16 +1,21 @@
 package dev.junyoung.trading.order.application.engine;
 
-import dev.junyoung.trading.order.fixture.OrderFixture;
-
-import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.application.engine.handler.EngineHandler;
+import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
+import dev.junyoung.trading.order.application.engine.loop.EngineLoop;
+import dev.junyoung.trading.order.application.engine.loop.EngineThread;
+import dev.junyoung.trading.order.application.engine.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.order.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.Price;
 import dev.junyoung.trading.order.domain.model.value.Quantity;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -23,6 +28,8 @@ import static org.mockito.Mockito.mock;
 
 @DisplayName("엔진 독립성 — BTC 블로킹 중 ETH 독립 처리")
 class EngineIndependenceTest {
+
+    private EngineMetrics engineMetrics = mock(EngineMetrics.class);
 
     @Test
     @DisplayName("BTC 엔진이 블로킹 중에도 ETH 엔진은 독립적으로 처리된다")
@@ -40,8 +47,9 @@ class EngineIndependenceTest {
 
         BlockingQueue<EngineCommand> btcQueue = new ArrayBlockingQueue<>(100);
         BlockingQueue<EngineCommand> ethQueue = new ArrayBlockingQueue<>(100);
-        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"));
-        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"));
+        EngineRuntimeOwner runtimeOwner = mock(EngineRuntimeOwner.class);
+        EngineLoop btcLoop = new EngineLoop(btcQueue, btcHandler, new EngineThread("BTC"), runtimeOwner, engineMetrics);
+        EngineLoop ethLoop = new EngineLoop(ethQueue, ethHandler, new EngineThread("ETH"), runtimeOwner, engineMetrics);
 
         btcLoop.start();
         ethLoop.start();
@@ -59,11 +67,13 @@ class EngineIndependenceTest {
 
     private static EngineCommand.PlaceOrder btcPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5)),
+            Instant.now(), Instant.now());
     }
 
     private static EngineCommand.PlaceOrder ethPlaceOrder() {
         return new EngineCommand.PlaceOrder(
-            OrderFixture.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)));
+            OrderFixture.createLimit(Side.BUY, new Symbol("ETH"), TimeInForce.GTC, new Price(10_000), new Quantity(5)),
+            Instant.now(), Instant.now());
     }
 }

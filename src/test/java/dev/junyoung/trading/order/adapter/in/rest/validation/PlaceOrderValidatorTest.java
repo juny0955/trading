@@ -47,10 +47,9 @@ class PlaceOrderValidatorTest {
     // ── MARKET BUY ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("MARKET BUY: quantity, quoteQty 둘 다 null → false")
-    void marketBuy_bothNull_invalid() {
+    @DisplayName("MARKET BUY: quoteQty 없으면 false")
+    void marketBuy_quoteQtyMissing_invalid() {
         assertThat(sut.isValid(request("BUY", "MARKET", null, null, null), context)).isFalse();
-        verify(builder, atLeastOnce()).addPropertyNode("quantity");
         verify(builder, atLeastOnce()).addPropertyNode("quoteQty");
     }
 
@@ -58,6 +57,7 @@ class PlaceOrderValidatorTest {
     @DisplayName("MARKET BUY: quantity, quoteQty 둘 다 입력 → false")
     void marketBuy_bothPresent_invalid() {
         assertThat(sut.isValid(request("BUY", "MARKET", null, 50_000L, 5L), context)).isFalse();
+        verify(builder, atLeastOnce()).addPropertyNode("quantity");
     }
 
     @Test
@@ -67,9 +67,10 @@ class PlaceOrderValidatorTest {
     }
 
     @Test
-    @DisplayName("MARKET BUY: quantity만 입력 → true")
-    void marketBuy_quantityOnly_valid() {
-        assertThat(sut.isValid(request("BUY", "MARKET", null, null, 5L), context)).isTrue();
+    @DisplayName("MARKET BUY: quantity만 입력 → false")
+    void marketBuy_quantityOnly_invalid() {
+        assertThat(sut.isValid(request("BUY", "MARKET", null, null, 5L), context)).isFalse();
+        verify(builder, atLeastOnce()).addPropertyNode("quoteQty");
     }
 
     // ── MARKET SELL ───────────────────────────────────────────────────────

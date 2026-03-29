@@ -10,4 +10,16 @@ public record QuoteQty(
 		if (value < 0)
 			throw new BusinessRuleException("QUOTE_QTY_NEGATIVE", "value must be positive");
 	}
+
+	public static QuoteQty ofPriceAndQuantity(Price price, Quantity quantity) {
+		return new QuoteQty(Math.multiplyExact(price.value(), quantity.value()));
+	}
+
+    public static QuoteQty zero() {
+		return new QuoteQty(0);
+    }
+
+	public QuoteQty add(long executeQuoteQty) {
+		return new QuoteQty(Math.addExact(value, executeQuoteQty));
+	}
 }

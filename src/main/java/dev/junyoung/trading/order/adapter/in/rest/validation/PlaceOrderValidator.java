@@ -15,7 +15,7 @@ import jakarta.validation.ConstraintValidatorContext;
  *
  * <ul>
  *   <li>MARKET 주문에 {@code tif}를 명시하면 거부 (MARKET은 TIF 개념이 없음)</li>
- *   <li>MARKET BUY: {@code quantity} / {@code quoteQty} 중 정확히 하나만 입력 (XOR)</li>
+ *   <li>MARKET BUY: {@code quoteQty} 필수</li>
  *   <li>MARKET SELL: {@code quantity} 필수</li>
  *   <li>LIMIT: {@code quantity} 필수</li>
  * </ul>
@@ -25,7 +25,8 @@ public class PlaceOrderValidator implements ConstraintValidator<ValidPlaceOrder,
     private static final String MSG_TIF_NOT_ALLOWED_FOR_MARKET = "TIF is not allowed for MARKET orders";
     private static final String MSG_QTY_REQUIRED_FOR_LIMIT = "quantity is required for LIMIT orders";
     private static final String MSG_QTY_REQUIRED_FOR_SELL_MARKET = "quantity is required for SELL MARKET orders";
-    private static final String MSG_BUY_MUST_HAVE_EXACTLY_ONE = "Either quantity or quoteQty must be specified for BUY orders";
+    private static final String MSG_QUOTQTY_REQUIRED_FOR_MARKET_BUY = "quoteQty is required for MARKET BUY orders";
+    private static final String MSG_QTY_NOT_ALLOWED_FOR_MARKET_BUY = "quantity is not allowed for MARKET BUY orders";
 
     @Override
     public boolean isValid(PlaceOrderRequest request, ConstraintValidatorContext context) {
@@ -57,24 +58,16 @@ public class PlaceOrderValidator implements ConstraintValidator<ValidPlaceOrder,
         return isBuy ? validMarketBuyOrder(request, context) : validMarketSellOrder(request, context);
     }
 
-    /**
-     * MARKET BUY는 quantity / quoteQty 중 정확히 하나만 입력해야 한다 (XOR).
-     * <ul>
-     *   <li>둘 다 null → 수량 기준을 알 수 없으므로 거부</li>
-     *   <li>둘 다 입력 → 모호하므로 거부</li>
-     * </ul>
-     * 에러는 두 필드 모두에 부착하여 클라이언트가 어느 쪽이 문제인지 식별할 수 있게 한다.
-     */
+    /** MARKET BUY는 quoteQty만 허용한다. */
     private boolean validMarketBuyOrder(PlaceOrderRequest request, ConstraintValidatorContext context) {
-        boolean hasQuantity = request.quantity() != null;
-        boolean hasQuoteQty = request.quoteQty() != null;
-
-        if (hasQuantity == hasQuoteQty) {
-            addViolation(context, "quantity", MSG_BUY_MUST_HAVE_EXACTLY_ONE);
-            addViolation(context, "quoteQty", MSG_BUY_MUST_HAVE_EXACTLY_ONE);
+        if (request.quoteQty() == null) {
+            addViolation(context, "quoteQty", MSG_QUOTQTY_REQUIRED_FOR_MARKET_BUY);
             return false;
         }
-
+        if (request.quantity() != null) {
+            addViolation(context, "quantity", MSG_QTY_NOT_ALLOWED_FOR_MARKET_BUY);
+            return false;
+        }
         return true;
     }
 

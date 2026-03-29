@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -26,6 +27,7 @@ class OrderTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private static final Symbol SYMBOL = new Symbol("BTC");
+    private static final Price DEFAULT_PRICE = new Price(10_000);
 
     private Order buyOrder(long price, long qty) {
         return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty));
@@ -37,9 +39,7 @@ class OrderTest {
 
     /** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
     private Order newBuyOrder(long price, long qty) {
-        Order order = buyOrder(price, qty);
-        order.activate();
-        return order;
+        return buyOrder(price, qty).activate();
     }
 
     // ── 생성 ──────────────────────────────────────────────────────────────
@@ -151,12 +151,12 @@ class OrderTest {
         class MarketCreation {
 
             @Test
-            @DisplayName("BUY MARKET 주문을 정상 생성한다")
-            void createBuyMarketOrder() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            @DisplayName("SELL MARKET 주문을 정상 생성한다")
+            void createSellMarketOrder() {
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
                 assertThat(order.getOrderId()).isNotNull();
-                assertThat(order.getSide()).isEqualTo(Side.BUY);
+                assertThat(order.getSide()).isEqualTo(Side.SELL);
                 assertThat(order.getSymbol()).isEqualTo(SYMBOL);
                 assertThat(order.getOrderType()).isEqualTo(OrderType.MARKET);
                 assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
@@ -167,14 +167,14 @@ class OrderTest {
             @Test
             @DisplayName("MARKET 주문에서 getLimitPriceOrThrow()를 호출하면 BusinessRuleException이 발생한다")
             void marketOrderThrowsOnGetPrice() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThrows(BusinessRuleException.class, order::getLimitPriceOrThrow);
             }
 
             @Test
             @DisplayName("isMarket()은 MARKET 주문에서 true를 반환한다")
             void isMarketReturnsTrueForMarketOrder() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThat(order.isMarket()).isTrue();
             }
 
@@ -189,28 +189,35 @@ class OrderTest {
             @DisplayName("MARKET 주문 side = null이면 NullPointerException이 발생한다")
             void rejectNullSide() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> OrderFixture.createMarket(null, SYMBOL, new Quantity(5)));
+                        .isThrownBy(() -> Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, null, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
             @DisplayName("MARKET 주문 symbol = null이면 NullPointerException이 발생한다")
             void rejectNullSymbol() {
                 assertThatNullPointerException()
-                        .isThrownBy(() -> OrderFixture.createMarket(Side.BUY, null, new Quantity(5)));
+                        .isThrownBy(() -> OrderFixture.createMarketSell(null, new Quantity(5)));
             }
 
             @Test
             @DisplayName("MARKET SELL + quantity=null이면 BusinessRuleException이 발생한다")
             void rejectNullQuantityForMarketSell() {
                 assertThrows(BusinessRuleException.class, () ->
-                        Order.create(SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
+                        Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.SELL, OrderType.MARKET, null, null, null, null));
             }
 
             @Test
-            @DisplayName("MARKET BUY + quantity/quoteQty 둘 다 null이면 BusinessRuleException이 발생한다")
-            void rejectMarketBuyWhenBothQuantityAndQuoteQtyAreNull() {
+            @DisplayName("MARKET BUY + quoteQty=null이면 BusinessRuleException이 발생한다")
+            void rejectMarketBuyWhenQuoteQtyIsNull() {
                 assertThrows(BusinessRuleException.class, () ->
-                    Order.create(SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
+                    Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, null));
+            }
+
+            @Test
+            @DisplayName("MARKET BUY + quantity가 입력되면 BusinessRuleException이 발생한다")
+            void rejectMarketBuyWhenQuantityIsProvided() {
+                assertThrows(BusinessRuleException.class, () ->
+                    Order.create(OrderId.newId(), OrderFixture.DEFAULT_ACCOUNT_ID, OrderFixture.DEFAULT_CLIENT_ORDER_ID, 1L, SYMBOL, Side.BUY, OrderType.MARKET, null, null, null, new Quantity(5)));
             }
 
             @Test
@@ -218,6 +225,10 @@ class OrderTest {
             void rejectMarketBuyWhenBothQuantityAndQuoteQtyAreProvided() {
                 assertThrows(BusinessRuleException.class, () ->
                     Order.create(
+                        OrderId.newId(),
+                        OrderFixture.DEFAULT_ACCOUNT_ID,
+                        OrderFixture.DEFAULT_CLIENT_ORDER_ID,
+                        1L,
                         SYMBOL,
                         Side.BUY,
                         OrderType.MARKET,
@@ -253,9 +264,9 @@ class OrderTest {
             }
 
             @Test
-            @DisplayName("isQuoteQtyMode() — quantity 기반 주문이면 false")
-            void isQuoteQtyMode_returnsFalse_whenQuantityBased() {
-                Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            @DisplayName("isQuoteQtyMode() — MARKET SELL이면 false")
+            void isQuoteQtyMode_returnsFalse_whenMarketSell() {
+                Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
                 assertThat(order.isQuoteQtyMode()).isFalse();
             }
         }
@@ -270,18 +281,16 @@ class OrderTest {
         @Test
         @DisplayName("NEW 상태에서 호출하면 FILLED로 전이한다")
         void markFilledByMarketBuy_fromNew_filled() {
-            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000));
-            order.activate();
-            order.markFilledByMarketBuy();
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000))
+                    .activate().markFilledByMarketBuy();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
         }
 
         @Test
         @DisplayName("FILLED 전이 후 remaining은 0으로 유지된다")
         void markFilledByMarketBuy_remainingStaysZero() {
-            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000));
-            order.activate();
-            order.markFilledByMarketBuy();
+            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000))
+                    .activate().markFilledByMarketBuy();
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
         }
 
@@ -295,10 +304,9 @@ class OrderTest {
         @Test
         @DisplayName("CANCELLED 상태에서 호출하면 ConflictException이 발생한다")
         void markFilledByMarketBuy_fromCancelled_throwsConflictException() {
-            Order order = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000));
-            order.activate();
-            order.cancel();
-            assertThrows(ConflictException.class, order::markFilledByMarketBuy);
+            Order cancelled = OrderFixture.createMarketBuyWithQuoteQty(Side.BUY, SYMBOL, new QuoteQty(100_000))
+                    .activate().cancel();
+            assertThrows(ConflictException.class, cancelled::markFilledByMarketBuy);
         }
     }
 
@@ -311,8 +319,7 @@ class OrderTest {
         @Test
         @DisplayName("ACCEPTED → NEW로 전이한다")
         void acceptedToNew() {
-            Order order = buyOrder(10_000, 5);
-            order.activate();
+            Order order = buyOrder(10_000, 5).activate();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
         }
 
@@ -326,24 +333,21 @@ class OrderTest {
         @Test
         @DisplayName("PARTIALLY_FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromPartiallyFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(2), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
         @DisplayName("FILLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
         @DisplayName("CANCELLED 상태에서 activate() 호출하면 ConflictException이 발생한다")
         void cannotActivateFromCancelled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).cancel();
             assertThrows(ConflictException.class, order::activate);
         }
     }
@@ -357,8 +361,7 @@ class OrderTest {
         @Test
         @DisplayName("NEW 상태에서 부분 체결 → PARTIALLY_FILLED, remaining 감소")
         void partialFillFromNew() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(2), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
@@ -367,8 +370,7 @@ class OrderTest {
         @Test
         @DisplayName("NEW 상태에서 전량 체결 → FILLED, remaining = 0")
         void fullFillFromNew() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -378,8 +380,8 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 추가 부분 체결 → PARTIALLY_FILLED 유지, remaining 감소")
         void partialFillFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 10);
-            order.fill(new Quantity(3));  // remaining = 7
-            order.fill(new Quantity(4));  // remaining = 3
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 7
+            order = order.fill(new Quantity(4), DEFAULT_PRICE);  // remaining = 3
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
@@ -389,8 +391,8 @@ class OrderTest {
         @DisplayName("PARTIALLY_FILLED 상태에서 잔량 전량 체결 → FILLED")
         void fullFillFromPartiallyFilled() {
             Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));  // remaining = 3
-            order.fill(new Quantity(3));  // remaining = 0
+            order = order.fill(new Quantity(2), DEFAULT_PRICE);  // remaining = 3
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 0
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -400,9 +402,9 @@ class OrderTest {
         @DisplayName("1개씩 여러 번 체결하여 전량 체결된다")
         void fillOneByOne() {
             Order order = newBuyOrder(10_000, 3);
-            order.fill(new Quantity(1));
-            order.fill(new Quantity(1));
-            order.fill(new Quantity(1));
+            order = order.fill(new Quantity(1), DEFAULT_PRICE);
+            order = order.fill(new Quantity(1), DEFAULT_PRICE);
+            order = order.fill(new Quantity(1), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -411,8 +413,7 @@ class OrderTest {
         @Test
         @DisplayName("quantity = 1인 주문을 전량 체결한다")
         void fillMinQuantityOrder() {
-            Order order = newBuyOrder(1, 1);
-            order.fill(new Quantity(1));
+            Order order = newBuyOrder(1, 1).fill(new Quantity(1), DEFAULT_PRICE);
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
@@ -421,48 +422,45 @@ class OrderTest {
         @Test
         @DisplayName("원래 quantity는 체결 후에도 변경되지 않는다")
         void quantityUnchangedAfterFill() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(3));
+            Order original = newBuyOrder(10_000, 5);
+            Order filled = original.fill(new Quantity(3), DEFAULT_PRICE);
 
-            assertThat(order.getQuantity()).isEqualTo(new Quantity(5));
+            assertThat(filled.getQuantity()).isEqualTo(new Quantity(5));
         }
 
         @Test
         @DisplayName("체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다 (remaining 음수 방지)")
         void fillExceedingRemainingThrows() {
             Order order = newBuyOrder(10_000, 3);
-            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(4)));
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(4), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("부분 체결 후 체결 수량이 잔량보다 크면 BusinessRuleException이 발생한다")
         void fillExceedingRemainingAfterPartialFillThrows() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(3));  // remaining = 2
-            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(3)));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(3), DEFAULT_PRICE);  // remaining = 2
+            assertThrows(BusinessRuleException.class, () -> order.fill(new Quantity(3), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("ACCEPTED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromAccepted() {
             Order order = buyOrder(10_000, 5);
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("FILLED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("CANCELLED 상태에서 fill() 호출하면 ConflictException이 발생한다")
         void cannotFillFromCancelled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            Order order = newBuyOrder(10_000, 5).cancel();
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
     }
 
@@ -475,26 +473,21 @@ class OrderTest {
         @Test
         @DisplayName("NEW 상태에서 취소 → CANCELLED")
         void cancelFromNew() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).cancel();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         }
 
         @Test
         @DisplayName("PARTIALLY_FILLED 상태에서 취소 → CANCELLED")
         void cancelFromPartiallyFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(2), DEFAULT_PRICE).cancel();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         }
 
         @Test
         @DisplayName("취소 후 remaining은 변경되지 않는다")
         void cancelDoesNotChangeRemaining() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(2));  // remaining = 3
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(2), DEFAULT_PRICE).cancel();  // remaining = 3
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
         }
 
@@ -508,16 +501,14 @@ class OrderTest {
         @Test
         @DisplayName("FILLED 상태에서 cancel() 호출하면 ConflictException이 발생한다")
         void cannotCancelFromFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
         @DisplayName("CANCELLED 상태에서 cancel() 호출하면 ConflictException이 발생한다 (중복 취소 방지)")
         void cannotCancelFromCancelled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).cancel();
             assertThrows(ConflictException.class, order::cancel);
         }
     }
@@ -532,17 +523,16 @@ class OrderTest {
         @DisplayName("ACCEPTED → NEW → PARTIALLY_FILLED → FILLED 전체 흐름")
         void fullLifecycle_PartialThenFull() {
             Order order = buyOrder(10_000, 10);
-
             assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
 
-            order.activate();
+            order = order.activate();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
 
-            order.fill(new Quantity(4));
+            order = order.fill(new Quantity(4), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(6));
 
-            order.fill(new Quantity(6));
+            order = order.fill(new Quantity(6), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
         }
@@ -550,22 +540,16 @@ class OrderTest {
         @Test
         @DisplayName("ACCEPTED → NEW → CANCELLED 전체 흐름")
         void fullLifecycle_Cancel() {
-            Order order = buyOrder(10_000, 5);
-
-            order.activate();
-            order.cancel();
-
+            Order order = buyOrder(10_000, 5).activate().cancel();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         }
 
         @Test
         @DisplayName("ACCEPTED → NEW → PARTIALLY_FILLED → CANCELLED 전체 흐름")
         void fullLifecycle_PartialThenCancel() {
-            Order order = buyOrder(10_000, 5);
-
-            order.activate();
-            order.fill(new Quantity(2));
-            order.cancel();
+            Order order = buyOrder(10_000, 5).activate()
+                    .fill(new Quantity(2), DEFAULT_PRICE)
+                    .cancel();
 
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
@@ -576,15 +560,15 @@ class OrderTest {
         void multiplePartialFillsThenFilled() {
             Order order = newBuyOrder(10_000, 9);
 
-            order.fill(new Quantity(3));
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(6));
 
-            order.fill(new Quantity(3));
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(3));
 
-            order.fill(new Quantity(3));
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(0));
         }
@@ -592,29 +576,68 @@ class OrderTest {
         @Test
         @DisplayName("MARKET 주문 ACCEPTED → NEW → FILLED 전체 흐름")
         void marketOrder_fullLifecycle_Filled() {
-            Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
-
+            Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
             assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
 
-            order.activate();
+            order = order.activate();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.NEW);
 
-            order.fill(new Quantity(5));
+            order = order.fill(new Quantity(5), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.FILLED);
         }
 
         @Test
         @DisplayName("MARKET 주문 유동성 부족 → PARTIALLY_FILLED → CANCELLED 전체 흐름")
         void marketOrder_fullLifecycle_PartialThenCancelled() {
-            Order order = OrderFixture.createMarket(Side.BUY, SYMBOL, new Quantity(5));
+            Order order = OrderFixture.createMarketSell(SYMBOL, new Quantity(5));
 
-            order.activate();
-            order.fill(new Quantity(3));
+            order = order.activate();
+            order = order.fill(new Quantity(3), DEFAULT_PRICE);
             assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 
-            order.cancel();
+            order = order.cancel();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
             assertThat(order.getRemaining()).isEqualTo(new Quantity(2));
+        }
+    }
+
+    @Nested
+    @DisplayName("cancelOrphan()")
+    class CancelOrphan {
+
+        @Test
+        @DisplayName("ACCEPTED 상태에서 호출하면 CANCELLED를 반환한다")
+        void cancelOrphan_fromAccepted_returnsCancelled() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL); // ACCEPTED 상태
+            Order cancelled = order.cancelOrphan();
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getOrderId()).isEqualTo(order.getOrderId());
+        }
+
+        @Test
+        @DisplayName("NEW 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromNew_throws() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate();
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
+        }
+
+        @Test
+        @DisplayName("PARTIALLY_FILLED 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromPartiallyFilled_throws() {
+            // activate() → NEW 후 fill() 호출로 PARTIALLY_FILLED 만들기
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate()
+                .fill(new Quantity(1L), new Price(1000L)); // 일부 체결 → PARTIALLY_FILLED
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
+        }
+
+        @Test
+        @DisplayName("CANCELLED 상태에서 호출하면 예외를 던진다")
+        void cancelOrphan_fromCancelled_throws() {
+            Order order = OrderFixture.createLimitBuy(SYMBOL).activate().cancel();
+            assertThatThrownBy(order::cancelOrphan)
+                .isInstanceOf(ConflictException.class);
         }
     }
 
@@ -627,49 +650,81 @@ class OrderTest {
         @Test
         @DisplayName("FILLED 이후 fill()은 불가하다")
         void filledOrder_cannotBeFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("FILLED 이후 cancel()은 불가하다")
         void filledOrder_cannotBeCancelled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
         @DisplayName("FILLED 이후 activate()는 불가하다")
         void filledOrder_cannotBeActivated() {
-            Order order = newBuyOrder(10_000, 5);
-            order.fill(new Quantity(5));
+            Order order = newBuyOrder(10_000, 5).fill(new Quantity(5), DEFAULT_PRICE);
             assertThrows(ConflictException.class, order::activate);
         }
 
         @Test
         @DisplayName("CANCELLED 이후 fill()은 불가하다")
         void cancelledOrder_cannotBeFilled() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
-            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1)));
+            Order order = newBuyOrder(10_000, 5).cancel();
+            assertThrows(ConflictException.class, () -> order.fill(new Quantity(1), DEFAULT_PRICE));
         }
 
         @Test
         @DisplayName("CANCELLED 이후 cancel()은 불가하다")
         void cancelledOrder_cannotBeCancelledAgain() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).cancel();
             assertThrows(ConflictException.class, order::cancel);
         }
 
         @Test
         @DisplayName("CANCELLED 이후 activate()는 불가하다")
         void cancelledOrder_cannotBeActivated() {
-            Order order = newBuyOrder(10_000, 5);
-            order.cancel();
+            Order order = newBuyOrder(10_000, 5).cancel();
             assertThrows(ConflictException.class, order::activate);
+        }
+    }
+
+    // ── 상태 불변식 ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("상태 불변식")
+    class StateInvariants {
+
+        @Test
+        @DisplayName("FILLED 주문은 remaining == 0")
+        void filled_remaining_isZero() {
+            Order filled = newBuyOrder(10_000, 5).fill(new Quantity(5), new Price(10_000));
+
+            assertThat(filled.getStatus()).isEqualTo(OrderStatus.FILLED);
+            assertThat(filled.getRemaining().value()).isEqualTo(0L);
+        }
+
+        @Test
+        @DisplayName("체결 없는 취소(cumBaseQty == 0)는 remaining == quantity")
+        void cancelledWithNoFill_remaining_equalsOriginalQuantity() {
+            Order cancelled = newBuyOrder(10_000, 5).cancel();
+
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getCumBaseQty().value()).isEqualTo(0L);
+            assertThat(cancelled.getRemaining().value()).isEqualTo(cancelled.getQuantity().value());
+        }
+
+        @Test
+        @DisplayName("부분체결 후 취소는 0 < remaining < quantity")
+        void cancelledAfterPartialFill_remaining_isStrictlyBetweenZeroAndQuantity() {
+            Order cancelled = newBuyOrder(10_000, 5)
+                    .fill(new Quantity(2), new Price(10_000))
+                    .cancel();
+
+            assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(cancelled.getRemaining().value()).isGreaterThan(0L);
+            assertThat(cancelled.getRemaining().value()).isLessThan(cancelled.getQuantity().value());
         }
     }
 }

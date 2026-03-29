@@ -1,5 +1,6 @@
 package dev.junyoung.trading.order.application.port.in.command;
 
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -9,6 +10,7 @@ import dev.junyoung.trading.order.domain.model.value.QuoteQty;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 public record PlaceOrderCommand(
+	AccountId accountId,
 	Symbol symbol,
 	Side side,
 	OrderType orderType,

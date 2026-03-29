@@ -135,6 +135,7 @@ print_metric "db_deadlock_count"                 "rate(db_deadlock_count_total[5
 print_metric "db_commit_failure_count"           "rate(db_commit_failure_count_total[5m])"
 print_metric "db_rollback_count"                 "rate(db_rollback_count_total[5m])"
 print_metric "replay_duration_on_startup_p95_ms" "histogram_quantile(0.95, sum(rate(replay_duration_on_startup_seconds_bucket[5m])) by (le)) * 1000"
-print_metric "replay_open_order_count"           "replay_open_order_count_total"
+print_metric "replay_orphan_cancelled_count"      "replay_orphan_cancelled_count_total"
+print_metric "replay_restored_order_count"       "replay_restored_order_count_total"
 print_metric "replay_consistency_check"          "replay_consistency_check"
 print_metric "replay_duration_by_symbol_p95_ms"  "histogram_quantile(0.95, sum(rate(replay_duration_by_symbol_seconds_bucket[5m])) by (le, symbol)) * 1000"

@@ -1061,7 +1061,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
           "editorMode": "code",
-          "expr": "replay_open_order_count_total",
+          "expr": "replay_orphan_cancelled_count_total",
           "legendFormat": "고아 주문 정리 수",
           "range": true,
           "refId": "A"
@@ -1136,6 +1136,44 @@
       ],
       "title": "심볼별 재기동 복구 시간",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 70 },
+      "id": 22,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "editorMode": "code",
+          "expr": "replay_restored_order_count_total",
+          "legendFormat": "복원 주문 수",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "재기동 복원 주문 수",
+      "type": "stat"
     }
   ],
   "refresh": "5s",

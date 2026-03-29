@@ -27,7 +27,7 @@ public class EngineStartupRecoveryService {
     @Transactional
     public void cleanupOrphanAccepted(Symbol symbol) {
         List<Order> orphans = orderRepository.findAcceptedOrdersBySymbol(symbol);
-        replayMetrics.incrementReplayOpenOrderCount(orphans.size());
+        replayMetrics.incrementOrphanCancelledCount(orphans.size());
 
         for (Order orphan : orphans) {
             Order cancelled = orphan.cancelOrphan();

@@ -1,24 +1,14 @@
 package dev.junyoung.trading.order.application.service;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import java.util.Optional;
 import java.util.UUID;
 
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
-import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
-import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
-import dev.junyoung.trading.order.application.metrics.OrderMetrics;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.shared.domain.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.shared.domain.value.Price;
-import dev.junyoung.trading.shared.domain.value.Quantity;
-import dev.junyoung.trading.shared.domain.value.QuoteQty;
-import dev.junyoung.trading.shared.domain.value.Symbol;
-import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -28,15 +18,23 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.fixture.OrderFixture;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CancelOrderService")
@@ -150,15 +148,15 @@ class CancelOrderServiceTest {
         }
 
         @Test
-        @DisplayName("이미 종료된 주문은 엔진 커맨드 없이 no-op으로 성공 반환한다 (idempotent cancel)")
-        void cancelAlreadyFinalized_noOpSuccessReturn() {
+        @DisplayName("이미 종료된 주문은 OrderAlreadyFinalizedException이 발생한다")
+        void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
             OrderId orderId = new OrderId(UUID.randomUUID());
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5))
                     .activate().cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-            assertDoesNotThrow(() -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
+            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
             verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
     }

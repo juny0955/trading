@@ -81,9 +81,6 @@ class PlaceOrderServiceTest {
     private OrderMetrics orderMetrics;
 
     @Mock
-    private EngineMetrics engineMetrics;
-
-    @Mock
     private Timer orderAcceptTxTimer;
 
     @InjectMocks

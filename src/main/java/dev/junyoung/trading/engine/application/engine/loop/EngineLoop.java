@@ -89,7 +89,10 @@ public class EngineLoop implements Runnable {
 		try {
 			if (!running) throw new IllegalStateException("Engine is shutting down");
 			command = stampEnqueuedAt(command);
-			if (!engineQueue.offer(command)) throw new EngineQueueFullException();
+			if (!engineQueue.offer(command)) {
+				engineMetrics.incrementEngineBackpressure();
+				throw new EngineQueueFullException();
+			}
 		} finally {
 			submitLock.unlock();
 		}

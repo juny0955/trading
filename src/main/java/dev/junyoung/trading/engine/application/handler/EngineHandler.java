@@ -7,6 +7,7 @@ import java.util.List;
 import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
+import dev.junyoung.trading.engine.application.contract.EngineContractMapper;
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
 import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
@@ -15,9 +16,9 @@ import dev.junyoung.trading.engine.application.exception.RetryablePersistenceExc
 import dev.junyoung.trading.engine.application.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
 import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
@@ -52,7 +53,7 @@ public class EngineHandler {
 	private final OrderBook orderBook;
 	private final OrderBookStateApplier orderBookStateApplier;
 	private final OrderBookCachePort orderBookCachePort;
-	private final EngineResultPersistenceService engineResultPersistenceService;
+	private final EngineResultCommitPort engineResultCommitPort;
 	private final EngineRuntimeOwner runtimeOwner;
 	private final EngineMetrics engineMetrics;
 
@@ -99,7 +100,7 @@ public class EngineHandler {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		PlaceCalculationResult result;
 		try {
-			result = engine.calculatePlace(new PlaceCalculationInput(view, command.order()));
+			result = engine.calculatePlace(new PlaceCalculationInput(view, EngineContractMapper.toOrder(command.command())));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -156,7 +157,7 @@ public class EngineHandler {
 
 	private void persistPlace(PlaceCalculationResult.Accepted accepted) {
 		try {
-			engineResultPersistenceService.persistPlaceResult(accepted);
+			engineResultCommitPort.commitPlace(accepted);
 		} catch (RetryablePersistenceException e) {
 			throw e;
 		} catch (PersistenceInvariantViolationException e) {
@@ -167,7 +168,7 @@ public class EngineHandler {
 
 	private void persistCancel(CancelCalculationResult.Cancelled cancelled) {
 		try {
-			engineResultPersistenceService.persistCancelResult(cancelled);
+			engineResultCommitPort.commitCancel(cancelled);
 		} catch (RetryablePersistenceException e) {
 			throw e;
 		} catch (PersistenceInvariantViolationException e) {

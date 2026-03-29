@@ -16,7 +16,7 @@ import dev.junyoung.trading.engine.application.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.loop.EngineThread;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -54,7 +54,7 @@ public class EngineRuntime implements EngineRuntimeOwner {
         Symbol symbol,
         OrderBookCachePort orderBookCachePort,
         OrderBookProjectionApplier orderBookProjectionApplier,
-        EngineResultPersistenceService engineResultPersistenceService,
+        EngineResultCommitPort engineResultCommitPort,
         OrderBookRebuilder orderBookRebuilder,
         EngineMetrics engineMetrics
     ) {
@@ -68,7 +68,7 @@ public class EngineRuntime implements EngineRuntimeOwner {
         EngineThread engineThread = new EngineThread(symbol.value());
         MatchingEngine matchingEngine = new MatchingEngine();
         OrderBookStateApplier orderBookStateApplier = new SymbolOrderBookStateApplier(orderBook, orderBookProjectionApplier);
-        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, this, engineMetrics);
+        EngineHandler engineHandler = new EngineHandler(symbol, matchingEngine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultCommitPort, this, engineMetrics);
         this.engineLoop = new EngineLoop(queue, engineHandler, engineThread, this, engineMetrics);
     }
 

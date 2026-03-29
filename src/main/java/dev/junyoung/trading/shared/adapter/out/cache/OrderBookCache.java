@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
-import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
 import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
@@ -16,8 +15,7 @@ import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
  * <pre>
  *   engine-thread                      HTTP thread
  *        |                                  |
- *   update(symbol, orderBook)               |
- *   └─ snapshot = OrderBookSnapshot.from()  |
+ *   update(symbol, snapshot)                |
  *      cache.put(symbol, snapshot) ────> cache.getOrDefault(symbol, EMPTY)
  *      (ConcurrentHashMap 원자적 write)      (ConcurrentHashMap 원자적 read)
  * </pre>
@@ -34,7 +32,7 @@ public class OrderBookCache implements OrderBookCachePort {
     private final ConcurrentHashMap<Symbol, OrderBookSnapshot> cache = new ConcurrentHashMap<>();
 
     /**
-     * engine-thread에서만 호출. {@link OrderBook}으로부터 새 스냅샷을 생성해 해당 심볼 캐시를 교체한다.
+     * engine-thread에서만 호출. 새 스냅샷으로 해당 심볼 캐시를 교체한다.
      */
     public void update(Symbol symbol, OrderBookSnapshot orderBookSnapshot) {
         cache.put(symbol, orderBookSnapshot);

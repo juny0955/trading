@@ -3,14 +3,12 @@ package dev.junyoung.trading.engine.application.runtime;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
-import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
 import dev.junyoung.trading.engine.application.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.exception.EngineNotActiveException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
 import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.shared.domain.enums.Side;
@@ -36,7 +34,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
@@ -131,28 +128,29 @@ class EngineRuntimeTest {
 
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
-            verify(orderBookCachePort).update(eq(SYMBOL), argThat(book -> {
-                assertThat(book.bids()).contains(new Price(10_100L));
-                assertThat(book.asks()).contains(new Price(10_200L));
-                return true;
-            }));
+            ArgumentCaptor<OrderBookSnapshot> captor = ArgumentCaptor.forClass(OrderBookSnapshot.class);
+            verify(orderBookCachePort).update(eq(SYMBOL), captor.capture());
+
+            OrderBookSnapshot snapshot = captor.getValue();
+            assertThat(snapshot.bids()).containsKey(new Price(10_100L));
+            assertThat(snapshot.asks()).containsKey(new Price(10_200L));
         }
 
         @Test
-        @DisplayName("동일 가격 replay는 acceptedSeq 순서대로 FIFO가 복구된다")
-        void constructor_replaysSamePriceOrdersInAcceptedSeqOrder() {
+        @DisplayName("동일 가격 replay 주문은 같은 가격 레벨 수량으로 집계된다")
+        void constructor_replaysSamePriceOrdersIntoSamePriceLevel() {
             Order first = activeLimitOrder("bid-1", 10L, Side.BUY, 10_100L, 3L);
             Order second = activeLimitOrder("bid-2", 20L, Side.BUY, 10_100L, 5L);
             when(orderBookRebuilder.loadOpenOrders(SYMBOL)).thenReturn(List.of(first, second));
 
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
-            ArgumentCaptor<OrderBook> captor = ArgumentCaptor.forClass(OrderBook.class);
-            verify(orderBookCachePort).update(eq(SYMBOL), OrderBookSnapshotMapper.from(captor.capture()));
+            ArgumentCaptor<OrderBookSnapshot> captor = ArgumentCaptor.forClass(OrderBookSnapshot.class);
+            verify(orderBookCachePort).update(eq(SYMBOL), captor.capture());
 
-            OrderBook rebuiltBook = captor.getValue();
-            assertThat(rebuiltBook.poll(Side.BUY)).get().extracting(Order::getOrderId).isEqualTo(first.getOrderId());
-            assertThat(rebuiltBook.poll(Side.BUY)).get().extracting(Order::getOrderId).isEqualTo(second.getOrderId());
+            OrderBookSnapshot snapshot = captor.getValue();
+            assertThat(snapshot.bids()).containsEntry(new Price(10_100L), new Quantity(8L));
+            assertThat(snapshot.asks()).isEmpty();
         }
 
         @Test

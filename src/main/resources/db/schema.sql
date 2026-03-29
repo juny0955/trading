@@ -12,7 +12,50 @@ CREATE TABLE balances (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (account_id, asset),
     CONSTRAINT fk_balances_account
-        FOREIGN KEY (account_id) REFERENCES accounts (account_id)
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id),
+    CONSTRAINT fk_balances_asset
+        FOREIGN KEY (asset) REFERENCES assets (asset_code)
+);
+
+CREATE TABLE assets (
+    asset_code VARCHAR(32) PRIMARY KEY,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE TABLE symbols (
+    symbol VARCHAR(32) PRIMARY KEY,
+    base_asset VARCHAR(32) NOT NULL,
+    quote_asset VARCHAR(32) NOT NULL,
+    step_size BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_symbols_base_asset
+       FOREIGN KEY (base_asset) REFERENCES assets (asset_code),
+    CONSTRAINT fk_symbols_quote_asset
+       FOREIGN KEY (quote_asset) REFERENCES assets (asset_code)
+);
+
+CREATE TABLE symbol_states (
+    symbol VARCHAR(32) PRIMARY KEY,
+    last_event_sequence BIGINT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_symbol_states_symbol
+       FOREIGN KEY (symbol) REFERENCES symbols (symbol)
+);
+
+CREATE TABLE tick_size_rules (
+    rule_id BIGSERIAL PRIMARY KEY,
+    symbol VARCHAR(32) NOT NULL,
+    min_price BIGINT NOT NULL,
+    max_price BIGINT NULL,
+    tick_size BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_tick_size_rules_symbol
+        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
 );
 
 CREATE TABLE orders (
@@ -68,43 +111,8 @@ CREATE TABLE idempotency_keys (
         FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );
 
-CREATE TABLE symbols (
-    symbol VARCHAR(32) PRIMARY KEY,
-    base_asset VARCHAR(32) NOT NULL,
-    quote_asset VARCHAR(32) NOT NULL,
-    status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
-);
-
-CREATE TABLE symbol_states (
-    symbol VARCHAR(32) PRIMARY KEY,
-    last_event_sequence BIGINT NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_symbol_states_symbol
-        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
-);
-
-CREATE TABLE assets (
-    asset_code VARCHAR(20) PRIMARY KEY,
-    status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
-);
-
-CREATE TABLE tick_size_rules (
-    rule_id BIGSERIAL PRIMARY KEY,
-    symbol VARCHAR(32) NOT NULL,
-    min_price BIGINT NOT NULL,
-    max_price BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_tick_size_rules_symbol
-        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
-);
-
 CREATE TABLE outbox_events (
-    event_id UUID PRIMARY KEY,
+    event_id BIGSERIAL PRIMARY KEY,
     aggregate_id VARCHAR(64) NOT NULL,
     aggregate_type VARCHAR(32) NOT NULL,
     symbol VARCHAR(32) NOT NULL,
@@ -112,7 +120,7 @@ CREATE TABLE outbox_events (
     event_version INT NOT NULL,
     sequence BIGINT NOT NULL,
     payload JSONB NOT NULL,
-    statue VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
     attempt_count INT NOT NULL,
     last_error TEXT,
     next_retry_at TIMESTAMP WITH TIME ZONE,

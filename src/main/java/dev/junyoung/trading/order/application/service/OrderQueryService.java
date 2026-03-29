@@ -4,7 +4,7 @@ import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.port.in.GetOrderUseCase;
 import dev.junyoung.trading.order.application.port.in.result.OrderResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;

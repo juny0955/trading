@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.port.in.GetTradeUseCase;
 import dev.junyoung.trading.order.application.port.in.result.TradeResult;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;

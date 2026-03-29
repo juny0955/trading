@@ -16,7 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <pre>
  * - 전체 재생 시간: replay_duration_on_startup
  * - 심볼별 재생 시간: replay_duration_by_symbol
- * - 고아 주문 정리: replay_open_order_count
+ * - ACCEPTED orphan 정리 수: replay_orphan_cancelled_count
+ * - 복원된 open order 수: replay_restored_order_count
  * - 정합성 검사: replay_consistency_check (심볼별 게이지)
  * </pre>
  */
@@ -28,8 +29,11 @@ public class ReplayMetrics {
     // Timer for total replay duration
     private final Timer totalReplayDurationTimer;
 
-    // Counter for orphan orders
-    private final Counter replayOpenOrderCounter;
+    // Counter for orphan ACCEPTED orders cancelled during startup
+    private final Counter replayOrphanCancelledCounter;
+
+    // Counter for open orders restored to the order book during startup
+    private final Counter replayRestoredOrderCounter;
 
     // Per-symbol timers: symbol -> Timer
     private final ConcurrentHashMap<String, Timer> replayDurationBySymbolMap;
@@ -53,9 +57,12 @@ public class ReplayMetrics {
             .publishPercentileHistogram()
             .register(meterRegistry);
 
-        // Replay open order counter initialization
-        this.replayOpenOrderCounter = Counter.builder("replay_open_order_count")
-            .description("Total number of orphan orders cleaned up during replay")
+        this.replayOrphanCancelledCounter = Counter.builder("replay_orphan_cancelled_count")
+            .description("Number of ACCEPTED orphan orders cancelled during startup recovery")
+            .register(meterRegistry);
+
+        this.replayRestoredOrderCounter = Counter.builder("replay_restored_order_count")
+            .description("Number of open orders restored to the order book during startup recovery")
             .register(meterRegistry);
     }
 
@@ -76,7 +83,7 @@ public class ReplayMetrics {
      * @param duration 재생 지연 시간
      */
     public void recordReplayDurationBySymbol(String symbol, Duration duration) {
-        Timer timer = replayDurationBySymbolMap.computeIfAbsent(symbol, key ->
+        Timer timer = replayDurationBySymbolMap.computeIfAbsent(symbol, _ ->
             Timer.builder("replay_duration_by_symbol")
                 .description("Replay/recovery duration by symbol")
                 .tag("symbol", symbol)
@@ -92,12 +99,21 @@ public class ReplayMetrics {
     // -------------------------------------------------------------------------
 
     /**
-     * 재생 중 정리된 고아 주문 개수를 증가시킨다.
+     * 스타트업 복구 중 취소된 ACCEPTED orphan 주문 개수를 증가시킨다.
      *
-     * @param count 정리된 고아 주문 개수
+     * @param count 취소된 orphan 주문 개수
      */
-    public void incrementReplayOpenOrderCount(int count) {
-        replayOpenOrderCounter.increment(count);
+    public void incrementOrphanCancelledCount(int count) {
+        replayOrphanCancelledCounter.increment(count);
+    }
+
+    /**
+     * 스타트업 복구 중 오더북에 복원된 open order 개수를 증가시킨다.
+     *
+     * @param count 복원된 주문 개수
+     */
+    public void incrementRestoredOrderCount(int count) {
+        replayRestoredOrderCounter.increment(count);
     }
 
     // -------------------------------------------------------------------------
@@ -117,7 +133,7 @@ public class ReplayMetrics {
      * @param value 1=정상/고아없음, 0=고아있음
      */
     public void updateConsistencyCheck(String symbol, int value) {
-        AtomicInteger consistencyValue = consistencyCheckMap.computeIfAbsent(symbol, key -> {
+        AtomicInteger consistencyValue = consistencyCheckMap.computeIfAbsent(symbol, _ -> {
             AtomicInteger atomicInt = new AtomicInteger(value);
             Gauge.builder("replay_consistency_check", atomicInt::get)
                 .description("Replay consistency check (1=clean/no orphans, 0=has orphans)")

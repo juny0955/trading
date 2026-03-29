@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: trading-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: trading
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading
+    volumes:
+      - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./scripts/sql/perf-seed-100-accounts.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+
   prometheus:
     image: prom/prometheus:latest
     container_name: trading-prometheus

@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import dev.junyoung.trading.order.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
@@ -14,8 +15,11 @@ import lombok.RequiredArgsConstructor;
 public class OrderBookRebuilder {
 
 	private final OrderRepository orderRepository;
+	private final ReplayMetrics replayMetrics;
 
 	public List<Order> loadOpenOrders(Symbol symbol) {
-		return orderRepository.findOpenOrdersBySymbol(symbol);
+		List<Order> orders = orderRepository.findOpenOrdersBySymbol(symbol);
+		replayMetrics.incrementRestoredOrderCount(orders.size());
+		return orders;
 	}
 }

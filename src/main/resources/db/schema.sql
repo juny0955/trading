@@ -61,7 +61,5 @@ CREATE TABLE idempotency_keys (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (account_id, client_order_id),
     CONSTRAINT fk_idempotency_account
-        FOREIGN KEY (account_id) REFERENCES accounts (account_id),
-    CONSTRAINT fk_idempotency_order
-        FOREIGN KEY (order_id) REFERENCES orders (order_id)
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id)
 );

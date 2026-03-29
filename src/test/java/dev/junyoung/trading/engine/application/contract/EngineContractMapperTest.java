@@ -1,12 +1,11 @@
 package dev.junyoung.trading.engine.application.contract;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import dev.junyoung.trading.shared.domain.enums.Side;
@@ -33,22 +32,5 @@ class EngineContractMapperTest {
 		assertThat(restored.getSymbol()).isEqualTo(order.getSymbol());
 		assertThat(restored.getStatus()).isEqualTo(order.getStatus());
 		assertThat(restored.getRemaining()).isEqualTo(order.getRemaining());
-	}
-
-	@Test
-	@DisplayName("Trade를 EngineTradeResult로 변환한다")
-	void toEngineTradeResult_mapsTrade() {
-		Order buy = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000L), new Quantity(5L)).activate();
-		Order sell = OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(10_000L), new Quantity(5L)).activate();
-		Trade trade = Trade.of(buy, sell, new Quantity(3L));
-
-		EngineTradeResult result = EngineContractMapper.toEngineTradeResult(trade);
-
-		assertThat(result.tradeId()).isEqualTo(trade.tradeId());
-		assertThat(result.symbol()).isEqualTo(trade.symbol());
-		assertThat(result.buyOrderId()).isEqualTo(trade.buyOrderId());
-		assertThat(result.sellOrderId()).isEqualTo(trade.sellOrderId());
-		assertThat(result.price()).isEqualTo(trade.price());
-		assertThat(result.quantity()).isEqualTo(trade.quantity());
 	}
 }

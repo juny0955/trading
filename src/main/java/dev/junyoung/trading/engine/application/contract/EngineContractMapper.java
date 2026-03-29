@@ -1,7 +1,7 @@
 package dev.junyoung.trading.engine.application.contract;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.entity.Trade;
+import dev.junyoung.trading.shared.domain.value.Price;
 
 public final class EngineContractMapper {
 
@@ -17,7 +17,7 @@ public final class EngineContractMapper {
 			order.getSymbol(),
 			order.getOrderType(),
 			order.getTif(),
-			order.getPriceValue().map(dev.junyoung.trading.shared.domain.value.Price::new).orElse(null),
+			order.getPriceValue().map(Price::new).orElse(null),
 			order.getQuoteQty(),
 			order.getQuantity(),
 			order.getRemaining(),
@@ -50,18 +50,6 @@ public final class EngineContractMapper {
 			command.orderedAt(),
 			command.createdAt(),
 			command.updatedAt()
-		);
-	}
-
-	public static EngineTradeResult toEngineTradeResult(Trade trade) {
-		return new EngineTradeResult(
-			trade.tradeId(),
-			trade.symbol(),
-			trade.buyOrderId(),
-			trade.sellOrderId(),
-			trade.price(),
-			trade.quantity(),
-			trade.createdAt()
 		);
 	}
 }

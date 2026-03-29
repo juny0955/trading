@@ -1,28 +1,11 @@
 package dev.junyoung.trading.engine.application;
 
-import dev.junyoung.trading.account.application.port.out.BalanceRepository;
-import dev.junyoung.trading.account.domain.model.entity.Balance;
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
-import dev.junyoung.trading.jooq.Tables;
-import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
-import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
-import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
-import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
-import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import static dev.junyoung.trading.order.domain.model.enums.OrderType.*;
+import static org.assertj.core.api.Assertions.*;
+
+import java.time.Instant;
+import java.util.UUID;
+
 import org.jooq.DSLContext;
 import org.jooq.exception.NoDataFoundException;
 import org.junit.jupiter.api.AfterEach;
@@ -32,12 +15,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.UUID;
-
-import static dev.junyoung.trading.order.domain.model.enums.OrderType.*;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import dev.junyoung.trading.account.application.port.out.BalanceRepository;
+import dev.junyoung.trading.account.domain.model.entity.Balance;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
+import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.jooq.Tables;
+import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 
 @SpringBootTest
 @Transactional
@@ -72,7 +72,7 @@ class EngineRestartIntegrationTest {
     private OrderBookProjectionApplier orderBookProjectionApplier;
 
     @Autowired
-    private EngineResultPersistenceService engineResultPersistenceService;
+    private EngineResultCommitPort engineResultCommitPort;
 
     @Autowired
     private OrderBookRebuilder orderBookRebuilder;
@@ -110,7 +110,7 @@ class EngineRestartIntegrationTest {
             SYMBOL,
             orderBookCachePort,
             orderBookProjectionApplier,
-            engineResultPersistenceService,
+            engineResultCommitPort,
             orderBookRebuilder,
             engineMetrics
         );

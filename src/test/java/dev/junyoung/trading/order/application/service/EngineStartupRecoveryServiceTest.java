@@ -15,7 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
@@ -23,12 +23,12 @@ import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 @ExtendWith(MockitoExtension.class)

@@ -1,14 +1,16 @@
-package dev.junyoung.trading.order.adapter.out.cache;
+package dev.junyoung.trading.shared.adapter.out.cache;
 
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -84,7 +86,7 @@ class OrderBookCacheTest {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).bids()).containsKey(new Price(10_000));
 		}
@@ -97,7 +99,7 @@ class OrderBookCacheTest {
 			book.add(activatedBuy(BTC, 11_000, 1));
 			book.add(activatedBuy(BTC, 10_000, 1));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
 			assertThat(bids.firstKey()).isEqualTo(new Price(11_000));
@@ -112,7 +114,7 @@ class OrderBookCacheTest {
 			book.add(activatedBuy(BTC, 10_000, 3));
 			book.add(activatedBuy(BTC, 10_000, 2));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).bids().get(new Price(10_000))).isEqualTo(new Quantity(10));
 		}
@@ -123,7 +125,7 @@ class OrderBookCacheTest {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).bids()).isEmpty();
 		}
@@ -141,7 +143,7 @@ class OrderBookCacheTest {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).asks()).containsKey(new Price(10_000));
 		}
@@ -154,7 +156,7 @@ class OrderBookCacheTest {
 			book.add(activatedSell(BTC, 9_000, 1));
 			book.add(activatedSell(BTC, 10_000, 1));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
 			assertThat(asks.firstKey()).isEqualTo(new Price(9_000));
@@ -168,7 +170,7 @@ class OrderBookCacheTest {
 			book.add(activatedSell(BTC, 10_000, 4));
 			book.add(activatedSell(BTC, 10_000, 6));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).asks().get(new Price(10_000))).isEqualTo(new Quantity(10));
 		}
@@ -179,7 +181,7 @@ class OrderBookCacheTest {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
 
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			assertThat(cache.getSnapshot(BTC).asks()).isEmpty();
 		}
@@ -196,11 +198,11 @@ class OrderBookCacheTest {
 		void bids_returnsLatestSnapshot() {
 			OrderBook book1 = new OrderBook();
 			book1.add(activatedBuy(BTC, 10_000, 5));
-			cache.update(BTC, book1);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book1));
 
 			OrderBook book2 = new OrderBook();
 			book2.add(activatedBuy(BTC, 12_000, 3));
-			cache.update(BTC, book2);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book2));
 
 			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
 			assertThat(bids).containsKey(new Price(12_000));
@@ -212,11 +214,11 @@ class OrderBookCacheTest {
 		void asks_returnsLatestSnapshot() {
 			OrderBook book1 = new OrderBook();
 			book1.add(activatedSell(BTC, 10_000, 5));
-			cache.update(BTC, book1);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book1));
 
 			OrderBook book2 = new OrderBook();
 			book2.add(activatedSell(BTC, 8_000, 3));
-			cache.update(BTC, book2);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book2));
 
 			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
 			assertThat(asks).containsKey(new Price(8_000));
@@ -228,9 +230,9 @@ class OrderBookCacheTest {
 		void update_emptyOrderBook_returnsEmptySnapshot() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
-			cache.update(BTC, new OrderBook());
+			cache.update(BTC, OrderBookSnapshot.EMPTY);
 
 			assertThat(cache.getSnapshot(BTC).bids()).isEmpty();
 			assertThat(cache.getSnapshot(BTC).asks()).isEmpty();
@@ -242,7 +244,7 @@ class OrderBookCacheTest {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 9_000, 2));
 			book.add(activatedSell(BTC, 11_000, 3));
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			OrderBookSnapshot snapshot = cache.getSnapshot(BTC);
 
@@ -262,7 +264,7 @@ class OrderBookCacheTest {
 		void bids_returnsUnmodifiableMap() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			NavigableMap<Price, Quantity> bids = cache.getSnapshot(BTC).bids();
 
@@ -275,7 +277,7 @@ class OrderBookCacheTest {
 		void asks_returnsUnmodifiableMap() {
 			OrderBook book = new OrderBook();
 			book.add(activatedSell(BTC, 10_000, 5));
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			NavigableMap<Price, Quantity> asks = cache.getSnapshot(BTC).asks();
 
@@ -295,11 +297,11 @@ class OrderBookCacheTest {
 		void update_differentSymbols_areIndependent() {
 			OrderBook btcBook = new OrderBook();
 			btcBook.add(activatedBuy(BTC, 30_000, 2));
-			cache.update(BTC, btcBook);
+			cache.update(BTC, OrderBookSnapshotMapper.from(btcBook));
 
 			OrderBook ethBook = new OrderBook();
 			ethBook.add(activatedBuy(ETH, 2_000, 10));
-			cache.update(ETH, ethBook);
+			cache.update(ETH, OrderBookSnapshotMapper.from(ethBook));
 
 			assertThat(cache.getSnapshot(BTC).bids()).containsKey(new Price(30_000)).doesNotContainKey(new Price(2_000));
 			assertThat(cache.getSnapshot(ETH).bids()).containsKey(new Price(2_000)).doesNotContainKey(new Price(30_000));
@@ -310,9 +312,9 @@ class OrderBookCacheTest {
 		void update_btc_doesNotAffectEth() {
 			OrderBook ethBook = new OrderBook();
 			ethBook.add(activatedBuy(ETH, 2_000, 5));
-			cache.update(ETH, ethBook);
+			cache.update(ETH, OrderBookSnapshotMapper.from(ethBook));
 
-			cache.update(BTC, new OrderBook()); // BTC 갱신
+			cache.update(BTC, OrderBookSnapshot.EMPTY);
 
 			assertThat(cache.getSnapshot(ETH).bids()).containsKey(new Price(2_000));
 		}
@@ -322,7 +324,7 @@ class OrderBookCacheTest {
 		void getSnapshot_unknownSymbol_doesNotAffectRegisteredSymbol() {
 			OrderBook book = new OrderBook();
 			book.add(activatedBuy(BTC, 10_000, 5));
-			cache.update(BTC, book);
+			cache.update(BTC, OrderBookSnapshotMapper.from(book));
 
 			cache.getSnapshot(new Symbol("UNKNOWN")); // 부수 효과 없어야 함
 

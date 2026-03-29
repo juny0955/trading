@@ -1,7 +1,7 @@
 package dev.junyoung.trading.order.domain.service.dto;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

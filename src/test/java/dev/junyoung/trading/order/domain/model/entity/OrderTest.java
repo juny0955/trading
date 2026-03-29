@@ -14,12 +14,12 @@ import dev.junyoung.trading.common.exception.ConflictException;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 @DisplayName("Order")
 class OrderTest {

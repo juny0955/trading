@@ -1,33 +1,34 @@
 package dev.junyoung.trading.engine.application.handler;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
-import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
+import dev.junyoung.trading.engine.application.contract.EngineContractMapper;
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
 import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
-import dev.junyoung.trading.engine.application.loop.EngineCommand;
-import dev.junyoung.trading.engine.application.loop.EngineLoop;
-import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.application.exception.PersistenceInvariantViolationException;
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.time.Duration;
-import java.time.Instant;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -52,7 +53,7 @@ public class EngineHandler {
 	private final OrderBook orderBook;
 	private final OrderBookStateApplier orderBookStateApplier;
 	private final OrderBookCachePort orderBookCachePort;
-	private final EngineResultPersistenceService engineResultPersistenceService;
+	private final EngineResultCommitPort engineResultCommitPort;
 	private final EngineRuntimeOwner runtimeOwner;
 	private final EngineMetrics engineMetrics;
 
@@ -99,7 +100,7 @@ public class EngineHandler {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		PlaceCalculationResult result;
 		try {
-			result = engine.calculatePlace(new PlaceCalculationInput(view, command.order()));
+			result = engine.calculatePlace(new PlaceCalculationInput(view, EngineContractMapper.toOrder(command.command())));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -156,7 +157,7 @@ public class EngineHandler {
 
 	private void persistPlace(PlaceCalculationResult.Accepted accepted) {
 		try {
-			engineResultPersistenceService.persistPlaceResult(accepted);
+			engineResultCommitPort.commitPlace(accepted);
 		} catch (RetryablePersistenceException e) {
 			throw e;
 		} catch (PersistenceInvariantViolationException e) {
@@ -167,7 +168,7 @@ public class EngineHandler {
 
 	private void persistCancel(CancelCalculationResult.Cancelled cancelled) {
 		try {
-			engineResultPersistenceService.persistCancelResult(cancelled);
+			engineResultCommitPort.commitCancel(cancelled);
 		} catch (RetryablePersistenceException e) {
 			throw e;
 		} catch (PersistenceInvariantViolationException e) {
@@ -187,7 +188,7 @@ public class EngineHandler {
 
 	private void updateCache() {
 		try {
-			orderBookCachePort.update(symbol, orderBook);
+			orderBookCachePort.update(symbol, OrderBookSnapshotMapper.from(orderBook));
 		} catch (Exception e) {
 			log.error("Cache update failed after apply: symbol={}", symbol, e);
 		}

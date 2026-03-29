@@ -27,29 +27,28 @@ import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
 import dev.junyoung.trading.engine.application.dto.CancelResultCode;
 import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
-import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
-
-import dev.junyoung.trading.engine.domain.model.OrderBook;
-
-import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
-import dev.junyoung.trading.engine.application.loop.EngineCommand;
-import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.application.exception.PersistenceInvariantViolationException;
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.engine.domain.service.MatchingEngineTest;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
-import dev.junyoung.trading.engine.domain.service.MatchingEngineTest;
 import dev.junyoung.trading.order.fixture.OrderFixture;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 
 /**
  * {@link EngineHandler} 단위 테스트.
@@ -74,7 +73,7 @@ class EngineHandlerTest {
 	private OrderBookCachePort orderBookCachePort;
 
 	@Mock
-	private EngineResultPersistenceService engineResultPersistenceService;
+	private EngineResultCommitPort engineResultCommitPort;
 
 	@Mock
 	private EngineRuntimeOwner runtimeOwner;
@@ -93,9 +92,11 @@ class EngineHandlerTest {
 		// Shutdown 같이 engine 미사용 테스트에서 불필요한 stub 경고가 발생하지 않도록 lenient() 사용
 		lenient().when(orderBook.getBids()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
 		lenient().when(orderBook.getAsks()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
+		lenient().when(orderBook.bidsSnapshot()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
+		lenient().when(orderBook.asksSnapshot()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
 		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
-		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultPersistenceService, runtimeOwner, engineMetrics);
+		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultCommitPort, runtimeOwner, engineMetrics);
 	}
 
 	private Order buyOrder(long price, long qty) {
@@ -129,14 +130,18 @@ class EngineHandlerTest {
 	class PlaceOrderCommand {
 
 		@Test
-		@DisplayName("Order를 engine.calculatePlace()에 전달한다")
+		@DisplayName("Order와 동일 의미의 주문이 engine.calculatePlace()에 전달된다")
 		void handle_placeOrder_callsCalculatePlace() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+			verify(engine).calculatePlace(argThat(i ->
+				i.taker().getOrderId().equals(order.getOrderId())
+					&& i.taker().getAcceptedSeq() == order.getAcceptedSeq()
+					&& i.taker().getSymbol().equals(order.getSymbol())
+			));
 		}
 
 		@Test
@@ -161,14 +166,18 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("PlaceOrder에 담긴 Order 참조가 그대로 calculatePlace에 전달된다")
-		void handle_placeOrder_passesExactOrderReference() {
+		@DisplayName("PlaceOrder에 담긴 주문 정보가 손실 없이 calculatePlace에 전달된다")
+		void handle_placeOrder_passesEquivalentOrder() {
 			Order order = buyOrder(10_000, 5);
-			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+			verify(engine).calculatePlace(argThat(i ->
+				i.taker().getOrderId().equals(order.getOrderId())
+					&& i.taker().getAcceptedSeq() == order.getAcceptedSeq()
+					&& i.taker().getRemaining().equals(order.getRemaining())
+			));
 			assertThat(order.getStatus().name()).isEqualTo("ACCEPTED");
 		}
 
@@ -180,7 +189,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 
 		@Test
@@ -192,19 +201,22 @@ class EngineHandlerTest {
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
 			InOrder inOrder = inOrder(engine, orderBookCachePort);
-			inOrder.verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(engine).calculatePlace(any());
+			inOrder.verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 
 		@Test
 		@DisplayName("MARKET SELL 주문도 calculatePlace()로 전달된다")
 		void handle_placeOrder_marketSell_callsCalculatePlace() {
 			Order order = marketSellOrder(5);
-			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+			verify(engine).calculatePlace(argThat(i ->
+				i.taker().getOrderId().equals(order.getOrderId())
+					&& i.taker().isMarket()
+			));
 		}
 
 		@Test
@@ -215,11 +227,11 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 
 		@Test
-		@DisplayName("Accepted 결과이면 engineResultPersistenceService.persistPlaceResult()가 호출된다")
+		@DisplayName("Accepted 결과이면 engineResultCommitPort.commitPlace()가 호출된다")
 		void handle_placeOrder_accepted_delegatesToPersistenceService() {
 			Order order = marketSellOrder(5);
 			Order activated = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC,
@@ -229,22 +241,25 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engineResultPersistenceService).persistPlaceResult(accepted);
+			verify(engineResultCommitPort).commitPlace(accepted);
 		}
 
 		@Test
 		@DisplayName("BUY MARKET quoteQty 주문도 calculatePlace()로 전달된다")
 		void handle_placeOrder_marketBuyQuoteQty_callsCalculatePlace() {
 			Order order = marketBuyQuoteQtyOrder(50_000);
-			when(engine.calculatePlace(argThat(i -> i.taker().equals(order)))).thenReturn(emptyAccepted());
+			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
+			verify(engine).calculatePlace(argThat(i ->
+				i.taker().getOrderId().equals(order.getOrderId())
+					&& i.taker().getQuoteQty().equals(order.getQuoteQty())
+			));
 		}
 
 		@Test
-		@DisplayName("Rejected 결과이면 persistPlaceResult가 호출되지 않는다")
+		@DisplayName("Rejected 결과이면 commitPlace가 호출되지 않는다")
 		void handle_placeOrder_rejected_doesNotCallPersistenceService() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any()))
@@ -252,7 +267,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(engineResultPersistenceService, never()).persistPlaceResult(any());
+			verify(engineResultCommitPort, never()).commitPlace(any());
 		}
 
 		@Test
@@ -269,17 +284,17 @@ class EngineHandlerTest {
 		}
 
 		@Test
-		@DisplayName("Accepted 결과의 호출 순서: persistPlaceResult → apply → cache.update")
+		@DisplayName("Accepted 결과의 호출 순서: commitPlace → apply → cache.update")
 		void handle_placeOrder_accepted_callOrder_persistThenApplyThenCache() {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
-			inOrder.verify(engineResultPersistenceService).persistPlaceResult(any());
+			InOrder inOrder = inOrder(engineResultCommitPort, orderBookStateApplier, orderBookCachePort);
+			inOrder.verify(engineResultCommitPort).commitPlace(any());
 			inOrder.verify(orderBookStateApplier).apply(any(), any());
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 	}
 
@@ -297,9 +312,9 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
 
-			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now())));
+			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now())));
 
-			verify(engineResultPersistenceService, never()).persistCancelResult(any());
+			verify(engineResultCommitPort, never()).commitCancel(any());
 		}
 
 		@Test
@@ -311,10 +326,10 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now()));
 
 			verify(orderBookStateApplier).apply(any(), any());
-			verify(engineResultPersistenceService).persistCancelResult(any(CancelCalculationResult.Cancelled.class));
+			verify(engineResultCommitPort).commitCancel(any(CancelCalculationResult.Cancelled.class));
 		}
 
 		@Test
@@ -324,9 +339,9 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Skipped(SYMBOL, null, CancelResultCode.ORDER_ALREADY_FINAL));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now()));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now()));
 
-			verify(engineResultPersistenceService, never()).persistCancelResult(any());
+			verify(engineResultCommitPort, never()).commitCancel(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());
 		}
@@ -338,9 +353,9 @@ class EngineHandlerTest {
 			when(engine.calculateCancel(any()))
 				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now()));
+			handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now()));
 
-			verify(engineResultPersistenceService, never()).persistCancelResult(any());
+			verify(engineResultCommitPort, never()).commitCancel(any());
 			verify(orderBookStateApplier, never()).apply(any(), any());
 			verify(orderBookCachePort, never()).update(any(), any());
 		}
@@ -354,13 +369,13 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 
 		@Test
-		@DisplayName("호출 순서: persistCancelResult → orderBookStateApplier.apply → orderBookCachePort.update")
+		@DisplayName("호출 순서: commitCancel → orderBookStateApplier.apply → orderBookCachePort.update")
 		void handle_cancelOrder_callOrderIsRemoveSettlementCache() {
 			Order activatedOrder = buyOrder(10_000, 5).activate();
 			Map<OrderId, Order> index = new HashMap<>();
@@ -368,12 +383,12 @@ class EngineHandlerTest {
 			when(orderBook.getIndex()).thenReturn(index);
 			when(engine.calculateCancel(any())).thenReturn(cancelledResult(activatedOrder));
 
-			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
+			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, SYMBOL, Instant.now(), Instant.now()));
 
-			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
-			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
+			InOrder inOrder = inOrder(engineResultCommitPort, orderBookStateApplier, orderBookCachePort);
+			inOrder.verify(engineResultCommitPort).commitCancel(any());
 			inOrder.verify(orderBookStateApplier).apply(any(), any());
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(eq(SYMBOL), any(OrderBookSnapshot.class));
 		}
 	}
 
@@ -394,7 +409,7 @@ class EngineHandlerTest {
 		void handle_shutdown_noInteractions() {
 			handler.handle(new EngineCommand.Shutdown());
 
-			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+			verifyNoInteractions(engine, engineResultCommitPort, orderBookCachePort);
 		}
 	}
 
@@ -463,7 +478,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 			doThrow(new RetryablePersistenceException("retry", new RuntimeException("db timeout")))
-				.when(engineResultPersistenceService).persistPlaceResult(any());
+				.when(engineResultCommitPort).commitPlace(any());
 
 			assertThrows(RetryablePersistenceException.class, () -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
 
@@ -479,7 +494,7 @@ class EngineHandlerTest {
 			Order order = buyOrder(10_000, 5);
 			when(engine.calculatePlace(any())).thenReturn(emptyAccepted());
 			doThrow(new PersistenceInvariantViolationException("broken", new IllegalStateException("unique violation")))
-				.when(engineResultPersistenceService).persistPlaceResult(any());
+				.when(engineResultCommitPort).commitPlace(any());
 
 			assertThrows(PersistenceInvariantViolationException.class,
 				() -> handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now())));
@@ -497,7 +512,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+			verifyNoInteractions(engine, engineResultCommitPort, orderBookCachePort);
 		}
 
 		@Test
@@ -508,7 +523,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verifyNoInteractions(engine, engineResultPersistenceService, orderBookCachePort);
+			verifyNoInteractions(engine, engineResultCommitPort, orderBookCachePort);
 		}
 
 		@Test

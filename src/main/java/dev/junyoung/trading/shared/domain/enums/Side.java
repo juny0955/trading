@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.domain.model.enums;
+package dev.junyoung.trading.shared.domain.enums;
 
 /** 매매 방향. */
 public enum Side {

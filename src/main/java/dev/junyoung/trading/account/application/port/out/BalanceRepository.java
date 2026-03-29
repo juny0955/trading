@@ -4,7 +4,7 @@ import java.util.Optional;
 
 import dev.junyoung.trading.account.domain.model.entity.Balance;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 
 public interface BalanceRepository {
     Optional<Balance> findByAccountIdAndAsset(AccountId accountId, Asset asset);

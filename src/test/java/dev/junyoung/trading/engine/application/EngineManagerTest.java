@@ -3,18 +3,18 @@ package dev.junyoung.trading.engine.application;
 import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
 import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,7 +46,7 @@ class EngineManagerTest {
     private OrderBookCachePort orderBookCachePort;
 
     @Mock
-    private EngineResultPersistenceService engineResultPersistenceService;
+    private EngineResultCommitPort engineResultCommitPort;
 
     @Mock
     private OrderBookProjectionApplier orderBookProjectionApplier;
@@ -87,7 +87,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -106,7 +106,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -136,7 +136,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -156,7 +156,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -185,7 +185,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -265,7 +265,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -284,7 +284,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -303,7 +303,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,
@@ -322,7 +322,7 @@ class EngineManagerTest {
                 tradingProperties,
                 engineStartupRecoveryService,
                 orderBookCachePort,
-                engineResultPersistenceService,
+                engineResultCommitPort,
                 orderBookProjectionApplier,
                 orderBookRebuilder,
                 engineMetrics,

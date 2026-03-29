@@ -25,11 +25,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
-import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import io.micrometer.core.instrument.Timer;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
 import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
@@ -39,13 +38,13 @@ import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PlaceOrderService")

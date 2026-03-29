@@ -5,7 +5,7 @@ import java.util.List;
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 /**
  * 특정 심볼의 live {@link OrderBook}에 {@link BookOperation} 목록을 반영하는 {@link OrderBookStateApplier} 구현체.

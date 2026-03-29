@@ -2,11 +2,11 @@ package dev.junyoung.trading.order.application.port.out.result;
 
 import java.time.Instant;
 
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.domain.model.value.TradeId;
 
 public record AccountTradeResult(

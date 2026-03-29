@@ -5,7 +5,7 @@ import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

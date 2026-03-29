@@ -3,8 +3,11 @@ package dev.junyoung.trading.order.domain.model.entity;
 import java.time.Instant;
 import java.util.Objects;
 
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.*;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 /**
  * 매칭된 단일 체결 결과.

@@ -3,6 +3,7 @@ package dev.junyoung.trading.order.application.service;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import org.springframework.stereotype.Service;
 
+import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
 import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
 import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
 import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
@@ -40,10 +41,8 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isMarket())
             throw new OrderNotCancellableException(orderId);
 
-        if (order.isFinal()) {
-            log.info("Cancel request ignored — order already final (idempotent): orderId={}, status={}", orderId, order.getStatus());
-            return;
-        }
+        if (order.isFinal())
+            throw new OrderAlreadyFinalizedException(orderId);
 
         long acceptedSeq = acceptedSeqGenerator.next();
         orderMetrics.incrementCancelOrderTps();

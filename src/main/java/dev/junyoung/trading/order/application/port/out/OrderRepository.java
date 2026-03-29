@@ -2,7 +2,7 @@ package dev.junyoung.trading.order.application.port.out;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 import java.util.List;
 import java.util.Optional;

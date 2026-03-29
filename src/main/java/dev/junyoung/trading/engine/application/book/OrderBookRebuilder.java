@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import lombok.RequiredArgsConstructor;
 
 @Component

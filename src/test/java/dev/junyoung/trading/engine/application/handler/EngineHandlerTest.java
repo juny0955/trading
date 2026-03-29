@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
@@ -39,15 +40,16 @@ import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.application.exception.PersistenceInvariantViolationException;
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.engine.domain.service.MatchingEngineTest;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
@@ -180,7 +182,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 
 		@Test
@@ -193,7 +195,7 @@ class EngineHandlerTest {
 
 			InOrder inOrder = inOrder(engine, orderBookCachePort);
 			inOrder.verify(engine).calculatePlace(argThat(i -> i.taker().equals(order)));
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 
 		@Test
@@ -215,7 +217,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 
 		@Test
@@ -279,7 +281,7 @@ class EngineHandlerTest {
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistPlaceResult(any());
 			inOrder.verify(orderBookStateApplier).apply(any(), any());
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 	}
 
@@ -356,7 +358,7 @@ class EngineHandlerTest {
 
 			handler.handle(new EngineCommand.CancelOrder(1L, activatedOrder.getOrderId(), ACCOUNT_ID, Instant.now(), Instant.now()));
 
-			verify(orderBookCachePort).update(SYMBOL, orderBook);
+			verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 
 		@Test
@@ -373,7 +375,7 @@ class EngineHandlerTest {
 			InOrder inOrder = inOrder(engineResultPersistenceService, orderBookStateApplier, orderBookCachePort);
 			inOrder.verify(engineResultPersistenceService).persistCancelResult(any());
 			inOrder.verify(orderBookStateApplier).apply(any(), any());
-			inOrder.verify(orderBookCachePort).update(SYMBOL, orderBook);
+			inOrder.verify(orderBookCachePort).update(SYMBOL, OrderBookSnapshotMapper.from(orderBook));
 		}
 	}
 

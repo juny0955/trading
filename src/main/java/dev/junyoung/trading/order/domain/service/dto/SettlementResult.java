@@ -4,7 +4,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 
 public record SettlementResult(
     List<BalanceDelta> balanceDeltas

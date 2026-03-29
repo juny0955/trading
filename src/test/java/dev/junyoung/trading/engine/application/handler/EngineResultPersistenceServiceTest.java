@@ -26,11 +26,11 @@ import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.application.port.out.TradeRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.domain.service.SettlementCalculatorTest;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 

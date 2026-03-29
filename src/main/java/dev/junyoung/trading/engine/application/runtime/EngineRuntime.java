@@ -1,27 +1,28 @@
 package dev.junyoung.trading.engine.application.runtime;
 
-import dev.junyoung.trading.engine.application.EngineManager;
-import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
-import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
-import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
-import dev.junyoung.trading.engine.application.book.SymbolOrderBookStateApplier;
-import dev.junyoung.trading.engine.application.handler.EngineHandler;
-import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
-import dev.junyoung.trading.engine.application.loop.EngineCommand;
-import dev.junyoung.trading.engine.application.loop.EngineLoop;
-import dev.junyoung.trading.engine.application.loop.EngineThread;
-import dev.junyoung.trading.engine.application.exception.EngineNotActiveException;
-import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
-import dev.junyoung.trading.engine.domain.service.MatchingEngine;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
+import dev.junyoung.trading.engine.application.EngineManager;
+import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
+import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
+import dev.junyoung.trading.engine.application.book.SymbolOrderBookStateApplier;
+import dev.junyoung.trading.engine.application.exception.EngineNotActiveException;
+import dev.junyoung.trading.engine.application.handler.EngineHandler;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.loop.EngineLoop;
+import dev.junyoung.trading.engine.application.loop.EngineThread;
+import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.service.MatchingEngine;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 단일 심볼의 매칭 엔진을 구성하는 모든 컴포넌트를 담는 컨테이너.
@@ -128,7 +129,7 @@ public class EngineRuntime implements EngineRuntimeOwner {
         try {
             List<Order> openOrders = orderBookRebuilder.loadOpenOrders(symbol);
             orderBook.rebuild(openOrders);
-            orderBookCachePort.update(symbol, orderBook);
+            orderBookCachePort.update(symbol, OrderBookSnapshotMapper.from(orderBook));
             transitionToActive();
         } catch (Exception e) {
             transitionToDirty();

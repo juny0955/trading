@@ -3,7 +3,7 @@ package dev.junyoung.trading.engine.application.dto;
 import java.util.List;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 public sealed interface CancelCalculationResult
 	permits CancelCalculationResult.Cancelled,

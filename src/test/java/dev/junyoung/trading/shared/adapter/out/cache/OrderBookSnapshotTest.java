@@ -1,14 +1,16 @@
-package dev.junyoung.trading.order.adapter.out.cache;
+package dev.junyoung.trading.shared.adapter.out.cache;
 
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -74,7 +76,7 @@ class OrderBookSnapshotTest {
             OrderBook book = new OrderBook();
             book.add(activatedBuy(10_000, 5));
 
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             assertThat(snapshot.bids()).containsKey(new Price(10_000));
             assertThat(snapshot.asks()).isEmpty();
@@ -86,7 +88,7 @@ class OrderBookSnapshotTest {
             OrderBook book = new OrderBook();
             book.add(activatedSell(10_000, 5));
 
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             assertThat(snapshot.asks()).containsKey(new Price(10_000));
             assertThat(snapshot.bids()).isEmpty();
@@ -99,7 +101,7 @@ class OrderBookSnapshotTest {
             book.add(activatedBuy(10_000, 3));
             book.add(activatedBuy(10_000, 7));
 
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             assertThat(snapshot.bids().get(new Price(10_000))).isEqualTo(new Quantity(10));
         }
@@ -109,7 +111,7 @@ class OrderBookSnapshotTest {
         void from_bidsIsUnmodifiable() {
             OrderBook book = new OrderBook();
             book.add(activatedBuy(10_000, 1));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             assertThatThrownBy(() -> snapshot.bids().put(new Price(9_000), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
@@ -120,7 +122,7 @@ class OrderBookSnapshotTest {
         void from_asksIsUnmodifiable() {
             OrderBook book = new OrderBook();
             book.add(activatedSell(10_000, 1));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             assertThatThrownBy(() -> snapshot.asks().put(new Price(11_000), new Quantity(1)))
                     .isInstanceOf(UnsupportedOperationException.class);
@@ -129,7 +131,7 @@ class OrderBookSnapshotTest {
         @Test
         @DisplayName("빈 OrderBook으로 생성하면 bids·asks 모두 비어 있다")
         void from_emptyOrderBook() {
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(new OrderBook());
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(new OrderBook());
 
             assertThat(snapshot.bids()).isEmpty();
             assertThat(snapshot.asks()).isEmpty();
@@ -147,7 +149,7 @@ class OrderBookSnapshotTest {
         void snapshot_doesNotChangeWhenOrderBookMutated() {
             OrderBook book = new OrderBook();
             book.add(activatedBuy(10_000, 5));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             // 스냅샷 이후 OrderBook 변경
             book.add(activatedBuy(12_000, 3));
@@ -161,7 +163,7 @@ class OrderBookSnapshotTest {
         void snapshot_doesNotChangeWhenOrderBookPolled() {
             OrderBook book = new OrderBook();
             book.add(activatedBuy(10_000, 5));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
 
             book.poll(Side.BUY);
 

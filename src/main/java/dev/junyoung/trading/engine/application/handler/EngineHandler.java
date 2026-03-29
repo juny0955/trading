@@ -1,33 +1,33 @@
 package dev.junyoung.trading.engine.application.handler;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
-import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.book.OrderBookStateApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
 import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
-import dev.junyoung.trading.engine.application.loop.EngineCommand;
-import dev.junyoung.trading.engine.application.loop.EngineLoop;
-import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.application.exception.PersistenceInvariantViolationException;
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.time.Duration;
-import java.time.Instant;
 
 /**
  * {@link EngineCommand}를 수신해 {@link MatchingEngine}으로 디스패치하는 핸들러.
@@ -187,7 +187,7 @@ public class EngineHandler {
 
 	private void updateCache() {
 		try {
-			orderBookCachePort.update(symbol, orderBook);
+			orderBookCachePort.update(symbol, OrderBookSnapshotMapper.from(orderBook));
 		} catch (Exception e) {
 			log.error("Cache update failed after apply: symbol={}", symbol, e);
 		}

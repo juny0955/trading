@@ -1,4 +1,4 @@
-package dev.junyoung.trading.account.domain.model.value;
+package dev.junyoung.trading.shared.domain.value;
 
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 

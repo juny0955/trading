@@ -3,20 +3,22 @@ package dev.junyoung.trading.engine.application.runtime;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.engine.application.service.EngineResultPersistenceService;
 import dev.junyoung.trading.engine.application.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.exception.EngineNotActiveException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -130,8 +132,8 @@ class EngineRuntimeTest {
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
             verify(orderBookCachePort).update(eq(SYMBOL), argThat(book -> {
-                assertThat(book.bestBid()).contains(new Price(10_100L));
-                assertThat(book.bestAsk()).contains(new Price(10_200L));
+                assertThat(book.bids()).contains(new Price(10_100L));
+                assertThat(book.asks()).contains(new Price(10_200L));
                 return true;
             }));
         }
@@ -146,7 +148,7 @@ class EngineRuntimeTest {
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultPersistenceService, orderBookRebuilder, engineMetrics);
 
             ArgumentCaptor<OrderBook> captor = ArgumentCaptor.forClass(OrderBook.class);
-            verify(orderBookCachePort).update(eq(SYMBOL), captor.capture());
+            verify(orderBookCachePort).update(eq(SYMBOL), OrderBookSnapshotMapper.from(captor.capture()));
 
             OrderBook rebuiltBook = captor.getValue();
             assertThat(rebuiltBook.poll(Side.BUY)).get().extracting(Order::getOrderId).isEqualTo(first.getOrderId());
@@ -191,7 +193,7 @@ class EngineRuntimeTest {
 
             runtime.attemptRebuild();
 
-            verify(orderBookCachePort, times(1)).update(eq(SYMBOL), any(OrderBook.class));
+            verify(orderBookCachePort, times(1)).update(eq(SYMBOL), any(OrderBookSnapshot.class));
         }
     }
 

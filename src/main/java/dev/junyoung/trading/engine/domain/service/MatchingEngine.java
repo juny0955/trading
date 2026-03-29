@@ -16,9 +16,9 @@ import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
 
 /**
  * 단일 종목 주문 매칭 엔진. 가격-시간 우선(Price-Time Priority)으로 체결을 수행한다.

@@ -1,6 +1,6 @@
 package dev.junyoung.trading.account.domain.model.entity;
 
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

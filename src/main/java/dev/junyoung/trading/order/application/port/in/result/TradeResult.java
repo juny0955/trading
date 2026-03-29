@@ -4,7 +4,7 @@ import java.time.Instant;
 
 import dev.junyoung.trading.order.application.port.out.result.AccountTradeResult;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 
 public record TradeResult(
 	String tradeId,

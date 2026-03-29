@@ -23,12 +23,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.engine.application.engine.book.OrderBookStateApplier;
+import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
+import dev.junyoung.trading.engine.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.engine.application.engine.dto.CancelResultCode;
+import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
-import dev.junyoung.trading.engine.domain.model.BookOperation;
-import dev.junyoung.trading.engine.domain.model.CancelCalculationResult;
-import dev.junyoung.trading.engine.domain.model.CancelResultCode;
+
 import dev.junyoung.trading.engine.domain.model.OrderBook;
-import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
+
 import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
 import dev.junyoung.trading.engine.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.engine.runtime.EngineRuntimeOwner;

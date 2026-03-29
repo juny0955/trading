@@ -1,4 +1,4 @@
-package dev.junyoung.trading.engine.domain.model;
+package dev.junyoung.trading.engine.application.engine.dto;
 
 public enum CancelResultCode {
 	ORDER_NOT_FOUND,

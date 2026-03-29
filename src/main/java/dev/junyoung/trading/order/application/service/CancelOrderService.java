@@ -23,7 +23,7 @@ import java.time.Instant;
 public class CancelOrderService implements CancelOrderUseCase {
 
     private final AcceptedSeqGenerator acceptedSeqGenerator;
-    private final EngineCommandPort engineCommandGateway;
+    private final EngineCommandPort engineCommandPort;
     private final OrderRepository orderRepository;
     private final OrderMetrics orderMetrics;
 
@@ -47,6 +47,6 @@ public class CancelOrderService implements CancelOrderUseCase {
 
         long acceptedSeq = acceptedSeqGenerator.next();
         orderMetrics.incrementCancelOrderTps();
-        engineCommandGateway.submitCancel(order.getSymbol(), acceptedSeq, order.getOrderId(), order.getAccountId(), serviceEnteredAt);
+        engineCommandPort.submitCancel(order.getSymbol(), acceptedSeq, order.getOrderId(), order.getAccountId(), serviceEnteredAt);
     }
 }

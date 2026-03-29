@@ -17,8 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.engine.domain.model.CancelCalculationResult;
-import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
+import dev.junyoung.trading.engine.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.BalanceSettlementPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;

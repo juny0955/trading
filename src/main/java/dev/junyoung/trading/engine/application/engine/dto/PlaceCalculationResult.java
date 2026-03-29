@@ -1,7 +1,8 @@
-package dev.junyoung.trading.engine.domain.model;
+package dev.junyoung.trading.engine.application.engine.dto;
 
 import java.util.List;
 
+import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.value.Symbol;

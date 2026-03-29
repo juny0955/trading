@@ -30,11 +30,14 @@ public class PlaceOrderService implements PlaceOrderUseCase {
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final AcceptedSeqGenerator acceptedSeqGenerator;
+    private final OrderRepository orderRepository;
+
+    private final OrderCompensationService orderCompensationService;
+
     private final AccountQueryPort accountQueryPort;
     private final HoldReservationPort holdReservationPort;
-    private final OrderRepository orderRepository;
-    private final EngineCommandPort engineCommandGateway;
-    private final OrderCompensationService orderCompensationService;
+    private final EngineCommandPort engineCommandPort;
+
     private final OrderMetrics orderMetrics;
     private final EngineMetrics engineMetrics;
 
@@ -78,7 +81,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             @Override
             public void afterCommit() {
                 try {
-                    engineCommandGateway.submitPlace(order.getSymbol(), order, serviceEnteredAt);
+                    engineCommandPort.submitPlace(order.getSymbol(), order, serviceEnteredAt);
                     orderMetrics.incrementAcceptedOrderTps();
                 } catch (Exception e) {
                     engineMetrics.incrementEngineBackpressure();

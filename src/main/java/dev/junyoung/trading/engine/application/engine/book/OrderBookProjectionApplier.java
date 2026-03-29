@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import dev.junyoung.trading.engine.domain.model.BookOperation;
+import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
 import dev.junyoung.trading.engine.domain.model.OrderBook;
 
 @Component

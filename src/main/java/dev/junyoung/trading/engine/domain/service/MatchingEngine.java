@@ -5,10 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import dev.junyoung.trading.engine.domain.model.BookOperation;
-import dev.junyoung.trading.engine.domain.model.CancelCalculationResult;
-import dev.junyoung.trading.engine.domain.model.CancelResultCode;
-import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
+import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
+import dev.junyoung.trading.engine.application.engine.dto.CancelCalculationResult;
+import dev.junyoung.trading.engine.application.engine.dto.CancelResultCode;
+import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
+
 import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;

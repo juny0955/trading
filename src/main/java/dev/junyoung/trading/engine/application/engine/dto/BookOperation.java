@@ -1,4 +1,4 @@
-package dev.junyoung.trading.engine.application.engine.dto;
+package dev.junyoung.trading.engine.domain.model;
 
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;

@@ -8,10 +8,13 @@ import dev.junyoung.trading.engine.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.engine.runtime.EngineRuntime;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
-import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -34,7 +37,7 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class EngineManager implements OrderCommandGateway {
+public class EngineManager implements EngineCommandPort {
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -98,9 +101,16 @@ public class EngineManager implements OrderCommandGateway {
      * @throws UnsupportedSymbolException 등록되지 않은 심볼인 경우
      */
     @Override
-    public void submit(Symbol symbol, EngineCommand command) {
+    public void submitPlace(Symbol symbol, Order order, Instant serviceEnteredAt) {
         EngineRuntime ctx = contexts.get(symbol);
         if (ctx == null) throw new UnsupportedSymbolException(symbol.value());
-        ctx.submit(command);
+        ctx.submit(new EngineCommand.PlaceOrder(order, serviceEnteredAt, null));
+    }
+
+    @Override
+    public void submitCancel(Symbol symbol, long acceptedSeq, OrderId orderId, AccountId requesterAccountId, Instant serviceEnteredAt) {
+        EngineRuntime ctx = contexts.get(symbol);
+        if (ctx == null) throw new UnsupportedSymbolException(symbol.value());
+        ctx.submit(new EngineCommand.CancelOrder(acceptedSeq, orderId, requesterAccountId, serviceEnteredAt, null));
     }
 }

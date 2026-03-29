@@ -8,11 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.annotation.Transactional;
 
-import dev.junyoung.trading.engine.application.engine.dto.CancelCalculationResult;
-import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
 import dev.junyoung.trading.engine.application.exception.PersistenceInvariantViolationException;
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.domain.model.CancelCalculationResult;
+import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
 import dev.junyoung.trading.order.application.port.out.BalanceSettlementPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.application.port.out.TradeRepository;

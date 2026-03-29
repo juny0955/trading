@@ -4,12 +4,11 @@ import dev.junyoung.trading.common.props.TradingProperties;
 import dev.junyoung.trading.engine.application.engine.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.engine.book.OrderBookRebuilder;
 import dev.junyoung.trading.engine.application.engine.handler.EngineResultPersistenceService;
-import dev.junyoung.trading.engine.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -71,10 +70,9 @@ class EngineManagerTest {
         if (engineManager != null) engineManager.stop();
     }
 
-    private EngineCommand.PlaceOrder placeOrder(String symbol) {
+    private Order placeOrder(String symbol) {
         Symbol sym = new Symbol(symbol);
-        Order order = OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
-        return new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now());
+        return OrderFixture.createLimit(Side.BUY, sym, TimeInForce.GTC, new Price(10_000), new Quantity(5));
     }
 
     @Nested
@@ -146,7 +144,7 @@ class EngineManagerTest {
             );
             engineManager.start();
 
-            assertThatCode(() -> engineManager.submit(new Symbol("BTC"), placeOrder("BTC"))).doesNotThrowAnyException();
+            assertThatCode(() -> engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now())).doesNotThrowAnyException();
         }
 
         @Test
@@ -168,7 +166,7 @@ class EngineManagerTest {
 
             assertThrows(
                 UnsupportedSymbolException.class,
-                () -> engineManager.submit(new Symbol("XRP"), placeOrder("XRP"))
+                () -> engineManager.submitPlace(new Symbol("XRP"), placeOrder("XRP"), Instant.now())
             );
         }
     }
@@ -208,7 +206,7 @@ class EngineManagerTest {
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+                        engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) {
                     } finally {
@@ -234,14 +232,14 @@ class EngineManagerTest {
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submit(new Symbol("BTC"), placeOrder("BTC"));
+                        engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) { } finally { doneLatch.countDown(); }
                 }).start();
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submit(new Symbol("ETH"), placeOrder("ETH"));
+                        engineManager.submitPlace(new Symbol("ETH"), placeOrder("ETH"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) { } finally { doneLatch.countDown(); }
                 }).start();

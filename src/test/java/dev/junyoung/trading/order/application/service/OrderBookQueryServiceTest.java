@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;

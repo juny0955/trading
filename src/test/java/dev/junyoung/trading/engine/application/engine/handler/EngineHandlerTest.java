@@ -22,11 +22,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
-import dev.junyoung.trading.engine.application.engine.dto.CancelCalculationResult;
-import dev.junyoung.trading.engine.application.engine.dto.CancelResultCode;
-import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
-import dev.junyoung.trading.engine.application.engine.dto.PlaceRejectCode;
+import dev.junyoung.trading.engine.application.engine.book.OrderBookStateApplier;
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
+import dev.junyoung.trading.engine.domain.model.BookOperation;
+import dev.junyoung.trading.engine.domain.model.CancelCalculationResult;
+import dev.junyoung.trading.engine.domain.model.CancelResultCode;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
+import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
 import dev.junyoung.trading.engine.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.engine.runtime.EngineRuntimeOwner;
 import dev.junyoung.trading.engine.application.engine.runtime.EngineSymbolState;
@@ -34,9 +37,6 @@ import dev.junyoung.trading.engine.application.exception.PersistenceInvariantVio
 import dev.junyoung.trading.engine.application.exception.RetryablePersistenceException;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
-import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
-import dev.junyoung.trading.order.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
@@ -292,7 +292,7 @@ class EngineHandlerTest {
 			OrderId orderId = OrderId.newId();
 			// getIndex()는 @BeforeEach에서 빈 맵으로 설정
 			when(engine.calculateCancel(any()))
-				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, dev.junyoung.trading.engine.application.engine.dto.CancelResultCode.ORDER_NOT_FOUND));
+				.thenReturn(new CancelCalculationResult.Rejected(SYMBOL, null, CancelResultCode.ORDER_NOT_FOUND));
 
 			assertDoesNotThrow(() -> handler.handle(new EngineCommand.CancelOrder(1L, orderId, ACCOUNT_ID, Instant.now(), Instant.now())));
 

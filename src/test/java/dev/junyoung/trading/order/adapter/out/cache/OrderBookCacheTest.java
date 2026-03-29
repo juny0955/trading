@@ -2,7 +2,7 @@ package dev.junyoung.trading.order.adapter.out.cache;
 
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;

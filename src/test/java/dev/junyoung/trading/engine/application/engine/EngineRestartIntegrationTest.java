@@ -14,7 +14,7 @@ import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.enums.Side;
@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.UUID;
 
+import static dev.junyoung.trading.order.domain.model.enums.OrderType.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -150,7 +151,7 @@ class EngineRestartIntegrationTest {
             acceptedSeq,
             SYMBOL,
             side,
-            dev.junyoung.trading.order.domain.model.enums.OrderType.LIMIT,
+            LIMIT,
             TimeInForce.GTC,
             new Price(price),
             null,

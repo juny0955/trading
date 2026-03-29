@@ -16,9 +16,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
-import dev.junyoung.trading.engine.application.engine.dto.PlaceCalculationResult;
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.BookOperation;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.PlaceCalculationResult;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;

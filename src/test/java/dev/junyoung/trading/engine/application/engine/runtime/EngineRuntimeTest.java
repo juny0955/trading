@@ -8,7 +8,7 @@ import dev.junyoung.trading.engine.application.engine.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.exception.EngineNotActiveException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.application.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
 import dev.junyoung.trading.order.domain.model.enums.Side;

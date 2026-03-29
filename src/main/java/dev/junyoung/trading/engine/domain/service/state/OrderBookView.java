@@ -7,7 +7,7 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
 
-import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.Side;
 import dev.junyoung.trading.order.domain.model.value.OrderId;

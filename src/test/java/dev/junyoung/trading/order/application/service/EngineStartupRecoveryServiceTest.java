@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.Asset;
 import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
 import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
 import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;

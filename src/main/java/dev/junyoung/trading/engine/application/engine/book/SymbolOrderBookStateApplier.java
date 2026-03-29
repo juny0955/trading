@@ -2,10 +2,9 @@ package dev.junyoung.trading.engine.application.engine.book;
 
 import java.util.List;
 
-import dev.junyoung.trading.engine.application.engine.dto.BookOperation;
+import dev.junyoung.trading.engine.domain.model.BookOperation;
 import dev.junyoung.trading.engine.application.engine.runtime.EngineRuntime;
-import dev.junyoung.trading.order.application.port.out.OrderBookStateApplier;
-import dev.junyoung.trading.order.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.Symbol;
 
 /**

@@ -1,8 +1,8 @@
-package dev.junyoung.trading.order.domain.model;
+package dev.junyoung.trading.engine.domain.model;
 
 import java.util.*;
 
-import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.order.domain.model.value.OrderId;

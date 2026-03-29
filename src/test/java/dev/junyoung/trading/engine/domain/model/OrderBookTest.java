@@ -1,4 +1,4 @@
-package dev.junyoung.trading.order.domain.model;
+package dev.junyoung.trading.engine.domain.model;
 
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.junyoung.trading.order.domain.exception.OrderBookInvariantViolationException;
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
 
 @DisplayName("OrderBook")
 class OrderBookTest {

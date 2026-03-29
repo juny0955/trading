@@ -1,35 +1,32 @@
 package dev.junyoung.trading.engine.application;
 
-import dev.junyoung.trading.common.props.TradingProperties;
-import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
-import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
-import dev.junyoung.trading.engine.application.contract.CancelCommandEnvelope;
-import dev.junyoung.trading.engine.application.contract.EngineContractMapper;
-import dev.junyoung.trading.engine.application.contract.PlaceCommandEnvelope;
-import dev.junyoung.trading.engine.application.loop.EngineCommand;
-import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
-import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
-import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
-import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
-import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
-import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
-import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.shared.domain.value.Symbol;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import dev.junyoung.trading.common.props.TradingProperties;
+import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
+import dev.junyoung.trading.engine.application.contract.CancelCommandEnvelope;
+import dev.junyoung.trading.engine.application.contract.PlaceCommandEnvelope;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 심볼별 {@link EngineRuntime}를 생성·관리하고 커맨드를 올바른 엔진으로 라우팅하는 오케스트레이터.
@@ -105,27 +102,15 @@ public class EngineManager implements EngineCommandPort {
      *
      * @throws UnsupportedSymbolException 등록되지 않은 심볼인 경우
      */
-    @Override
     public void submitPlace(PlaceCommandEnvelope command, Instant serviceEnteredAt) {
         EngineRuntime ctx = contexts.get(command.symbol());
         if (ctx == null) throw new UnsupportedSymbolException(command.symbol().value());
         ctx.submit(new EngineCommand.PlaceOrder(command, serviceEnteredAt, null));
     }
 
-    @Override
-    public void submitPlace(Symbol symbol, Order order, Instant serviceEnteredAt) {
-        submitPlace(EngineContractMapper.toPlaceCommandEnvelope(order), serviceEnteredAt);
-    }
-
-    @Override
     public void submitCancel(CancelCommandEnvelope command, Instant serviceEnteredAt) {
         EngineRuntime ctx = contexts.get(command.symbol());
         if (ctx == null) throw new UnsupportedSymbolException(command.symbol().value());
         ctx.submit(new EngineCommand.CancelOrder(command, serviceEnteredAt, null));
-    }
-
-    @Override
-    public void submitCancel(Symbol symbol, long acceptedSeq, OrderId orderId, AccountId requesterAccountId, Instant serviceEnteredAt) {
-        submitCancel(new CancelCommandEnvelope(symbol, acceptedSeq, orderId, requesterAccountId), serviceEnteredAt);
     }
 }

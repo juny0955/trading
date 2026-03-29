@@ -1,7 +1,7 @@
 package dev.junyoung.trading.engine.application.exception;
 
 import dev.junyoung.trading.common.exception.base.BusinessException;
-import dev.junyoung.trading.engine.application.engine.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
 
 public class EngineNotActiveException extends BusinessException {
     public EngineNotActiveException(EngineSymbolState state) {

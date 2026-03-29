@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.junyoung.trading.engine.application.engine.book.OrderBookViewFactory;
+import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
 import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
 import dev.junyoung.trading.engine.domain.model.OrderBook;

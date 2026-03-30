@@ -12,6 +12,8 @@ import dev.junyoung.trading.shared.domain.value.Quantity;
 
 public final class OrderBookSnapshotMapper {
 
+	private OrderBookSnapshotMapper() {}
+
 	/**
 	 * {@link OrderBook}의 현재 상태를 읽어 불변 스냅샷을 생성한다.
 	 * engine-thread에서만 호출해야 한다.

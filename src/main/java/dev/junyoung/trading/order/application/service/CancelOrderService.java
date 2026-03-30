@@ -1,22 +1,22 @@
 package dev.junyoung.trading.order.application.service;
 
-import dev.junyoung.trading.account.domain.model.value.AccountId;
+import java.time.Instant;
+
 import org.springframework.stereotype.Service;
 
-import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
-import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
-import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
 import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
 import dev.junyoung.trading.order.application.port.in.CancelOrderUseCase;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
 import dev.junyoung.trading.order.application.port.out.OrderRepository;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.Instant;
 
 @Slf4j
 @Service
@@ -41,8 +41,10 @@ public class CancelOrderService implements CancelOrderUseCase {
         if (order.isMarket())
             throw new OrderNotCancellableException(orderId);
 
-        if (order.isFinal())
-            throw new OrderAlreadyFinalizedException(orderId);
+        if (order.isFinal()) {
+            log.info("Cancel request ignored — order already final (idempotent): orderId={}, status={}", orderId, order.getStatus());
+            return;
+        }
 
         long acceptedSeq = acceptedSeqGenerator.next();
         orderMetrics.incrementCancelOrderTps();

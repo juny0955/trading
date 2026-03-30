@@ -19,7 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.exception.OrderAlreadyFinalizedException;
 import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
 import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
 import dev.junyoung.trading.order.application.metrics.OrderMetrics;
@@ -148,15 +147,15 @@ class CancelOrderServiceTest {
         }
 
         @Test
-        @DisplayName("이미 종료된 주문은 OrderAlreadyFinalizedException이 발생한다")
-        void cancelAlreadyFinalized_throwsOrderAlreadyFinalizedException() {
+        @DisplayName("이미 종료된 주문은 엔진 커맨드 없이 no-op으로 성공 반환한다 (idempotent cancel)")
+        void cancelAlreadyFinalized_noOpSuccessReturn() {
             OrderId orderId = new OrderId(UUID.randomUUID());
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5))
-                    .activate().cancel();
+                .activate().cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
-            assertThrows(OrderAlreadyFinalizedException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
+            assertDoesNotThrow(() -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
             verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
     }

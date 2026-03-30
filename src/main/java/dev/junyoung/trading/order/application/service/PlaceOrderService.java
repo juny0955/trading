@@ -1,27 +1,30 @@
 package dev.junyoung.trading.order.application.service;
 
-import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
-import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
-import dev.junyoung.trading.order.application.metrics.EngineMetrics;
-import dev.junyoung.trading.order.application.metrics.OrderMetrics;
-import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
-import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
-import dev.junyoung.trading.order.application.port.out.*;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
-import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.Instant;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.time.Instant;
+import dev.junyoung.trading.account.application.exception.account.AccountNotFoundException;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
+import dev.junyoung.trading.order.application.port.in.PlaceOrderUseCase;
+import dev.junyoung.trading.order.application.port.in.command.PlaceOrderCommand;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.AccountQueryPort;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.order.application.port.out.HoldReservationPort;
+import dev.junyoung.trading.order.application.port.out.IdempotencyKeyRepository;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.domain.service.BalanceHoldPolicy;
+import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -31,13 +34,15 @@ public class PlaceOrderService implements PlaceOrderUseCase {
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final AcceptedSeqGenerator acceptedSeqGenerator;
+    private final OrderRepository orderRepository;
+
+    private final OrderCompensationService orderCompensationService;
+
     private final AccountQueryPort accountQueryPort;
     private final HoldReservationPort holdReservationPort;
-    private final OrderRepository orderRepository;
-    private final OrderCommandGateway engineCommandGateway;
-    private final OrderCompensationService orderCompensationService;
+    private final EngineCommandPort engineCommandPort;
+
     private final OrderMetrics orderMetrics;
-    private final EngineMetrics engineMetrics;
 
     @Override
     public OrderId placeOrder(PlaceOrderCommand command) {
@@ -79,11 +84,9 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             @Override
             public void afterCommit() {
                 try {
-                    engineCommandGateway.submit(order.getSymbol(),
-                        new EngineCommand.PlaceOrder(order, serviceEnteredAt, null));
+                    engineCommandPort.submitPlace(order.getSymbol(), order, serviceEnteredAt);
                     orderMetrics.incrementAcceptedOrderTps();
                 } catch (Exception e) {
-                    engineMetrics.incrementEngineBackpressure();
                     try {
                         orderCompensationService.compensate(order);
                         orderMetrics.incrementQueueFullRollback();

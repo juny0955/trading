@@ -1,7 +1,7 @@
 package dev.junyoung.trading.order.domain.service;
 
 import dev.junyoung.trading.account.domain.model.entity.Balance;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.common.exception.BusinessRuleException;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 

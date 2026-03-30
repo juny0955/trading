@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import lombok.Getter;
 
 /**

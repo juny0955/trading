@@ -1,7 +1,7 @@
 package dev.junyoung.trading.order.application.port.in.result;
 
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
 
 import java.util.NavigableMap;
 

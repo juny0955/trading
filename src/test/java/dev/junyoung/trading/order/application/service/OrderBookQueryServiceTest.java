@@ -1,21 +1,9 @@
 package dev.junyoung.trading.order.application.service;
 
-import dev.junyoung.trading.order.adapter.out.cache.OrderBookCache;
-import dev.junyoung.trading.order.fixture.OrderFixture;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-import dev.junyoung.trading.order.adapter.out.cache.OrderBookSnapshot;
-import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
-import dev.junyoung.trading.order.domain.model.OrderBook;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,6 +11,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
+import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.fixture.OrderFixture;
+import dev.junyoung.trading.shared.adapter.out.cache.OrderBookCache;
+import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderBookQueryService")
@@ -59,7 +60,7 @@ class OrderBookQueryServiceTest {
             book.add(activatedBuy(10_000, 5));
             book.add(activatedBuy(9_000, 3));
             book.add(activatedSell(11_000, 2));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
             when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");
@@ -88,7 +89,7 @@ class OrderBookQueryServiceTest {
             book.add(activatedBuy(8_000, 3));
             book.add(activatedSell(12_000, 1));
             book.add(activatedSell(11_000, 2));
-            OrderBookSnapshot snapshot = OrderBookSnapshot.from(book);
+            OrderBookSnapshot snapshot = OrderBookSnapshotMapper.from(book);
             when(orderBookCache.getSnapshot(any(Symbol.class))).thenReturn(snapshot);
 
             OrderBookResult result = sut.getOrderBookCache("BTC");

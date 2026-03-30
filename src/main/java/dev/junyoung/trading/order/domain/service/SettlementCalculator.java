@@ -1,10 +1,10 @@
 package dev.junyoung.trading.order.domain.service;
 
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
 import dev.junyoung.trading.order.domain.service.dto.DeltaBook;
 import dev.junyoung.trading.order.domain.service.dto.OrderIndex;
 import dev.junyoung.trading.order.domain.service.dto.SettlementInput;

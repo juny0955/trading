@@ -1,25 +1,14 @@
 package dev.junyoung.trading.order.application.service;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentCaptor.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import java.util.Optional;
 import java.util.UUID;
 
-import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.order.application.engine.loop.EngineCommand;
-import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
-import dev.junyoung.trading.order.application.port.out.OrderCommandGateway;
-import dev.junyoung.trading.order.application.exception.order.OrderNotCancellableException;
-import dev.junyoung.trading.order.application.exception.order.OrderNotFoundException;
-import dev.junyoung.trading.order.application.metrics.OrderMetrics;
-import dev.junyoung.trading.order.application.port.out.OrderRepository;
-import dev.junyoung.trading.order.domain.model.entity.Order;
-import dev.junyoung.trading.order.domain.model.enums.Side;
-import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
-import dev.junyoung.trading.order.domain.model.value.OrderId;
-import dev.junyoung.trading.order.domain.model.value.Price;
-import dev.junyoung.trading.order.domain.model.value.Quantity;
-import dev.junyoung.trading.order.domain.model.value.QuoteQty;
-import dev.junyoung.trading.order.domain.model.value.Symbol;
-import dev.junyoung.trading.order.fixture.OrderFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,14 +18,22 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentCaptor.forClass;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import dev.junyoung.trading.account.domain.model.value.AccountId;
+import dev.junyoung.trading.order.application.exception.OrderNotCancellableException;
+import dev.junyoung.trading.order.application.exception.OrderNotFoundException;
+import dev.junyoung.trading.order.application.metrics.OrderMetrics;
+import dev.junyoung.trading.order.application.port.out.AcceptedSeqGenerator;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.order.application.port.out.OrderRepository;
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.order.fixture.OrderFixture;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.QuoteQty;
+import dev.junyoung.trading.shared.domain.value.Symbol;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CancelOrderService")
@@ -51,7 +48,7 @@ class CancelOrderServiceTest {
     private AcceptedSeqGenerator acceptedSeqGenerator;
 
     @Mock
-    private OrderCommandGateway engineCommandGateway;
+    private EngineCommandPort engineCommandGateway;
 
     @Mock
     private OrderRepository orderRepository;
@@ -78,9 +75,7 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-            assertThat(captor.getValue()).isInstanceOf(EngineCommand.CancelOrder.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), any(OrderId.class), any(AccountId.class), any());
         }
 
         @Test
@@ -92,11 +87,9 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-
-            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
-            assertThat(cmd.orderId()).isEqualTo(orderId);
+            ArgumentCaptor<OrderId> captor = forClass(OrderId.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), captor.capture(), any(AccountId.class), any());
+            assertThat(captor.getValue()).isEqualTo(orderId);
         }
 
         @Test
@@ -107,11 +100,9 @@ class CancelOrderServiceTest {
 
             sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString());
 
-            ArgumentCaptor<EngineCommand> captor = forClass(EngineCommand.class);
-            verify(engineCommandGateway).submit(any(Symbol.class), captor.capture());
-
-            EngineCommand.CancelOrder cmd = (EngineCommand.CancelOrder) captor.getValue();
-            assertThat(cmd.requesterAccountId()).isEqualTo(ACCOUNT_ID);
+            ArgumentCaptor<AccountId> captor = forClass(AccountId.class);
+            verify(engineCommandGateway).submitCancel(any(Symbol.class), anyLong(), any(OrderId.class), captor.capture(), any());
+            assertThat(captor.getValue()).isEqualTo(ACCOUNT_ID);
         }
 
         @Test
@@ -130,7 +121,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(buyOrder("BTC")));
 
             assertThrows(OrderNotFoundException.class, () -> sut.cancelOrder(OTHER_ACCOUNT_ID, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
 
         @Test
@@ -152,7 +143,7 @@ class CancelOrderServiceTest {
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(marketOrder));
 
             assertThrows(OrderNotCancellableException.class, () -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
 
         @Test
@@ -160,12 +151,12 @@ class CancelOrderServiceTest {
         void cancelAlreadyFinalized_noOpSuccessReturn() {
             OrderId orderId = new OrderId(UUID.randomUUID());
             Order order = OrderFixture.createLimit(ACCOUNT_ID, Side.BUY, new Symbol("BTC"), TimeInForce.GTC, new Price(10_000), new Quantity(5))
-                    .activate().cancel();
+                .activate().cancel();
 
             when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
             assertDoesNotThrow(() -> sut.cancelOrder(ACCOUNT_ID_RAW, orderId.toString()));
-            verify(engineCommandGateway, never()).submit(any(), any());
+            verify(engineCommandGateway, never()).submitCancel(any(), anyLong(), any(), any(), any());
         }
     }
 }

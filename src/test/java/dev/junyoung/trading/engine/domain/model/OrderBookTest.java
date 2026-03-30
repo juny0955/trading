@@ -1,0 +1,956 @@
+package dev.junyoung.trading.engine.domain.model;
+
+import dev.junyoung.trading.order.fixture.OrderFixture;
+
+import dev.junyoung.trading.order.domain.model.entity.Order;
+import dev.junyoung.trading.order.domain.model.value.OrderId;
+import dev.junyoung.trading.shared.domain.value.Price;
+import dev.junyoung.trading.shared.domain.value.Quantity;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.domain.enums.Side;
+import dev.junyoung.trading.order.domain.model.enums.TimeInForce;
+
+import java.util.List;
+import java.util.NavigableMap;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
+
+@DisplayName("OrderBook")
+class OrderBookTest {
+
+	private OrderBook orderBook;
+
+	@BeforeEach
+	void setUp() {
+		orderBook = new OrderBook();
+	}
+
+	// ── 헬퍼 ──────────────────────────────────────────────────────────────
+
+	private static final Symbol SYMBOL = new Symbol("BTC");
+	private static final Price DEFAULT_PRICE = new Price(10_000);
+
+	/** ACCEPTED → activate() → NEW 상태인 BUY 주문 */
+	private Order newBuyOrder(long price, long qty) {
+		return OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
+	}
+
+	/** ACCEPTED → activate() → NEW 상태인 SELL 주문 */
+	private Order newSellOrder(long price, long qty) {
+		return OrderFixture.createLimit(Side.SELL, SYMBOL, TimeInForce.GTC, new Price(price), new Quantity(qty)).activate();
+	}
+
+	// ── add() ─────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("add()")
+	class Add {
+
+		@Test
+		@DisplayName("BUY 주문을 추가하면 bestBid에서 해당 가격이 조회된다")
+		void addBuyOrderUpdatesBestBid() {
+			orderBook.add(newBuyOrder(10_000, 5));
+
+			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("SELL 주문을 추가하면 bestAsk에서 해당 가격이 조회된다")
+		void addSellOrderUpdatesBestAsk() {
+			orderBook.add(newSellOrder(10_000, 5));
+
+			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨에 두 주문을 추가하면 추가 순서(FIFO)로 보관된다")
+		void samePriceLevelPreservesFifoOrder() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(first);
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+		}
+
+		@Test
+		@DisplayName("BUY 주문을 낮은 가격 순으로 추가해도 bestBid는 가장 높은 가격이다")
+		void addBuyOrdersAscendingPriceStillShowsHighestBestBid() {
+			orderBook.add(newBuyOrder(8_000, 1));
+			orderBook.add(newBuyOrder(9_000, 1));
+			orderBook.add(newBuyOrder(10_000, 1));
+
+			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("SELL 주문을 높은 가격 순으로 추가해도 bestAsk는 가장 낮은 가격이다")
+		void addSellOrdersDescendingPriceStillShowsLowestBestAsk() {
+			orderBook.add(newSellOrder(12_000, 1));
+			orderBook.add(newSellOrder(11_000, 1));
+			orderBook.add(newSellOrder(10_000, 1));
+
+			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("동일 orderId 주문을 중복 추가하면 OrderBookInvariantViolationException이 발생한다")
+		void addDuplicateOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+
+			assertThatThrownBy(() -> orderBook.add(order))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("시장가(MARKET) 주문 추가 시 OrderBookInvariantViolationException이 발생한다")
+		void addMarketOrder_throwsException() {
+			Order market = OrderFixture.createMarketSell(SYMBOL, new Quantity(1)).activate();
+
+			assertThatThrownBy(() -> orderBook.add(market))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("비활성(ACCEPTED) 주문 추가 시 OrderBookInvariantViolationException이 발생한다")
+		void addInactiveOrder_throwsException() {
+			Order accepted = OrderFixture.createLimit(Side.BUY, SYMBOL, TimeInForce.GTC, new Price(10_000), new Quantity(5));
+
+			assertThatThrownBy(() -> orderBook.add(accepted))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+	}
+
+	// ── poll() ────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("poll()")
+	class Poll {
+
+		@Test
+		@DisplayName("BUY 호가가 없으면 Optional.empty()를 반환한다")
+		void pollEmptyBidsReturnsEmpty() {
+			assertThat(orderBook.poll(Side.BUY)).isEmpty();
+		}
+
+		@Test
+		@DisplayName("SELL 호가가 없으면 Optional.empty()를 반환한다")
+		void pollEmptyAsksReturnsEmpty() {
+			assertThat(orderBook.poll(Side.SELL)).isEmpty();
+		}
+
+		@Test
+		@DisplayName("BUY poll: 가장 높은 가격 주문이 먼저 반환된다 (가격 우선)")
+		void pollBuyReturnsHighestPriceFirst() {
+			Order low  = newBuyOrder(9_000, 1);
+			Order high = newBuyOrder(11_000, 1);
+			orderBook.add(low);
+			orderBook.add(high);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(high);
+			assertThat(orderBook.poll(Side.BUY)).contains(low);
+		}
+
+		@Test
+		@DisplayName("SELL poll: 가장 낮은 가격 주문이 먼저 반환된다 (가격 우선)")
+		void pollSellReturnsLowestPriceFirst() {
+			Order low  = newSellOrder(9_000, 1);
+			Order high = newSellOrder(11_000, 1);
+			orderBook.add(high);
+			orderBook.add(low);
+
+			assertThat(orderBook.poll(Side.SELL)).contains(low);
+			assertThat(orderBook.poll(Side.SELL)).contains(high);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨에서 FIFO 순서로 poll된다")
+		void pollSamePriceLevelRespectsFifo() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			Order third  = newBuyOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(first);
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+			assertThat(orderBook.poll(Side.BUY)).contains(third);
+		}
+
+		@Test
+		@DisplayName("가격 레벨의 마지막 주문을 poll하면 해당 가격 레벨이 제거되어 bestBid가 갱신된다")
+		void pollLastOrderAtLevelRemovesLevelAndUpdatesBestBid() {
+			orderBook.add(newBuyOrder(10_000, 1));
+			orderBook.add(newBuyOrder(9_000, 1));
+
+			orderBook.poll(Side.BUY); // 10_000 레벨 제거
+
+			assertThat(orderBook.bestBid()).contains(new Price(9_000));
+		}
+
+		@Test
+		@DisplayName("가격 레벨의 마지막 주문을 poll하면 해당 가격 레벨이 제거되어 bestAsk가 갱신된다")
+		void pollLastOrderAtLevelRemovesLevelAndUpdatesBestAsk() {
+			orderBook.add(newSellOrder(9_000, 1));
+			orderBook.add(newSellOrder(10_000, 1));
+
+			orderBook.poll(Side.SELL); // 9_000 레벨 제거
+
+			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("모든 BUY 주문을 poll하면 bestBid가 empty가 된다")
+		void pollAllBuyOrdersLeavesBestBidEmpty() {
+			orderBook.add(newBuyOrder(10_000, 1));
+			orderBook.poll(Side.BUY);
+
+			assertThat(orderBook.bestBid()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨에 주문이 2개일 때 1개를 poll해도 bestBid는 같은 가격이다")
+		void pollOneOfTwoOrdersAtSameLevelPreservesBestBid() {
+			orderBook.add(newBuyOrder(10_000, 1));
+			orderBook.add(newBuyOrder(10_000, 2));
+
+			orderBook.poll(Side.BUY);
+
+			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+		}
+	}
+
+	// ── bestBid() / bestAsk() ─────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("bestBid() / bestAsk()")
+	class BestPrice {
+
+		@Test
+		@DisplayName("BUY 주문이 없으면 bestBid는 empty다")
+		void bestBidIsEmptyWhenNoBuyOrders() {
+			assertThat(orderBook.bestBid()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("SELL 주문이 없으면 bestAsk는 empty다")
+		void bestAskIsEmptyWhenNoSellOrders() {
+			assertThat(orderBook.bestAsk()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("여러 BUY 가격 중 bestBid는 가장 높은 가격이다")
+		void bestBidIsHighestBuyPrice() {
+			orderBook.add(newBuyOrder(8_000, 1));
+			orderBook.add(newBuyOrder(10_000, 1));
+			orderBook.add(newBuyOrder(9_000, 1));
+
+			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("여러 SELL 가격 중 bestAsk는 가장 낮은 가격이다")
+		void bestAskIsLowestSellPrice() {
+			orderBook.add(newSellOrder(10_000, 1));
+			orderBook.add(newSellOrder(8_000, 1));
+			orderBook.add(newSellOrder(9_000, 1));
+
+			assertThat(orderBook.bestAsk()).contains(new Price(8_000));
+		}
+
+		@Test
+		@DisplayName("SELL 주문이 있어도 bestBid는 영향 받지 않는다")
+		void sellOrdersDoNotAffectBestBid() {
+			orderBook.add(newSellOrder(9_000, 1));
+
+			assertThat(orderBook.bestBid()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("BUY 주문이 있어도 bestAsk는 영향 받지 않는다")
+		void buyOrdersDoNotAffectBestAsk() {
+			orderBook.add(newBuyOrder(10_000, 1));
+
+			assertThat(orderBook.bestAsk()).isEmpty();
+		}
+	}
+
+	// ── remove() ──────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("remove()")
+	class Remove {
+
+		@Test
+		@DisplayName("존재하지 않는 orderId로 제거하면 Optional.empty()를 반환한다")
+		void removeNonExistentOrderReturnsEmpty() {
+			assertThat(orderBook.remove(OrderId.newId())).isEmpty();
+		}
+
+		@Test
+		@DisplayName("호가창에 있는 BUY 주문을 제거하면 해당 주문이 반환된다")
+		void removeExistingBuyOrderReturnsIt() {
+			Order buy = newBuyOrder(10_000, 5);
+			orderBook.add(buy);
+
+			assertThat(orderBook.remove(buy.getOrderId())).contains(buy);
+		}
+
+		@Test
+		@DisplayName("호가창에 있는 SELL 주문을 제거하면 해당 주문이 반환된다")
+		void removeExistingSellOrderReturnsIt() {
+			Order sell = newSellOrder(10_000, 5);
+			orderBook.add(sell);
+
+			assertThat(orderBook.remove(sell.getOrderId())).contains(sell);
+		}
+
+		@Test
+		@DisplayName("동일 orderId로 두 번 제거하면 두 번째는 Optional.empty()를 반환한다")
+		void removeSameOrderTwiceReturnsEmptyOnSecond() {
+			Order buy = newBuyOrder(10_000, 5);
+			orderBook.add(buy);
+
+			orderBook.remove(buy.getOrderId());
+
+			assertThat(orderBook.remove(buy.getOrderId())).isEmpty();
+		}
+
+		@Test
+		@DisplayName("마지막 BUY 주문 제거 후 bestBid가 empty가 된다")
+		void removeLastBuyOrderLeavesBestBidEmpty() {
+			Order buy = newBuyOrder(10_000, 1);
+			orderBook.add(buy);
+
+			orderBook.remove(buy.getOrderId());
+
+			assertThat(orderBook.bestBid()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("마지막 SELL 주문 제거 후 bestAsk가 empty가 된다")
+		void removeLastSellOrderLeavesBestAskEmpty() {
+			Order sell = newSellOrder(10_000, 1);
+			orderBook.add(sell);
+
+			orderBook.remove(sell.getOrderId());
+
+			assertThat(orderBook.bestAsk()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("최고가 BUY 레벨의 유일한 주문 제거 후 bestBid가 다음 가격으로 갱신된다")
+		void removeBestBidOnlyOrderUpdatesNextBestBid() {
+			Order best = newBuyOrder(10_000, 1);
+			orderBook.add(best);
+			orderBook.add(newBuyOrder(9_000, 1));
+
+			orderBook.remove(best.getOrderId());
+
+			assertThat(orderBook.bestBid()).contains(new Price(9_000));
+		}
+
+		@Test
+		@DisplayName("최저가 SELL 레벨의 유일한 주문 제거 후 bestAsk가 다음 가격으로 갱신된다")
+		void removeBestAskOnlyOrderUpdatesNextBestAsk() {
+			Order best = newSellOrder(9_000, 1);
+			orderBook.add(best);
+			orderBook.add(newSellOrder(10_000, 1));
+
+			orderBook.remove(best.getOrderId());
+
+			assertThat(orderBook.bestAsk()).contains(new Price(10_000));
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨 첫 번째 주문 제거 후 두 번째 주문이 poll된다")
+		void removeFirstOrderOfLevelLeavesSecondOrderPollable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨 첫 번째 주문 제거 후 두 번째 주문이 peek된다")
+		void removeFirstOrderOfLevelLeavesSecondOrderPeekable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(second);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨 두 번째 주문 제거 후 첫 번째 주문이 poll된다")
+		void removeSecondOrderOfLevelLeavesFirstOrderPollable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(second.getOrderId());
+
+			assertThat(orderBook.poll(Side.BUY)).contains(first);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨 두 번째 주문 제거 후 첫 번째 주문이 peek된다")
+		void removeSecondOrderOfLevelLeavesFirstOrderPeekable() {
+			Order first  = newBuyOrder(10_000, 3);
+			Order second = newBuyOrder(10_000, 7);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(second.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(first);
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨에서 중간 주문 제거 후 나머지 주문의 FIFO 순서가 유지된다")
+		void removeMiddleOrderPreservesFifoForRemainingOrders() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order middle = newBuyOrder(10_000, 2);
+			Order last   = newBuyOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(middle);
+			orderBook.add(last);
+
+			orderBook.remove(middle.getOrderId());
+
+			assertThat(orderBook.poll(Side.BUY)).contains(first);
+			assertThat(orderBook.poll(Side.BUY)).contains(last);
+		}
+
+		@Test
+		@DisplayName("비최우선 가격 레벨의 주문 제거 후 bestBid는 변경되지 않는다")
+		void removeNonBestBidOrderDoesNotChangeBestBid() {
+			orderBook.add(newBuyOrder(10_000, 1));
+			Order lower = newBuyOrder(9_000, 1);
+			orderBook.add(lower);
+
+			orderBook.remove(lower.getOrderId());
+
+			assertThat(orderBook.bestBid()).contains(new Price(10_000));
+		}
+	}
+
+	// ── 인덱스 정합성 (poll + remove) ─────────────────────────────────────
+
+	@Nested
+	@DisplayName("인덱스 정합성")
+	class IndexConsistency {
+
+		@Test
+		@DisplayName("poll()로 꺼낸 주문을 remove()하면 Optional.empty()를 반환한다 (이중 제거 방지)")
+		void removeAfterPollReturnsEmpty() {
+			Order buy = newBuyOrder(10_000, 1);
+			orderBook.add(buy);
+
+			orderBook.poll(Side.BUY);
+
+			assertThat(orderBook.remove(buy.getOrderId())).isEmpty();
+		}
+
+		@Test
+		@DisplayName("poll() 후 같은 가격 레벨의 다른 주문은 remove()로 정상 제거된다")
+		void removeOtherOrderAfterPollSameLevelWorks() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.poll(Side.BUY); // first 제거
+
+			assertThat(orderBook.remove(second.getOrderId())).contains(second);
+			assertThat(orderBook.bestBid()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("remove() 후 해당 주문은 poll()에서 나오지 않는다")
+		void pollAfterRemoveDoesNotReturnRemovedOrder() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+			assertThat(orderBook.poll(Side.BUY)).isEmpty();
+		}
+
+		@Test
+		@DisplayName("remove() 후 해당 주문은 peek()에서 나오지 않는다")
+		void peekAfterRemoveDoesNotReturnRemovedOrder() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			orderBook.add(first);
+			orderBook.add(second);
+
+			orderBook.remove(first.getOrderId());
+
+			assertThat(orderBook.peek(Side.BUY)).contains(second);
+		}
+	}
+
+	// ── bidsSnapshot() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("bidsSnapshot()")
+	class BidsSnapshot {
+
+		@Test
+		@DisplayName("BUY 주문이 없으면 빈 맵을 반환한다")
+		void bidsSnapshot_empty_returnsEmptyMap() {
+			assertThat(orderBook.bidsSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("단일 BUY 주문의 잔량이 반영된다")
+		void bidsSnapshot_singleOrder_reflectsQuantity() {
+			orderBook.add(newBuyOrder(10_000, 5));
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(5));
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨의 여러 BUY 주문 잔량이 합산된다")
+		void bidsSnapshot_samePriceMultipleOrders_sumsQuantity() {
+			orderBook.add(newBuyOrder(10_000, 3));
+			orderBook.add(newBuyOrder(10_000, 7));
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(10));
+		}
+
+		@Test
+		@DisplayName("여러 가격 레벨은 내림차순(높은 가격 먼저)으로 반환된다")
+		void bidsSnapshot_multiplePriceLevels_descendingOrder() {
+			orderBook.add(newBuyOrder(9_000, 1));
+			orderBook.add(newBuyOrder(11_000, 1));
+			orderBook.add(newBuyOrder(10_000, 1));
+
+			NavigableMap<Price, Quantity> snapshot = orderBook.bidsSnapshot();
+
+			assertThat(snapshot.firstKey()).isEqualTo(new Price(11_000));
+			assertThat(snapshot.lastKey()).isEqualTo(new Price(9_000));
+		}
+
+		@Test
+		@DisplayName("SELL 주문은 bidsSnapshot에 포함되지 않는다")
+		void bidsSnapshot_doesNotIncludeSellOrders() {
+			orderBook.add(newSellOrder(10_000, 5));
+
+			assertThat(orderBook.bidsSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("부분 체결된 BUY 주문의 remaining 잔량이 반영된다")
+		void bidsSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
+			Order order = newBuyOrder(10_000, 10).fill(new Quantity(3), DEFAULT_PRICE); // remaining = 7
+			orderBook.add(order);
+
+			assertThat(orderBook.bidsSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(7));
+		}
+
+		@Test
+		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
+		void bidsSnapshot_isIndependentCopy() {
+			orderBook.add(newBuyOrder(10_000, 5));
+			NavigableMap<Price, Quantity> snapshot = orderBook.bidsSnapshot();
+
+			orderBook.add(newBuyOrder(9_000, 3));
+
+			assertThat(snapshot).doesNotContainKey(new Price(9_000));
+		}
+	}
+
+	// ── asksSnapshot() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("asksSnapshot()")
+	class AsksSnapshot {
+
+		@Test
+		@DisplayName("SELL 주문이 없으면 빈 맵을 반환한다")
+		void asksSnapshot_empty_returnsEmptyMap() {
+			assertThat(orderBook.asksSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("단일 SELL 주문의 잔량이 반영된다")
+		void asksSnapshot_singleOrder_reflectsQuantity() {
+			orderBook.add(newSellOrder(10_000, 5));
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(5));
+		}
+
+		@Test
+		@DisplayName("동일 가격 레벨의 여러 SELL 주문 잔량이 합산된다")
+		void asksSnapshot_samePriceMultipleOrders_sumsQuantity() {
+			orderBook.add(newSellOrder(10_000, 4));
+			orderBook.add(newSellOrder(10_000, 6));
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(10));
+		}
+
+		@Test
+		@DisplayName("여러 가격 레벨은 오름차순(낮은 가격 먼저)으로 반환된다")
+		void asksSnapshot_multiplePriceLevels_ascendingOrder() {
+			orderBook.add(newSellOrder(11_000, 1));
+			orderBook.add(newSellOrder(9_000, 1));
+			orderBook.add(newSellOrder(10_000, 1));
+
+			NavigableMap<Price, Quantity> snapshot = orderBook.asksSnapshot();
+
+			assertThat(snapshot.firstKey()).isEqualTo(new Price(9_000));
+			assertThat(snapshot.lastKey()).isEqualTo(new Price(11_000));
+		}
+
+		@Test
+		@DisplayName("BUY 주문은 asksSnapshot에 포함되지 않는다")
+		void asksSnapshot_doesNotIncludeBuyOrders() {
+			orderBook.add(newBuyOrder(10_000, 5));
+
+			assertThat(orderBook.asksSnapshot()).isEmpty();
+		}
+
+		@Test
+		@DisplayName("부분 체결된 SELL 주문의 remaining 잔량이 반영된다")
+		void asksSnapshot_partiallyFilledOrder_reflectsRemainingQuantity() {
+			Order order = newSellOrder(10_000, 10).fill(new Quantity(4), DEFAULT_PRICE); // remaining = 6
+			orderBook.add(order);
+
+			assertThat(orderBook.asksSnapshot())
+				.containsEntry(new Price(10_000), new Quantity(6));
+		}
+
+		@Test
+		@DisplayName("스냅샷 이후 주문 추가가 기존 스냅샷에 반영되지 않는다")
+		void asksSnapshot_isIndependentCopy() {
+			orderBook.add(newSellOrder(10_000, 5));
+			NavigableMap<Price, Quantity> snapshot = orderBook.asksSnapshot();
+
+			orderBook.add(newSellOrder(11_000, 3));
+
+			assertThat(snapshot).doesNotContainKey(new Price(11_000));
+		}
+	}
+
+	// ── 가격 우선순위 ──────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("가격 우선순위")
+	class PriceOrdering {
+
+		@Test
+		@DisplayName("BUY: 높은 가격 → 낮은 가격 순으로 poll된다")
+		void buyPollOrderIsDescendingByPrice() {
+			orderBook.add(newBuyOrder(9_000, 1));
+			orderBook.add(newBuyOrder(11_000, 1));
+			orderBook.add(newBuyOrder(10_000, 1));
+
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(11_000));
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(10_000));
+			assertThat(orderBook.poll(Side.BUY).map(Order::getLimitPriceOrThrow)).contains(new Price(9_000));
+		}
+
+		@Test
+		@DisplayName("SELL: 낮은 가격 → 높은 가격 순으로 poll된다")
+		void sellPollOrderIsAscendingByPrice() {
+			orderBook.add(newSellOrder(11_000, 1));
+			orderBook.add(newSellOrder(9_000, 1));
+			orderBook.add(newSellOrder(10_000, 1));
+
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(9_000));
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(10_000));
+			assertThat(orderBook.poll(Side.SELL).map(Order::getLimitPriceOrThrow)).contains(new Price(11_000));
+		}
+
+		@Test
+		@DisplayName("BUY: 나중에 추가된 더 높은 가격이 먼저 체결된다 (가격 우선 > 시간 우선)")
+		void buyLaterHigherPriceWinsOverEarlierLowerPrice() {
+			Order earlierLow = newBuyOrder(9_000, 1);
+			Order laterHigh  = newBuyOrder(10_000, 1);
+			orderBook.add(earlierLow);
+			orderBook.add(laterHigh);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(laterHigh);
+		}
+
+		@Test
+		@DisplayName("SELL: 나중에 추가된 더 낮은 가격이 먼저 체결된다 (가격 우선 > 시간 우선)")
+		void sellLaterLowerPriceWinsOverEarlierHigherPrice() {
+			Order earlierHigh = newSellOrder(10_000, 1);
+			Order laterLow    = newSellOrder(9_000, 1);
+			orderBook.add(earlierHigh);
+			orderBook.add(laterLow);
+
+			assertThat(orderBook.poll(Side.SELL)).contains(laterLow);
+		}
+	}
+
+	// ── replaceOrder() ────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("replaceOrder()")
+	class ReplaceOrder {
+
+		@Test
+		@DisplayName("정상 교체: 부분 체결 후 remaining 갱신된 주문으로 교체된다")
+		void normalReplace_updatesIndex() {
+			Order order = newBuyOrder(10_000, 10);
+			orderBook.add(order);
+			Order partiallyFilled = order.fill(new Quantity(3), DEFAULT_PRICE);
+
+			orderBook.replaceOrder(partiallyFilled);
+
+			assertThat(orderBook.peek(Side.BUY)).contains(partiallyFilled);
+		}
+
+		@Test
+		@DisplayName("교체 후 FIFO 위치가 유지된다")
+		void replace_preservesFifoPosition() {
+			Order first  = newBuyOrder(10_000, 10);
+			Order second = newBuyOrder(10_000, 5);
+			orderBook.add(first);
+			orderBook.add(second);
+			Order updated = first.fill(new Quantity(3), DEFAULT_PRICE);
+
+			orderBook.replaceOrder(updated);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(updated);
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+		}
+
+		@Test
+		@DisplayName("book에 없는 주문 교체 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceNonExistentOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(order))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("비활성(CANCELLED) updatedOrder 교체 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceWithInactiveOrder_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order cancelled = order.cancel();
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(cancelled))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("side 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceSideMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order sideMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				Side.SELL,
+				order.getSymbol(),
+				order.getOrderType(),
+				order.getTif(),
+				order.getLimitPriceOrThrow(),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(sideMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("symbol 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replaceSymbolMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order symbolMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				order.getSide(),
+				new Symbol("ETH"),
+				order.getOrderType(),
+				order.getTif(),
+				order.getLimitPriceOrThrow(),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(symbolMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+
+		@Test
+		@DisplayName("price 불일치 시 OrderBookInvariantViolationException이 발생한다")
+		void replacePriceMismatch_throwsException() {
+			Order order = newBuyOrder(10_000, 5);
+			orderBook.add(order);
+			Order priceMismatch = Order.restore(
+				order.getOrderId(),
+				order.getAccountId(),
+				order.getClientOrderId(),
+				order.getAcceptedSeq(),
+				order.getSide(),
+				order.getSymbol(),
+				order.getOrderType(),
+				order.getTif(),
+				new Price(9_000),
+				order.getQuoteQty(),
+				order.getQuantity(),
+				order.getRemaining(),
+				order.getStatus(),
+				order.getCumQuoteQty(),
+				order.getCumBaseQty(),
+				order.getOrderedAt(),
+				order.getCreatedAt(),
+				order.getUpdatedAt()
+			);
+
+			assertThatThrownBy(() -> orderBook.replaceOrder(priceMismatch))
+				.isInstanceOf(OrderBookInvariantViolationException.class);
+		}
+	}
+
+	// ── FIFO (시간 우선) ───────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("FIFO (시간 우선)")
+	class FifoOrdering {
+
+		@Test
+		@DisplayName("동일 BUY 가격: 먼저 추가된 주문이 먼저 poll된다")
+		void sameBuyPriceRespectsFifo_poll() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			Order third  = newBuyOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.poll(Side.BUY)).contains(first);
+			assertThat(orderBook.poll(Side.BUY)).contains(second);
+			assertThat(orderBook.poll(Side.BUY)).contains(third);
+		}
+
+		@Test
+		@DisplayName("동일 BUY 가격: 먼저 추가된 주문이 먼저 peek된다")
+		void sameBuyPriceRespectsFifo_peek() {
+			Order first  = newBuyOrder(10_000, 1);
+			Order second = newBuyOrder(10_000, 2);
+			Order third  = newBuyOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.peek(Side.BUY)).contains(first);
+		}
+
+		@Test
+		@DisplayName("동일 SELL 가격: 먼저 추가된 주문이 먼저 poll된다")
+		void sameSellPriceRespectsFifo_poll() {
+			Order first  = newSellOrder(10_000, 1);
+			Order second = newSellOrder(10_000, 2);
+			Order third  = newSellOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.poll(Side.SELL)).contains(first);
+			assertThat(orderBook.poll(Side.SELL)).contains(second);
+			assertThat(orderBook.poll(Side.SELL)).contains(third);
+		}
+
+		@Test
+		@DisplayName("동일 SELL 가격: 먼저 추가된 주문이 먼저 peek된다")
+		void sameSellPriceRespectsFifo_peek() {
+			Order first  = newSellOrder(10_000, 1);
+			Order second = newSellOrder(10_000, 2);
+			Order third  = newSellOrder(10_000, 3);
+			orderBook.add(first);
+			orderBook.add(second);
+			orderBook.add(third);
+
+			assertThat(orderBook.peek(Side.SELL)).contains(first);
+		}
+	}
+
+	// ── rebuild() ─────────────────────────────────────────────────────────────
+
+	@Nested
+	@DisplayName("rebuild()")
+	class Rebuild {
+
+		@Test
+		@DisplayName("rebuild()은 기존 주문을 모두 제거하고 새 주문 목록으로 재구성한다")
+		void rebuild_clearsAndRepopulates() {
+			Order existing = newBuyOrder(10_000, 5);
+			orderBook.add(existing);
+
+			Order newBuy = newBuyOrder(9_000, 3);
+			Order newSell = newSellOrder(11_000, 2);
+			orderBook.rebuild(List.of(newBuy, newSell));
+
+			assertThat(orderBook.getIndex()).containsOnlyKeys(newBuy.getOrderId(), newSell.getOrderId());
+			assertThat(orderBook.getIndex()).doesNotContainKey(existing.getOrderId());
+		}
+
+		@Test
+		@DisplayName("rebuild()은 빈 목록으로 호출하면 호가창이 비워진다")
+		void rebuild_emptyList_clearsAll() {
+			orderBook.add(newBuyOrder(10_000, 5));
+			orderBook.add(newSellOrder(11_000, 3));
+
+			orderBook.rebuild(List.of());
+
+			assertThat(orderBook.getIndex()).isEmpty();
+			assertThat(orderBook.bestBid()).isEmpty();
+			assertThat(orderBook.bestAsk()).isEmpty();
+		}
+	}
+}

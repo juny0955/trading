@@ -1,3 +1,10 @@
+CREATE TABLE assets (
+    asset_code VARCHAR(32) PRIMARY KEY,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 CREATE TABLE accounts (
     account_id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
@@ -12,7 +19,43 @@ CREATE TABLE balances (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY (account_id, asset),
     CONSTRAINT fk_balances_account
-        FOREIGN KEY (account_id) REFERENCES accounts (account_id)
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id),
+    CONSTRAINT fk_balances_asset
+        FOREIGN KEY (asset) REFERENCES assets (asset_code)
+);
+
+CREATE TABLE symbols (
+    symbol VARCHAR(32) PRIMARY KEY,
+    base_asset VARCHAR(32) NOT NULL,
+    quote_asset VARCHAR(32) NOT NULL,
+    step_size BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_symbols_base_asset
+       FOREIGN KEY (base_asset) REFERENCES assets (asset_code),
+    CONSTRAINT fk_symbols_quote_asset
+       FOREIGN KEY (quote_asset) REFERENCES assets (asset_code)
+);
+
+CREATE TABLE symbol_states (
+    symbol VARCHAR(32) PRIMARY KEY,
+    last_event_sequence BIGINT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_symbol_states_symbol
+       FOREIGN KEY (symbol) REFERENCES symbols (symbol)
+);
+
+CREATE TABLE tick_size_rules (
+    rule_id BIGSERIAL PRIMARY KEY,
+    symbol VARCHAR(32) NOT NULL,
+    min_price BIGINT NOT NULL,
+    max_price BIGINT NULL,
+    tick_size BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_tick_size_rules_symbol
+        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
 );
 
 CREATE TABLE orders (
@@ -36,6 +79,8 @@ CREATE TABLE orders (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_orders_account
         FOREIGN KEY (account_id) REFERENCES accounts (account_id),
+    CONSTRAINT fk_orders_symbol
+        FOREIGN KEY (symbol) REFERENCES symbols (symbol),
     CONSTRAINT uq_orders_account_client_order_id
         UNIQUE (account_id, client_order_id)
 );
@@ -51,7 +96,9 @@ CREATE TABLE trades (
     CONSTRAINT fk_trades_buy_order
         FOREIGN KEY (buy_order_id) REFERENCES orders (order_id),
     CONSTRAINT fk_trades_sell_order
-        FOREIGN KEY (sell_order_id) REFERENCES orders (order_id)
+        FOREIGN KEY (sell_order_id) REFERENCES orders (order_id),
+    CONSTRAINT fk_trades_symbol
+        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
 );
 
 CREATE TABLE idempotency_keys (
@@ -62,4 +109,24 @@ CREATE TABLE idempotency_keys (
     PRIMARY KEY (account_id, client_order_id),
     CONSTRAINT fk_idempotency_account
         FOREIGN KEY (account_id) REFERENCES accounts (account_id)
+);
+
+CREATE TABLE outbox_events (
+    event_id BIGSERIAL PRIMARY KEY,
+    aggregate_id VARCHAR(64) NOT NULL,
+    aggregate_type VARCHAR(32) NOT NULL,
+    symbol VARCHAR(32) NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    event_version INT NOT NULL,
+    sequence BIGINT NOT NULL,
+    payload JSONB NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    attempt_count INT NOT NULL,
+    last_error TEXT,
+    next_retry_at TIMESTAMP WITH TIME ZONE,
+    published_at TIMESTAMP WITH TIME ZONE,
+    trace_id VARCHAR(64),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT fk_outbox_events_symbol
+        FOREIGN KEY (symbol) REFERENCES symbols (symbol)
 );

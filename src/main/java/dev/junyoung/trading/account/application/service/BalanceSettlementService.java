@@ -4,7 +4,7 @@ import dev.junyoung.trading.account.application.exception.balance.BalanceNotFoun
 import dev.junyoung.trading.account.application.port.out.BalanceRepository;
 import dev.junyoung.trading.account.domain.model.entity.Balance;
 import dev.junyoung.trading.account.domain.model.value.AccountId;
-import dev.junyoung.trading.account.domain.model.value.Asset;
+import dev.junyoung.trading.shared.domain.value.Asset;
 import dev.junyoung.trading.order.application.port.out.BalanceSettlementPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

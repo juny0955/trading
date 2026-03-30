@@ -12,7 +12,7 @@ import dev.junyoung.trading.jooq.Tables;
 import dev.junyoung.trading.jooq.tables.Orders;
 import dev.junyoung.trading.jooq.tables.records.TradesRecord;
 import dev.junyoung.trading.order.application.port.out.TradeRepository;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import lombok.RequiredArgsConstructor;

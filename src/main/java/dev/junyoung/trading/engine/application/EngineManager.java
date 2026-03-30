@@ -1,0 +1,116 @@
+package dev.junyoung.trading.engine.application;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import dev.junyoung.trading.common.props.TradingProperties;
+import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
+import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
+import dev.junyoung.trading.engine.application.contract.CancelCommandEnvelope;
+import dev.junyoung.trading.engine.application.contract.PlaceCommandEnvelope;
+import dev.junyoung.trading.engine.application.loop.EngineCommand;
+import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
+import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
+import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
+import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
+import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
+import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
+import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
+import dev.junyoung.trading.shared.domain.value.Symbol;
+import dev.junyoung.trading.shared.port.out.OrderBookCachePort;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * 심볼별 {@link EngineRuntime}를 생성·관리하고 커맨드를 올바른 엔진으로 라우팅하는 오케스트레이터.
+ *
+ * <p>{@code trading.symbols} 프로퍼티에 등록된 심볼마다 독립적인 {@link EngineRuntime}를 생성한다.
+ * {@code contexts}는 {@link PostConstruct} 단계에서 한 번 채워진 후 읽기 전용으로
+ * 사용되므로 {@link HashMap}으로 충분하다.</p>
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class EngineManager implements EngineCommandPort {
+
+    // -------------------------------------------------------------------------
+    // 생성자
+    // -------------------------------------------------------------------------
+
+    private final TradingProperties tradingProperties;
+    private final EngineStartupRecoveryService engineStartupRecoveryService;
+    private final OrderBookCachePort orderBookCachePort;
+    private final EngineResultCommitPort engineResultCommitPort;
+    private final OrderBookProjectionApplier orderBookProjectionApplier;
+    private final OrderBookRebuilder orderBookRebuilder;
+    private final EngineMetrics engineMetrics;
+    private final ReplayMetrics replayMetrics;
+
+    private final Map<Symbol, EngineRuntime> contexts = new HashMap<>();
+
+    // -------------------------------------------------------------------------
+    // 생명주기
+    // -------------------------------------------------------------------------
+
+    /** trading.symbols에 정의된 각 심볼의 EngineContext를 생성하고 엔진 스레드를 시작한다. */
+    @PostConstruct
+    public void start() {
+        Instant totalStart = Instant.now();
+        List<String> symbols = tradingProperties.getSymbols() != null ? tradingProperties.getSymbols() : List.of();
+
+        for (String sym : symbols) {
+            Symbol symbol = new Symbol(sym);
+            Instant symStart = Instant.now();
+            engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
+
+            EngineRuntime ctx = new EngineRuntime(symbol, orderBookCachePort, orderBookProjectionApplier, engineResultCommitPort, orderBookRebuilder, engineMetrics);
+            replayMetrics.recordReplayDurationBySymbol(sym, Duration.between(symStart, Instant.now()));
+
+            contexts.put(symbol, ctx);
+            ctx.start();
+            log.info("Engine started for symbol: {}", symbol.value());
+        }
+
+        replayMetrics.recordTotalReplayDuration(Duration.between(totalStart, Instant.now()));
+    }
+
+    /** 모든 심볼의 엔진을 순차적으로 중단한다. 개별 엔진 종료 실패는 로그 후 계속 진행한다. */
+    @PreDestroy
+    public void stop() {
+        for (EngineRuntime ctx : contexts.values()) {
+            try {
+                ctx.stop();
+            } catch (Exception e) {
+                log.error("Engine stop failed", e);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 진입점
+    // -------------------------------------------------------------------------
+
+    /**
+     * 커맨드를 해당 심볼의 엔진 큐에 위임한다.
+     *
+     * @throws UnsupportedSymbolException 등록되지 않은 심볼인 경우
+     */
+    public void submitPlace(PlaceCommandEnvelope command, Instant serviceEnteredAt) {
+        EngineRuntime ctx = contexts.get(command.symbol());
+        if (ctx == null) throw new UnsupportedSymbolException(command.symbol().value());
+        ctx.submit(new EngineCommand.PlaceOrder(command, serviceEnteredAt, null));
+    }
+
+    public void submitCancel(CancelCommandEnvelope command, Instant serviceEnteredAt) {
+        EngineRuntime ctx = contexts.get(command.symbol());
+        if (ctx == null) throw new UnsupportedSymbolException(command.symbol().value());
+        ctx.submit(new EngineCommand.CancelOrder(command, serviceEnteredAt, null));
+    }
+}

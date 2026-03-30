@@ -3,7 +3,7 @@ package dev.junyoung.trading.order.adapter.in.rest.validation;
 import dev.junyoung.trading.order.adapter.in.rest.request.PlaceOrderRequest;
 import dev.junyoung.trading.order.adapter.in.rest.validation.annotation.ValidPlaceOrder;
 import dev.junyoung.trading.order.domain.model.enums.OrderType;
-import dev.junyoung.trading.order.domain.model.enums.Side;
+import dev.junyoung.trading.shared.domain.enums.Side;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

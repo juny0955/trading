@@ -136,8 +136,8 @@ public class EngineLoop implements Runnable {
 	private EngineCommand stampEnqueuedAt(EngineCommand command) {
 		Instant now = Instant.now();
 		return switch (command) {
-			case EngineCommand.PlaceOrder p -> new EngineCommand.PlaceOrder(p.command(), p.serviceEnteredAt(), now);
-			case EngineCommand.CancelOrder c -> new EngineCommand.CancelOrder(c.command(), c.serviceEnteredAt(), now);
+			case EngineCommand.PlaceOrder p -> new EngineCommand.PlaceOrder(p.envelope(), p.serviceEnteredAt(), now);
+			case EngineCommand.CancelOrder c -> new EngineCommand.CancelOrder(c.envelope(), c.serviceEnteredAt(), now);
 			default -> command;
 		};
 	}

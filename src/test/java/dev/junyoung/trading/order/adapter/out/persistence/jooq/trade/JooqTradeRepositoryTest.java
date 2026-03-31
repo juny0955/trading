@@ -59,6 +59,20 @@ class JooqTradeRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        dslContext.insertInto(Tables.ASSETS)
+                .set(Tables.ASSETS.ASSET_CODE, "BTC").set(Tables.ASSETS.STATUS, "ACTIVE")
+                .set(Tables.ASSETS.CREATED_AT, Instant.now()).set(Tables.ASSETS.UPDATED_AT, Instant.now())
+                .onConflict(Tables.ASSETS.ASSET_CODE).doNothing().execute();
+        dslContext.insertInto(Tables.ASSETS)
+                .set(Tables.ASSETS.ASSET_CODE, "USDT").set(Tables.ASSETS.STATUS, "ACTIVE")
+                .set(Tables.ASSETS.CREATED_AT, Instant.now()).set(Tables.ASSETS.UPDATED_AT, Instant.now())
+                .onConflict(Tables.ASSETS.ASSET_CODE).doNothing().execute();
+        dslContext.insertInto(Tables.SYMBOLS)
+                .set(Tables.SYMBOLS.SYMBOL, "BTCUSDT").set(Tables.SYMBOLS.BASE_ASSET, "BTC")
+                .set(Tables.SYMBOLS.QUOTE_ASSET, "USDT").set(Tables.SYMBOLS.STEP_SIZE, 1L)
+                .set(Tables.SYMBOLS.STATUS, "ACTIVE")
+                .set(Tables.SYMBOLS.CREATED_AT, Instant.now()).set(Tables.SYMBOLS.UPDATED_AT, Instant.now())
+                .onConflict(Tables.SYMBOLS.SYMBOL).doNothing().execute();
         dslContext.insertInto(Tables.ACCOUNTS)
                 .set(Tables.ACCOUNTS.ACCOUNT_ID, BUY_ACCOUNT_ID.value())
                 .set(Tables.ACCOUNTS.CREATED_AT, Instant.now())

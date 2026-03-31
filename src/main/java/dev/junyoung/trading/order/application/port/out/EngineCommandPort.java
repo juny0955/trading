@@ -13,7 +13,7 @@ import dev.junyoung.trading.shared.domain.value.Symbol;
 public interface EngineCommandPort {
 	void submitPlace(PlaceCommandEnvelope command, Instant serviceEnteredAt);
 
-	default void submitPlace(Symbol symbol, Order order, Instant serviceEnteredAt) {
+	default void submitPlace(Order order, Instant serviceEnteredAt) {
 		submitPlace(EngineContractMapper.toPlaceCommandEnvelope(order), serviceEnteredAt);
 	}
 

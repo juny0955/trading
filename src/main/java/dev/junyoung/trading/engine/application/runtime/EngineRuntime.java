@@ -3,8 +3,8 @@ package dev.junyoung.trading.engine.application.runtime;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
-import dev.junyoung.trading.engine.application.EngineManager;
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
 import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
@@ -17,7 +17,7 @@ import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.loop.EngineThread;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.shared.domain.value.Symbol;
@@ -35,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EngineRuntime implements EngineRuntimeOwner {
 
-    private volatile EngineSymbolState state = EngineSymbolState.REBUILDING;
+    private volatile EngineSymbolStatus state = EngineSymbolStatus.REBUILDING;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -48,6 +48,7 @@ public class EngineRuntime implements EngineRuntimeOwner {
     private final EngineLoop engineLoop;
     private final OrderBookCachePort orderBookCachePort;
     private final OrderBookRebuilder orderBookRebuilder;
+    private final AtomicLong eventSequence;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
     public EngineRuntime(
@@ -56,12 +57,14 @@ public class EngineRuntime implements EngineRuntimeOwner {
         OrderBookProjectionApplier orderBookProjectionApplier,
         EngineResultCommitPort engineResultCommitPort,
         OrderBookRebuilder orderBookRebuilder,
-        EngineMetrics engineMetrics
+        EngineMetrics engineMetrics,
+        long lastEventSequence
     ) {
         this.symbol = symbol;
         this.orderBook = new OrderBook();
         this.orderBookCachePort = orderBookCachePort;
         this.orderBookRebuilder = orderBookRebuilder;
+        this.eventSequence = new AtomicLong(lastEventSequence);
         attemptRebuild();
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         engineMetrics.registerQueueDepthGauge(symbol.value(), queue);
@@ -96,31 +99,39 @@ public class EngineRuntime implements EngineRuntimeOwner {
      * 클라이언트가 예외 없이 요청이 드롭될 수 있으나, 정합성은 항상 보장된다.</p>
      */
     public void submit(EngineCommand engineCommand) {
-        if (state != EngineSymbolState.ACTIVE)
+        if (state != EngineSymbolStatus.ACTIVE)
             throw new EngineNotActiveException(state);
         engineLoop.submit(engineCommand);
     }
 
+    /**
+     * 심볼별 단조 증가 event_sequence를 발급한다.
+     */
     @Override
-    public EngineSymbolState state() {
+    public long nextEventSequence() {
+        return eventSequence.incrementAndGet();
+    }
+
+    @Override
+    public EngineSymbolStatus state() {
         return state;
     }
 
     @Override
     public void transitionToActive() {
-        state = EngineSymbolState.ACTIVE;
+        state = EngineSymbolStatus.ACTIVE;
         log.info("[{}] Engine transitioning to ACTIVE", symbol.value());
     }
 
     @Override
     public void transitionToRebuilding() {
-        state = EngineSymbolState.REBUILDING;
+        state = EngineSymbolStatus.REBUILDING;
         log.warn("[{}] Engine transitioning to REBUILDING — rebuild required", symbol.value());
     }
 
     @Override
     public void transitionToDirty() {
-        state = EngineSymbolState.DIRTY;
+        state = EngineSymbolStatus.DIRTY;
         log.error("[{}] Engine transitioning to DIRTY — manual intervention required", symbol.value());
     }
 

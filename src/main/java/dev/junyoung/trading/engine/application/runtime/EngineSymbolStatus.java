@@ -3,7 +3,7 @@ package dev.junyoung.trading.engine.application.runtime;
 /**
  *  복구/장애 처리 정책을 위한 symbol 단위 상태
  */
-public enum EngineSymbolState {
+public enum EngineSymbolStatus {
     /// 정상 처리 가능
     ACTIVE,
 

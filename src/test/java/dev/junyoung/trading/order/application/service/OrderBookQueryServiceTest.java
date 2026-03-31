@@ -13,7 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.application.port.in.result.OrderBookResult;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;

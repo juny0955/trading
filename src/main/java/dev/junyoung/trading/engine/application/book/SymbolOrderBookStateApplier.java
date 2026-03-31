@@ -4,7 +4,7 @@ import java.util.List;
 
 import dev.junyoung.trading.engine.application.dto.BookOperation;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntime;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.shared.domain.value.Symbol;
 
 /**

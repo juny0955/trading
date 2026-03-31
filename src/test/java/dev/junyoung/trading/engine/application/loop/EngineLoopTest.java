@@ -2,7 +2,7 @@ package dev.junyoung.trading.engine.application.loop;
 
 import dev.junyoung.trading.engine.application.handler.EngineHandler;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolStatus;
 import dev.junyoung.trading.engine.application.exception.EngineQueueFullException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.order.fixture.OrderFixture;
@@ -65,7 +65,7 @@ class EngineLoopTest {
 		engineThread = new EngineThread("BTC");
 		runtimeOwner = mock(EngineRuntimeOwner.class);
 		engineMetrics = mock(EngineMetrics.class);
-		when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
+		when(runtimeOwner.state()).thenReturn(EngineSymbolStatus.ACTIVE);
 		loop = new EngineLoop(queue, handler, engineThread, runtimeOwner, engineMetrics);
 	}
 
@@ -174,7 +174,7 @@ class EngineLoopTest {
 		@DisplayName("핸들러 예외 발생 시 REBUILDING 상태이면 attemptRebuild()가 호출된다")
 		void run_handlerException_rebuilding_triggersAttemptRebuild() throws InterruptedException {
 			CountDownLatch rebuildCalled = new CountDownLatch(1);
-			when(runtimeOwner.state()).thenReturn(EngineSymbolState.REBUILDING);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolStatus.REBUILDING);
 			doAnswer(_ -> { rebuildCalled.countDown(); return null; }).when(runtimeOwner).attemptRebuild();
 			doThrow(new RuntimeException("apply failed")).when(handler).handle(any());
 

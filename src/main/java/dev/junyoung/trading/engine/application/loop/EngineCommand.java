@@ -31,7 +31,7 @@ public sealed interface EngineCommand
 	 * {@code order}는 {@link OrderStatus#ACCEPTED} 상태여야 하며,
 	 * engine-thread에서 {@link MatchingEngine#calculatePlace}의 입력으로 전달된다.
 	 */
-	record PlaceOrder(PlaceCommandEnvelope command, Instant serviceEnteredAt, Instant enqueuedAt) implements EngineCommand {
+	record PlaceOrder(PlaceCommandEnvelope envelope, Instant serviceEnteredAt, Instant enqueuedAt) implements EngineCommand {
 		public PlaceOrder(Order order, Instant serviceEnteredAt, Instant enqueuedAt) {
 			this(EngineContractMapper.toPlaceCommandEnvelope(order), serviceEnteredAt, enqueuedAt);
 		}
@@ -42,21 +42,9 @@ public sealed interface EngineCommand
 	 * {@code acceptedSeq}는 이 취소 커맨드 자체의 고유 시퀀스로, 취소 이벤트 식별 및 replay/추적에 사용된다.
 	 * {@code requesterAccountId}는 계산 단계에서 owner mismatch를 결과 타입으로 드러내기 위한 요청 메타다.
 	 */
-	record CancelOrder(CancelCommandEnvelope command, Instant serviceEnteredAt, Instant enqueuedAt) implements EngineCommand {
+	record CancelOrder(CancelCommandEnvelope envelope, Instant serviceEnteredAt, Instant enqueuedAt) implements EngineCommand {
 		public CancelOrder(long acceptedSeq, OrderId orderId, AccountId requesterAccountId, Symbol symbol, Instant serviceEnteredAt, Instant enqueuedAt) {
 			this(new CancelCommandEnvelope(symbol, acceptedSeq, orderId, requesterAccountId), serviceEnteredAt, enqueuedAt);
-		}
-
-		public long acceptedSeq() {
-			return command.acceptedSeq();
-		}
-
-		public OrderId orderId() {
-			return command.orderId();
-		}
-
-		public AccountId requesterAccountId() {
-			return command.requesterAccountId();
 		}
 	}
 

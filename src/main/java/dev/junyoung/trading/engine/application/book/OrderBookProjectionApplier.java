@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import dev.junyoung.trading.engine.application.dto.BookOperation;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 
 @Component
 public class OrderBookProjectionApplier {

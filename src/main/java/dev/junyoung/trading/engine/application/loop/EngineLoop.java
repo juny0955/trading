@@ -1,9 +1,9 @@
 package dev.junyoung.trading.engine.application.loop;
 
-import dev.junyoung.trading.engine.application.EngineManager;
+import dev.junyoung.trading.engine.application.runtime.EngineManager;
 import dev.junyoung.trading.engine.application.handler.EngineHandler;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolStatus;
 import dev.junyoung.trading.engine.application.exception.EngineQueueFullException;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import lombok.RequiredArgsConstructor;
@@ -127,7 +127,7 @@ public class EngineLoop implements Runnable {
 				break;
 			} catch (Exception e) {
 				log.error("Engine Command Failed", e);
-				if (runtimeOwner.state() == EngineSymbolState.REBUILDING)
+				if (runtimeOwner.state() == EngineSymbolStatus.REBUILDING)
 					runtimeOwner.attemptRebuild();
 			}
 		}
@@ -136,8 +136,8 @@ public class EngineLoop implements Runnable {
 	private EngineCommand stampEnqueuedAt(EngineCommand command) {
 		Instant now = Instant.now();
 		return switch (command) {
-			case EngineCommand.PlaceOrder p -> new EngineCommand.PlaceOrder(p.command(), p.serviceEnteredAt(), now);
-			case EngineCommand.CancelOrder c -> new EngineCommand.CancelOrder(c.command(), c.serviceEnteredAt(), now);
+			case EngineCommand.PlaceOrder p -> new EngineCommand.PlaceOrder(p.envelope(), p.serviceEnteredAt(), now);
+			case EngineCommand.CancelOrder c -> new EngineCommand.CancelOrder(c.envelope(), c.serviceEnteredAt(), now);
 			default -> command;
 		};
 	}

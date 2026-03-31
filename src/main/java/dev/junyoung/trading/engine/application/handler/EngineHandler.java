@@ -18,8 +18,8 @@ import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolStatus;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
@@ -71,7 +71,7 @@ public class EngineHandler {
 	 * </ul>
 	 */
 	public void handle(EngineCommand command) {
-		if (runtimeOwner.state() != EngineSymbolState.ACTIVE) {
+		if (runtimeOwner.state() != EngineSymbolStatus.ACTIVE) {
 			log.warn("Command dropped: engine not ACTIVE: state={}, symbol={}", runtimeOwner.state(), symbol);
 			return;
 		}
@@ -82,7 +82,7 @@ public class EngineHandler {
 				case EngineCommand.PlaceOrder c -> handlePlaceOrder(c);
 				case EngineCommand.CancelOrder c -> handleCancelOrder(c);
 				case EngineCommand.Shutdown _ ->
-					log.warn("Shutdown command reached EngineHandler; this should not happen.");
+					log.warn("Shutdown envelope reached EngineHandler; this should not happen.");
 			}
 		} catch (Exception e) {
 			engineMetrics.incrementErrorRate();
@@ -100,7 +100,7 @@ public class EngineHandler {
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		PlaceCalculationResult result;
 		try {
-			result = engine.calculatePlace(new PlaceCalculationInput(view, EngineContractMapper.toOrder(command.command())));
+			result = engine.calculatePlace(new PlaceCalculationInput(view, EngineContractMapper.toOrder(command.envelope())));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -126,12 +126,12 @@ public class EngineHandler {
 	}
 
 	private void handleCancelOrder(EngineCommand.CancelOrder command) {
-		Order order = orderBook.getIndex().get(command.orderId());
+		Order order = orderBook.getIndex().get(command.envelope().orderId());
 		OrderBookView view = OrderBookViewFactory.create(orderBook);
 		CancelCalculationResult result;
 
 		try {
-			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, command.acceptedSeq(), command.orderId(), command.requesterAccountId(), order));
+			result = engine.calculateCancel(new CancelCalculationInput(view, symbol, command.envelope().acceptedSeq(), command.envelope().orderId(), command.envelope().requesterAccountId(), order));
 		} catch (Exception e) {
 			runtimeOwner.transitionToDirty();
 			throw e;
@@ -157,6 +157,7 @@ public class EngineHandler {
 
 	private void persistPlace(PlaceCalculationResult.Accepted accepted) {
 		try {
+			long _ = runtimeOwner.nextEventSequence(); // TODO MVP5-005
 			engineResultCommitPort.commitPlace(accepted);
 		} catch (RetryablePersistenceException e) {
 			throw e;
@@ -168,6 +169,7 @@ public class EngineHandler {
 
 	private void persistCancel(CancelCalculationResult.Cancelled cancelled) {
 		try {
+			long _ = runtimeOwner.nextEventSequence(); // TODO MVP5-005
 			engineResultCommitPort.commitCancel(cancelled);
 		} catch (RetryablePersistenceException e) {
 			throw e;

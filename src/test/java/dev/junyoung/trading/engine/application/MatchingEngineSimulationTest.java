@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.entity.Trade;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
@@ -204,7 +205,7 @@ class MatchingEngineSimulationTest {
         // 불변식 2: MARKET 주문 최종 상태는 FILLED 또는 CANCELLED 이어야 함
         long marketStateViolations = marketOrderIds.stream()
             .map(latestOrders::get)
-            .filter(o -> o != null)
+            .filter(Objects::nonNull)
             .filter(o -> o.getStatus() != OrderStatus.FILLED && o.getStatus() != OrderStatus.CANCELLED)
             .count();
 

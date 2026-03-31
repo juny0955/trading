@@ -112,7 +112,8 @@ class EngineRestartIntegrationTest {
             orderBookProjectionApplier,
             engineResultCommitPort,
             orderBookRebuilder,
-            engineMetrics
+            engineMetrics,
+            0L
         );
 
         OrderBookSnapshot snapshot = orderBookCachePort.getSnapshot(SYMBOL);

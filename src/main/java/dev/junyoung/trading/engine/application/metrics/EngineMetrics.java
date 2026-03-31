@@ -100,13 +100,13 @@ public class EngineMetrics {
             .register(meterRegistry);
 
         this.queueWaitLatencyTimer = Timer.builder("queue_wait_latency")
-            .description("Time from command enqueue to dequeue (queue wait)")
+            .description("Time from envelope enqueue to dequeue (queue wait)")
             .publishPercentiles(0.5, 0.95, 0.99)
             .publishPercentileHistogram()
             .register(meterRegistry);
 
         this.engineProcessingLatencyTimer = Timer.builder("engine_processing_latency")
-            .description("Time to process a single engine command")
+            .description("Time to process a single engine envelope")
             .publishPercentiles(0.5, 0.95, 0.99)
             .publishPercentileHistogram()
             .register(meterRegistry);

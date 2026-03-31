@@ -44,6 +44,24 @@ class JooqOrderRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        for (String asset : new String[]{"BTC", "USDT", "ETH", "KRW"}) {
+            dslContext.insertInto(Tables.ASSETS)
+                    .set(Tables.ASSETS.ASSET_CODE, asset).set(Tables.ASSETS.STATUS, "ACTIVE")
+                    .set(Tables.ASSETS.CREATED_AT, Instant.now()).set(Tables.ASSETS.UPDATED_AT, Instant.now())
+                    .onConflict(Tables.ASSETS.ASSET_CODE).doNothing().execute();
+        }
+        dslContext.insertInto(Tables.SYMBOLS)
+                .set(Tables.SYMBOLS.SYMBOL, "BTCUSDT").set(Tables.SYMBOLS.BASE_ASSET, "BTC")
+                .set(Tables.SYMBOLS.QUOTE_ASSET, "USDT").set(Tables.SYMBOLS.STEP_SIZE, 1L)
+                .set(Tables.SYMBOLS.STATUS, "ACTIVE")
+                .set(Tables.SYMBOLS.CREATED_AT, Instant.now()).set(Tables.SYMBOLS.UPDATED_AT, Instant.now())
+                .onConflict(Tables.SYMBOLS.SYMBOL).doNothing().execute();
+        dslContext.insertInto(Tables.SYMBOLS)
+                .set(Tables.SYMBOLS.SYMBOL, "ETHKRW").set(Tables.SYMBOLS.BASE_ASSET, "ETH")
+                .set(Tables.SYMBOLS.QUOTE_ASSET, "KRW").set(Tables.SYMBOLS.STEP_SIZE, 1L)
+                .set(Tables.SYMBOLS.STATUS, "ACTIVE")
+                .set(Tables.SYMBOLS.CREATED_AT, Instant.now()).set(Tables.SYMBOLS.UPDATED_AT, Instant.now())
+                .onConflict(Tables.SYMBOLS.SYMBOL).doNothing().execute();
         dslContext.insertInto(Tables.ACCOUNTS)
                 .set(Tables.ACCOUNTS.ACCOUNT_ID, OrderFixture.DEFAULT_ACCOUNT_ID.value())
                 .set(Tables.ACCOUNTS.CREATED_AT, Instant.now())
@@ -156,7 +174,7 @@ class JooqOrderRepositoryTest {
             List<Order> result = repository.findAcceptedOrdersBySymbol(SYMBOL);
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+            assertThat(result.getFirst().getStatus()).isEqualTo(OrderStatus.ACCEPTED);
         }
 
         @Test

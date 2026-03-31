@@ -32,10 +32,10 @@ import dev.junyoung.trading.engine.application.exception.RetryablePersistenceExc
 import dev.junyoung.trading.engine.application.loop.EngineCommand;
 import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolStatus;
 import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
-import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.PlaceRejectCode;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.MatchingEngineTest;
 import dev.junyoung.trading.order.domain.model.entity.Order;
@@ -95,7 +95,7 @@ class EngineHandlerTest {
 		lenient().when(orderBook.bidsSnapshot()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value).reversed()));
 		lenient().when(orderBook.asksSnapshot()).thenReturn(new TreeMap<>(Comparator.comparing(Price::value)));
 		lenient().when(orderBook.getIndex()).thenReturn(new HashMap<>());
-		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolState.ACTIVE);
+		lenient().when(runtimeOwner.state()).thenReturn(EngineSymbolStatus.ACTIVE);
 		handler = new EngineHandler(SYMBOL, engine, orderBook, orderBookStateApplier, orderBookCachePort, engineResultCommitPort, runtimeOwner, engineMetrics);
 	}
 
@@ -508,7 +508,7 @@ class EngineHandlerTest {
 		@DisplayName("ACTIVE가 아닌 상태에서 커맨드 수신 시 engine/persist/cache를 호출하지 않는다")
 		void nonActiveState_commandDropped_noInteractions() {
 			Order order = buyOrder(10_000, 5);
-			when(runtimeOwner.state()).thenReturn(EngineSymbolState.REBUILDING);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolStatus.REBUILDING);
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 
@@ -519,7 +519,7 @@ class EngineHandlerTest {
 		@DisplayName("DIRTY 상태에서 커맨드 수신 시 engine/persist/cache를 호출하지 않는다")
 		void dirtyState_commandDropped_noInteractions() {
 			Order order = buyOrder(10_000, 5);
-			when(runtimeOwner.state()).thenReturn(EngineSymbolState.DIRTY);
+			when(runtimeOwner.state()).thenReturn(EngineSymbolStatus.DIRTY);
 
 			handler.handle(new EngineCommand.PlaceOrder(order, Instant.now(), Instant.now()));
 

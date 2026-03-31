@@ -7,7 +7,7 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.domain.model.value.OrderId;
 import dev.junyoung.trading.shared.domain.value.Price;
 

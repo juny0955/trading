@@ -5,7 +5,7 @@ import java.util.Comparator;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
 import dev.junyoung.trading.shared.domain.value.Price;
 import dev.junyoung.trading.shared.domain.value.Quantity;

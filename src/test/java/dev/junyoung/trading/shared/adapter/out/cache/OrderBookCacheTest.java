@@ -3,7 +3,7 @@ package dev.junyoung.trading.shared.adapter.out.cache;
 import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
 import dev.junyoung.trading.order.fixture.OrderFixture;
 
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.shared.domain.entity.OrderBookSnapshot;
 import dev.junyoung.trading.shared.domain.enums.Side;

@@ -18,7 +18,7 @@ import dev.junyoung.trading.engine.application.metrics.ReplayMetrics;
 import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.application.port.out.EngineSymbolStateRepository;
 import dev.junyoung.trading.engine.application.service.EngineStartupRecoveryService;
-import dev.junyoung.trading.engine.domain.model.EngineSymbolState;
+import dev.junyoung.trading.engine.domain.entity.EngineSymbolState;
 import dev.junyoung.trading.order.application.exception.UnsupportedSymbolException;
 import dev.junyoung.trading.order.application.port.out.EngineCommandPort;
 import dev.junyoung.trading.shared.domain.value.Symbol;

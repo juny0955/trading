@@ -17,7 +17,7 @@ import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.order.domain.model.enums.OrderStatus;
 import dev.junyoung.trading.shared.domain.enums.Side;
@@ -129,7 +129,7 @@ public class MatchingEngineTest {
 			assertThat(result.trades()).isEmpty();
 			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
+				op instanceof BookOperation.Add(Order order) && order.getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
@@ -141,7 +141,7 @@ public class MatchingEngineTest {
 			assertThat(result.trades()).isEmpty();
 			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
+				op instanceof BookOperation.Add(Order order) && order.getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
@@ -154,7 +154,7 @@ public class MatchingEngineTest {
 			assertThat(result.trades()).isEmpty();
 			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
+				op instanceof BookOperation.Add(Order order) && order.getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
@@ -167,7 +167,7 @@ public class MatchingEngineTest {
 			assertThat(result.trades()).isEmpty();
 			assertThat(findOrder(result, taker.getOrderId()).getStatus()).isEqualTo(OrderStatus.NEW);
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
+				op instanceof BookOperation.Add(Order order) && order.getOrderId().equals(taker.getOrderId()));
 		}
 	}
 
@@ -198,7 +198,7 @@ public class MatchingEngineTest {
 
 			assertThat(result.bookOps()).noneMatch(op -> op instanceof BookOperation.Add);
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Remove r && r.orderId().equals(maker.getOrderId()));
+				op instanceof BookOperation.Remove(OrderId orderId) && orderId.equals(maker.getOrderId()));
 		}
 
 		@Test
@@ -250,7 +250,7 @@ public class MatchingEngineTest {
 			assertThat(finalTaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 			assertThat(finalTaker.getRemaining()).isEqualTo(new Quantity(7));
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Add a && a.order().getOrderId().equals(taker.getOrderId()));
+				op instanceof BookOperation.Add(Order order) && order.getOrderId().equals(taker.getOrderId()));
 		}
 
 		@Test
@@ -267,7 +267,7 @@ public class MatchingEngineTest {
 			assertThat(finalMaker.getStatus()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
 			assertThat(finalMaker.getRemaining()).isEqualTo(new Quantity(7));
 			assertThat(result.bookOps()).anyMatch(op ->
-				op instanceof BookOperation.Replace r && r.updatedOrder().getOrderId().equals(maker.getOrderId()));
+				op instanceof BookOperation.Replace(Order updatedOrder) && updatedOrder.getOrderId().equals(maker.getOrderId()));
 		}
 	}
 

@@ -10,7 +10,7 @@ import dev.junyoung.trading.engine.application.dto.CancelCalculationResult;
 import dev.junyoung.trading.engine.application.dto.CancelResultCode;
 import dev.junyoung.trading.engine.application.dto.PlaceCalculationResult;
 
-import dev.junyoung.trading.engine.domain.model.PlaceRejectCode;
+import dev.junyoung.trading.engine.domain.entity.PlaceRejectCode;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
 import dev.junyoung.trading.engine.domain.service.dto.PlaceCalculationInput;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;

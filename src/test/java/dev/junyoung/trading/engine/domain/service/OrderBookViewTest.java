@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.junyoung.trading.engine.application.book.OrderBookViewFactory;
 import dev.junyoung.trading.engine.domain.service.state.OrderBookView;
 import dev.junyoung.trading.engine.domain.exception.OrderBookInvariantViolationException;
-import dev.junyoung.trading.engine.domain.model.OrderBook;
+import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.order.domain.model.entity.Order;
 import dev.junyoung.trading.shared.domain.enums.Side;
 import dev.junyoung.trading.order.domain.model.enums.TimeInForce;

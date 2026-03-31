@@ -7,7 +7,7 @@ import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 
 import dev.junyoung.trading.engine.application.port.out.EngineSymbolStateRepository;
-import dev.junyoung.trading.engine.domain.model.EngineSymbolState;
+import dev.junyoung.trading.engine.domain.entity.EngineSymbolState;
 import dev.junyoung.trading.jooq.Tables;
 import lombok.RequiredArgsConstructor;
 

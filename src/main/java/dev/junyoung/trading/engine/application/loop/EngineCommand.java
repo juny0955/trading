@@ -46,18 +46,6 @@ public sealed interface EngineCommand
 		public CancelOrder(long acceptedSeq, OrderId orderId, AccountId requesterAccountId, Symbol symbol, Instant serviceEnteredAt, Instant enqueuedAt) {
 			this(new CancelCommandEnvelope(symbol, acceptedSeq, orderId, requesterAccountId), serviceEnteredAt, enqueuedAt);
 		}
-
-		public long acceptedSeq() {
-			return command.acceptedSeq();
-		}
-
-		public OrderId orderId() {
-			return command.orderId();
-		}
-
-		public AccountId requesterAccountId() {
-			return command.requesterAccountId();
-		}
 	}
 
 	/**

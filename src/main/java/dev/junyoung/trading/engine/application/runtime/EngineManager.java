@@ -70,7 +70,7 @@ public class EngineManager implements EngineCommandPort {
             Symbol symbol = engineSymbolState.symbol();
             engineStartupRecoveryService.cleanupOrphanAccepted(symbol);
 
-            EngineRuntime runtime = createEngineRuntime(symbol);
+            EngineRuntime runtime = createEngineRuntime(symbol, engineSymbolState.lastEventSequence());
             recordReplayDuration(symbol, symStart);
 
             runtimes.put(symbol, runtime);
@@ -117,14 +117,15 @@ public class EngineManager implements EngineCommandPort {
         runtime.submit(new EngineCommand.CancelOrder(command, serviceEnteredAt, null));
     }
 
-    private EngineRuntime createEngineRuntime(Symbol symbol) {
+    private EngineRuntime createEngineRuntime(Symbol symbol, long lastEventSequence) {
         return new EngineRuntime(
             symbol,
             orderBookCachePort,
             orderBookProjectionApplier,
             engineResultCommitPort,
             orderBookRebuilder,
-            engineMetrics
+            engineMetrics,
+            lastEventSequence
         );
     }
 

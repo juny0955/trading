@@ -3,6 +3,7 @@ package dev.junyoung.trading.engine.application.runtime;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
@@ -47,6 +48,7 @@ public class EngineRuntime implements EngineRuntimeOwner {
     private final EngineLoop engineLoop;
     private final OrderBookCachePort orderBookCachePort;
     private final OrderBookRebuilder orderBookRebuilder;
+    private final AtomicLong eventSequence;
 
     /** 심볼별 큐·스레드·핸들러를 조립하고 {@link EngineLoop}를 초기화한다. */
     public EngineRuntime(
@@ -55,12 +57,14 @@ public class EngineRuntime implements EngineRuntimeOwner {
         OrderBookProjectionApplier orderBookProjectionApplier,
         EngineResultCommitPort engineResultCommitPort,
         OrderBookRebuilder orderBookRebuilder,
-        EngineMetrics engineMetrics
+        EngineMetrics engineMetrics,
+        long lastEventSequence
     ) {
         this.symbol = symbol;
         this.orderBook = new OrderBook();
         this.orderBookCachePort = orderBookCachePort;
         this.orderBookRebuilder = orderBookRebuilder;
+        this.eventSequence = new AtomicLong(lastEventSequence);
         attemptRebuild();
         BlockingQueue<EngineCommand> queue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
         engineMetrics.registerQueueDepthGauge(symbol.value(), queue);
@@ -77,6 +81,9 @@ public class EngineRuntime implements EngineRuntimeOwner {
 
     /** engine-thread를 시작한다. */
     public void start() { engineLoop.start(); }
+
+    /** 심볼별 단조 증가 event_sequence를 발급한다. */
+    public long nextEventSequence() { return eventSequence.incrementAndGet(); }
 
     /** engine-thread를 중단하고 자원을 반납한다. */
     public void stop() { engineLoop.stop(); }

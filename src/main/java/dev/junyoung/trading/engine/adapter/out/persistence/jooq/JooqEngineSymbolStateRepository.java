@@ -25,6 +25,5 @@ public class JooqEngineSymbolStateRepository implements EngineSymbolStateReposit
 				.on(Tables.SYMBOLS.SYMBOL.eq(Tables.SYMBOL_STATES.SYMBOL))
 			.where(Tables.SYMBOLS.STATUS.eq("ACTIVE"))
 			.fetch(JooqEngineSymbolStateMapper::toDomain);
-
 	}
 }

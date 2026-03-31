@@ -88,7 +88,7 @@ class EngineRuntimeTest {
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultCommitPort, orderBookRebuilder, engineMetrics, 0L);
             runtime.start();
 
-            assertThat(runtime.state()).isEqualTo(EngineSymbolState.ACTIVE);
+            assertThat(runtime.state()).isEqualTo(EngineSymbolStatus.ACTIVE);
             runtime.submit(placeOrder());
         }
 
@@ -160,11 +160,11 @@ class EngineRuntimeTest {
             runtime = new EngineRuntime(SYMBOL, orderBookCachePort, orderBookProjectionApplier, engineResultCommitPort, orderBookRebuilder, engineMetrics, 0L);
             runtime.start();
             runtime.transitionToRebuilding();
-            assertThat(runtime.state()).isEqualTo(EngineSymbolState.REBUILDING);
+            assertThat(runtime.state()).isEqualTo(EngineSymbolStatus.REBUILDING);
 
             runtime.attemptRebuild();
 
-            assertThat(runtime.state()).isEqualTo(EngineSymbolState.ACTIVE);
+            assertThat(runtime.state()).isEqualTo(EngineSymbolStatus.ACTIVE);
         }
 
         @Test
@@ -177,7 +177,7 @@ class EngineRuntimeTest {
 
             runtime.attemptRebuild();
 
-            assertThat(runtime.state()).isEqualTo(EngineSymbolState.DIRTY);
+            assertThat(runtime.state()).isEqualTo(EngineSymbolStatus.DIRTY);
         }
 
         @Test

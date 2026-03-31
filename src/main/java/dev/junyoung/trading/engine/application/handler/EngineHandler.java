@@ -18,7 +18,7 @@ import dev.junyoung.trading.engine.application.loop.EngineLoop;
 import dev.junyoung.trading.engine.application.metrics.EngineMetrics;
 import dev.junyoung.trading.engine.application.port.out.EngineResultCommitPort;
 import dev.junyoung.trading.engine.application.runtime.EngineRuntimeOwner;
-import dev.junyoung.trading.engine.application.runtime.EngineSymbolState;
+import dev.junyoung.trading.engine.application.runtime.EngineSymbolStatus;
 import dev.junyoung.trading.engine.domain.entity.OrderBook;
 import dev.junyoung.trading.engine.domain.service.MatchingEngine;
 import dev.junyoung.trading.engine.domain.service.dto.CancelCalculationInput;
@@ -71,7 +71,7 @@ public class EngineHandler {
 	 * </ul>
 	 */
 	public void handle(EngineCommand command) {
-		if (runtimeOwner.state() != EngineSymbolState.ACTIVE) {
+		if (runtimeOwner.state() != EngineSymbolStatus.ACTIVE) {
 			log.warn("Command dropped: engine not ACTIVE: state={}, symbol={}", runtimeOwner.state(), symbol);
 			return;
 		}

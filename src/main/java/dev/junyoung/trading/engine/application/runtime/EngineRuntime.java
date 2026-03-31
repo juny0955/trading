@@ -35,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EngineRuntime implements EngineRuntimeOwner {
 
-    private volatile EngineSymbolState state = EngineSymbolState.REBUILDING;
+    private volatile EngineSymbolStatus state = EngineSymbolStatus.REBUILDING;
 
     // -------------------------------------------------------------------------
     // 생성자
@@ -102,31 +102,31 @@ public class EngineRuntime implements EngineRuntimeOwner {
      * 클라이언트가 예외 없이 요청이 드롭될 수 있으나, 정합성은 항상 보장된다.</p>
      */
     public void submit(EngineCommand engineCommand) {
-        if (state != EngineSymbolState.ACTIVE)
+        if (state != EngineSymbolStatus.ACTIVE)
             throw new EngineNotActiveException(state);
         engineLoop.submit(engineCommand);
     }
 
     @Override
-    public EngineSymbolState state() {
+    public EngineSymbolStatus state() {
         return state;
     }
 
     @Override
     public void transitionToActive() {
-        state = EngineSymbolState.ACTIVE;
+        state = EngineSymbolStatus.ACTIVE;
         log.info("[{}] Engine transitioning to ACTIVE", symbol.value());
     }
 
     @Override
     public void transitionToRebuilding() {
-        state = EngineSymbolState.REBUILDING;
+        state = EngineSymbolStatus.REBUILDING;
         log.warn("[{}] Engine transitioning to REBUILDING — rebuild required", symbol.value());
     }
 
     @Override
     public void transitionToDirty() {
-        state = EngineSymbolState.DIRTY;
+        state = EngineSymbolStatus.DIRTY;
         log.error("[{}] Engine transitioning to DIRTY — manual intervention required", symbol.value());
     }
 

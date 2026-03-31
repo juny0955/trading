@@ -157,6 +157,7 @@ public class EngineHandler {
 
 	private void persistPlace(PlaceCalculationResult.Accepted accepted) {
 		try {
+			long _ = runtimeOwner.nextEventSequence(); // TODO MVP5-005
 			engineResultCommitPort.commitPlace(accepted);
 		} catch (RetryablePersistenceException e) {
 			throw e;
@@ -168,6 +169,7 @@ public class EngineHandler {
 
 	private void persistCancel(CancelCalculationResult.Cancelled cancelled) {
 		try {
+			long _ = runtimeOwner.nextEventSequence(); // TODO MVP5-005
 			engineResultCommitPort.commitCancel(cancelled);
 		} catch (RetryablePersistenceException e) {
 			throw e;

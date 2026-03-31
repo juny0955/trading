@@ -82,9 +82,6 @@ public class EngineRuntime implements EngineRuntimeOwner {
     /** engine-thread를 시작한다. */
     public void start() { engineLoop.start(); }
 
-    /** 심볼별 단조 증가 event_sequence를 발급한다. */
-    public long nextEventSequence() { return eventSequence.incrementAndGet(); }
-
     /** engine-thread를 중단하고 자원을 반납한다. */
     public void stop() { engineLoop.stop(); }
 
@@ -105,6 +102,14 @@ public class EngineRuntime implements EngineRuntimeOwner {
         if (state != EngineSymbolStatus.ACTIVE)
             throw new EngineNotActiveException(state);
         engineLoop.submit(engineCommand);
+    }
+
+    /**
+     * 심볼별 단조 증가 event_sequence를 발급한다.
+     */
+    @Override
+    public long nextEventSequence() {
+        return eventSequence.incrementAndGet();
     }
 
     @Override

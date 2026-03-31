@@ -148,7 +148,7 @@ class EngineManagerTest {
             );
             engineManager.start();
 
-            assertThatCode(() -> engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now())).doesNotThrowAnyException();
+            assertThatCode(() -> engineManager.submitPlace(placeOrder("BTC"), Instant.now())).doesNotThrowAnyException();
         }
 
         @Test
@@ -170,7 +170,7 @@ class EngineManagerTest {
 
             assertThrows(
                 UnsupportedSymbolException.class,
-                () -> engineManager.submitPlace(new Symbol("XRP"), placeOrder("XRP"), Instant.now())
+                () -> engineManager.submitPlace(placeOrder("XRP"), Instant.now())
             );
         }
     }
@@ -213,7 +213,7 @@ class EngineManagerTest {
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now());
+                        engineManager.submitPlace(placeOrder("BTC"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) {
                     } finally {
@@ -239,14 +239,14 @@ class EngineManagerTest {
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submitPlace(new Symbol("BTC"), placeOrder("BTC"), Instant.now());
+                        engineManager.submitPlace(placeOrder("BTC"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) { } finally { doneLatch.countDown(); }
                 }).start();
                 new Thread(() -> {
                     try {
                         startGate.await();
-                        engineManager.submitPlace(new Symbol("ETH"), placeOrder("ETH"), Instant.now());
+                        engineManager.submitPlace(placeOrder("ETH"), Instant.now());
                         successCount.incrementAndGet();
                     } catch (Exception ignored) { } finally { doneLatch.countDown(); }
                 }).start();

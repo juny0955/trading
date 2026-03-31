@@ -84,7 +84,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             @Override
             public void afterCommit() {
                 try {
-                    engineCommandPort.submitPlace(order.getSymbol(), order, serviceEnteredAt);
+                    engineCommandPort.submitPlace(order, serviceEnteredAt);
                     orderMetrics.incrementAcceptedOrderTps();
                 } catch (Exception e) {
                     try {

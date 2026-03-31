@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-import dev.junyoung.trading.engine.application.EngineManager;
 import dev.junyoung.trading.engine.application.book.OrderBookProjectionApplier;
 import dev.junyoung.trading.engine.application.book.OrderBookRebuilder;
 import dev.junyoung.trading.engine.application.book.OrderBookSnapshotMapper;
